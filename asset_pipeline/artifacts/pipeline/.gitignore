@@ -46,3 +46,5 @@
 /export_scenes_mujoco.success
 /export_objects_mujoco.json
 /export_objects_mujoco.success
+/export_objects_mujoco_debug.json
+/export_scenes_mujoco_debug.json

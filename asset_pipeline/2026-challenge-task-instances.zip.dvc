@@ -1,0 +1,13 @@
+md5: 8c0451bfd1d6927dd1a5223ff6ede138
+frozen: true
+deps:
+- checksum: '"32a3b3eae03522a517702f77cd018a00c4f0ff34379fff8af7b0eb32f5e7b391"'
+  size: 108543852
+  hash: md5
+  path: 
+    https://huggingface.co/datasets/behavior-1k/zipped-datasets/resolve/main/2026-challenge-task-instances.zip
+outs:
+- md5: 16c4d0bc4137486bd4bb661d08f00b4f
+  size: 108543852
+  hash: md5
+  path: 2026-challenge-task-instances.zip

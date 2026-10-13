@@ -575,6 +575,9 @@ stages:
     - artifacts/pipeline/aggregate_metadata.success
     - b1k_pipeline/export_objects_mujoco.py
     - b1k_pipeline/export_glbs.py
+    - b1k_pipeline/mujoco_common.py
+    - ../bddl3/bddl/generated_data/output_hierarchy_properties.json
+    - VERSION
     outs:
     - artifacts/parallels/objects_mujoco.zip
     - artifacts/pipeline/export_objects_mujoco.json
@@ -932,9 +935,14 @@ stages:
     deps:
     - artifacts/parallels/scenes.zip
     - artifacts/parallels/objects.zip
+    - artifacts/parallels/objects_mujoco.zip
     - artifacts/pipeline/export_scenes.success
     - artifacts/pipeline/export_objs.success
+    - artifacts/pipeline/export_objects_mujoco.success
+    - 2026-challenge-task-instances.zip
     - b1k_pipeline/export_scenes_mujoco.py
+    - b1k_pipeline/mujoco_common.py
+    - b1k_pipeline/mujoco_scene_utils.py
     - b1k_pipeline/assets/skybox.png
     - params.yaml
     outs:

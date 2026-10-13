@@ -1,0 +1,13 @@
+md5: 953ae7f1da22f08d8dfcfcd129d63da3
+frozen: true
+deps:
+- checksum: '"24a0a91395c5430dcf8ec7de22da4a7582b6906a"'
+  size: 22202
+  hash: md5
+  path: 
+    https://huggingface.co/datasets/behavior-1k/2026-challenge-demos/resolve/main/meta/tasks.jsonl
+outs:
+- md5: 6917de2c4aaf7406f1ced3295b8c7f8d
+  size: 22202
+  hash: md5
+  path: 2026-challenge-tasks.jsonl

@@ -17,3 +17,5 @@ selenium>=4.1.5
 sshfs>=2022.6.0
 tqdm>=4.64.0
 trimesh>=3.12.0
+# The MuJoCo export's scenes need a MuJoCo with anisotropic frame scale; objects load in 3.15.
+mujoco>=3.15

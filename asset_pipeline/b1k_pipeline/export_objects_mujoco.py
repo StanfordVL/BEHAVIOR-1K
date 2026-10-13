@@ -1,3 +1,5 @@
+import argparse
+import dataclasses
 import glob
 import json
 import multiprocessing
@@ -19,6 +21,7 @@ from scipy.spatial.transform import Rotation as R
 import tqdm
 
 import b1k_pipeline.utils
+from b1k_pipeline import mujoco_common
 from b1k_pipeline.export_glbs import (
     GLASS_MATERIAL_KWARGS,
     _apply_material,
@@ -64,11 +67,14 @@ META_TYPE_REPRESENTATIONS = {
 
 DIMENSIONLESS_SITE_RADIUS = 0.005
 
-# Geom/site groups: 2 = visual, 3 = collision, 4 = meta volumes/sites. Groups
-# above 2 are hidden by default in the MuJoCo visualizer.
-VISUAL_GROUP = "2"
-COLLISION_GROUP = "3"
-META_GROUP = "4"
+# Geom/site groups (see mujoco_common): 0 = collision, 2 = visual, 4 = meta
+# volumes/sites. Groups above 2 are hidden by default in the MuJoCo visualizer.
+VISUAL_GROUP = str(mujoco_common.VISUAL_GROUP)
+COLLISION_GROUP = str(mujoco_common.COLLISION_GROUP)
+META_GROUP = str(mujoco_common.META_GROUP)
+
+# Volume meta link types: their meshes become geoms rather than sites.
+VOLUME_META_TYPES = ("fillable", "openfillable")
 
 
 def _fmt(values):
@@ -151,13 +157,32 @@ def _export_link_glb(link, urdf_dir, is_glass, out_path):
     return True
 
 
-def _add_meta_sites_from_metadata(body_xml, link_name, meta_links):
+def _record_meta_element(meta_records, meta_type, meta_id, link, body, element_xml):
+    """Record a meta element in b1k_metadata's `meta_links` table.
+
+    Positions, orientations and sizes are in the frame of the body that holds
+    the element, unscaled, and names are those written into this MJCF (attach
+    prefixes them in scenes)."""
+    attrib = element_xml.attrib
+    record = {"link": link, "body": body, "element": element_xml.tag, "name": attrib["name"]}
+    if element_xml.tag in ("site", "geom"):
+        record["shape"] = attrib.get("type", "sphere")
+    for key in ("pos", "quat", "size", "dir"):
+        if key in attrib:
+            record[key] = [float(x) for x in attrib[key].split()]
+    if "mesh" in attrib:
+        record["mesh"] = attrib["mesh"]
+    meta_records.setdefault(meta_type, {}).setdefault(str(meta_id), []).append(record)
+
+
+def _add_meta_sites_from_metadata(body_xml, link_name, meta_links, meta_records):
     """Add sites/lights for the metadata-defined meta links of a link.
 
     Mirrors OmniGibson's _generate_meshes_for_primitive_meta_links conventions:
     primitives use size[0] as radius and size[2] as height with the shape origin
     at the base (offset by half height along local z); particleapplier cones are
-    flipped so the site's -z is the emission direction.
+    flipped so the site's -z is the emission direction. Each element is also
+    recorded in `meta_records` (see _record_meta_element).
     """
     for meta_type, meta_link_infos in meta_links.items():
         representation = META_TYPE_REPRESENTATIONS.get(meta_type)
@@ -180,6 +205,7 @@ def _add_meta_sites_from_metadata(body_xml, link_name, meta_links):
                         "dir": _fmt(orn.apply([0, 0, -1])),
                         "diffuse": _fmt(np.asarray(mesh_info["color"], dtype=np.float64) / 255.0),
                     }
+                    _record_meta_element(meta_records, meta_type, link_id, link_name, link_name, light_xml)
                     continue
 
                 site_attrs = {"name": name, "class": "meta_site"}
@@ -226,64 +252,190 @@ def _add_meta_sites_from_metadata(body_xml, link_name, meta_links):
                         site_attrs["quat"] = _fmt(_xyzw_to_wxyz(orn.as_quat()))
                     else:
                         raise ValueError(f"Unknown meta link primitive type {shape_type} for {name}")
-                ET.SubElement(body_xml, "site").attrib = site_attrs
+                site_xml = ET.SubElement(body_xml, "site", site_attrs)
+                _record_meta_element(meta_records, meta_type, link_id, link_name, link_name, site_xml)
 
 
-# Supported element types for mjs_scaleElement. Any MJCF element outside this
-# set will cause non-uniform scaling to silently produce wrong geometry, so we
-# validate at export time to fail fast.
-_SCALABLE_GEOM_TYPES = {"mesh"}
-_SCALABLE_SITE_TYPES = {"box", "cylinder", "ellipsoid"}
-_SCALABLE_JOINT_TYPES = {"hinge", "slide"}
+def _xml_rotation(element_xml):
+    """Rotation matrix of an MJCF element's `quat` (the only orientation
+    attribute this exporter writes)."""
+    for attr in ("euler", "axisangle", "xyaxes", "zaxis"):
+        assert attr not in element_xml.attrib, f"Unexpected {attr} on {element_xml.attrib.get('name')}"
+    if "quat" not in element_xml.attrib:
+        return np.eye(3)
+    w, x, y, z = (float(v) for v in element_xml.attrib["quat"].split())
+    return R.from_quat([x, y, z, w]).as_matrix()
 
 
-def _validate_scalable_mjcf(root):
-    """Validate that the assembled MJCF only contains element types that the
-    MuJoCo attach-scale system can handle correctly.
+def anisotropic_scaling_problems(root):
+    """Why a frame scale `sx sy sz` with `scaling="geometry"` wouldn't compile.
 
-    Raises ValueError if any unsupported element is found, so errors are caught
-    at export time rather than at scene-assembly time.
+    MuJoCo stretches each shape in its own coordinates, so a non-uniform frame
+    scale requires every hinge and slide joint, and every box, ellipsoid or
+    plane geom, to be aligned with the frame's axes; meshes always work, and
+    other primitives can't be stretched arbitrarily. Objects are scaled in
+    their base link's frame, so alignment is checked in that frame.
+
+    Returns:
+        A list of problems, empty if any anisotropic scale works.
     """
-    model_id = root.attrib.get("model", "<unknown>")
+    problems = []
 
-    for body_xml in root.iter("body"):
-        for geom_xml in body_xml.findall("geom"):
-            geom_type = geom_xml.attrib.get("type", "sphere")  # MuJoCo default
-            geom_name = geom_xml.attrib.get("name", "<unnamed>")
-            if geom_type not in _SCALABLE_GEOM_TYPES:
-                raise ValueError(
-                    f"[{model_id}] Geom '{geom_name}' has type '{geom_type}', "
-                    f"only {_SCALABLE_GEOM_TYPES} geom types are supported for scaling"
-                )
-
-        for site_xml in body_xml.findall("site"):
-            site_type = site_xml.attrib.get("type", "sphere")  # MuJoCo default
-            site_name = site_xml.attrib.get("name", "<unnamed>")
-            if site_type not in _SCALABLE_SITE_TYPES:
-                raise ValueError(
-                    f"[{model_id}] Site '{site_name}' has type '{site_type}', "
-                    f"only {_SCALABLE_SITE_TYPES} site types are supported for scaling"
-                )
-
+    def visit(body_xml, rotation):
         for joint_xml in body_xml.findall("joint"):
-            joint_type = joint_xml.attrib.get("type", "hinge")  # MuJoCo default
-            joint_name = joint_xml.attrib.get("name", "<unnamed>")
-            if joint_type not in _SCALABLE_JOINT_TYPES:
-                raise ValueError(
-                    f"[{model_id}] Joint '{joint_name}' has type '{joint_type}', "
-                    f"only {_SCALABLE_JOINT_TYPES} joint types are supported for scaling"
+            joint_type = joint_xml.attrib.get("type", "hinge")
+            if joint_type not in ("hinge", "slide"):
+                problems.append(f"joint {joint_xml.attrib.get('name')} has type {joint_type}")
+                continue
+            axis = np.array([float(v) for v in joint_xml.attrib.get("axis", "0 0 1").split()])
+            if not mujoco_common.is_axis_aligned(rotation @ axis):
+                problems.append(
+                    f"joint {joint_xml.attrib.get('name')} axis {_fmt(rotation @ axis)} is not aligned"
                 )
+        for geom_xml in body_xml.findall("geom"):
+            geom_type = geom_xml.attrib.get("type", "sphere")
+            name = geom_xml.attrib.get("name")
+            if "fromto" in geom_xml.attrib:
+                problems.append(f"geom {name} uses fromto")
+            elif geom_type == "mesh":
+                continue
+            elif geom_type in ("box", "ellipsoid", "plane"):
+                if not mujoco_common.is_frame_aligned(rotation @ _xml_rotation(geom_xml)):
+                    problems.append(f"{geom_type} geom {name} is not aligned")
+            else:
+                problems.append(f"{geom_type} geom {name} can't be stretched anisotropically")
+        for child_xml in body_xml.findall("body"):
+            visit(child_xml, rotation @ _xml_rotation(child_xml))
+        for frame_xml in body_xml.findall("frame"):
+            visit(frame_xml, rotation @ _xml_rotation(frame_xml))
 
-    # Reject elements that the scaling system does not handle at all.
-    for tag in ("actuator", "tendon", "equality", "sensor"):
+    for base_body_xml in root.find("worldbody").findall("body"):
+        # The base link's own orientation is the frame the scale applies in.
+        visit(base_body_xml, np.eye(3))
+
+    for tag in ("flexcomp", "flex", "skin", "plugin"):
         if root.find(f".//{tag}") is not None:
-            raise ValueError(
-                f"[{model_id}] MJCF contains <{tag}> elements which are not "
-                f"supported for scaling"
-            )
+            problems.append(f"contains <{tag}>")
+
+    return problems
 
 
-def urdf_to_mjz(in_obj_dir, out_obj_dir):
+def assert_anisotropically_scalable(root):
+    """Raise ValueError, listing every problem, unless any anisotropic frame
+    scale of the object compiles."""
+    problems = anisotropic_scaling_problems(root)
+    if problems:
+        model_id = root.attrib.get("model", "<unknown>")
+        raise ValueError(f"[{model_id}] not anisotropically scalable: " + "; ".join(problems))
+
+
+def _openable_metadata(metadata, joint_names):
+    """The joints OmniGibson's Open state checks, as _get_relevant_joints sees them.
+
+    OmniGibson's USD conversion turns metadata.json's `[[id, name], ...]` into a
+    `{str(id): name}` dict, and _get_relevant_joints reads `.items()` of it, so
+    every relevant joint has direction 1. Without annotations, every joint is
+    relevant, with direction 1.
+    """
+    raw_ids = metadata.get("openable_joint_ids")
+    both_sides = bool(metadata.get("openable_both_sides", False))
+    if raw_ids:
+        as_seen = {str(pair[0]): pair[1] for pair in raw_ids}
+        names = list(as_seen.values())
+        for name in names:
+            assert name in joint_names, f"Openable joint {name} is not a joint of the object"
+        joints = [{"joint": name, "direction": 1} for name in names]
+        both_sides_seen = both_sides
+    else:
+        joints = [{"joint": name, "direction": 1} for name in joint_names]
+        both_sides_seen = False
+    return {
+        "openable_joint_ids": raw_ids,
+        "openable_both_sides": metadata.get("openable_both_sides"),
+        "both_sides": both_sides_seen,
+        "joints": joints,
+    }
+
+
+_TAXONOMY = None
+
+
+def _taxonomy_info(category):
+    """(synset, abilities) of a category from bddl's object taxonomy."""
+    global _TAXONOMY
+    if _TAXONOMY is None:
+        from bddl.object_taxonomy import ObjectTaxonomy
+
+        _TAXONOMY = ObjectTaxonomy()
+    synset = _TAXONOMY.get_synset_from_category(category)
+    if synset is None:
+        return None, {}
+    return synset, _TAXONOMY.get_abilities(synset)
+
+
+@dataclasses.dataclass
+class ObjectMjcf:
+    """An object's MJCF and the files its archive needs.
+
+    Attributes:
+        root: The <mujoco> element.
+        files: Archive name -> (mode, source path); mode "copy" copies the
+            file, "strip_obj" copies an OBJ without its material references.
+        images: Archive name -> PIL image, written as PNG.
+        metadata: The b1k_metadata dict embedded in `root`.
+        tmp_dir: Scratch directory holding generated files; the caller removes it.
+    """
+
+    root: ET.Element
+    files: dict
+    images: dict
+    metadata: dict
+    tmp_dir: str
+
+
+def mjcf_to_string(root):
+    return minidom.parseString(ET.tostring(root)).toprettyxml(indent="  ")
+
+
+def write_mjz(obj_mjcf, out_file):
+    """Write an object's MJZ: model.xml plus every referenced file."""
+    os.makedirs(os.path.dirname(out_file), exist_ok=True)
+    with zipfile.ZipFile(out_file, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(mujoco_common.ARCHIVE_ROOT_FILE, mjcf_to_string(obj_mjcf.root))
+        for archive_name, (mode, src_path) in obj_mjcf.files.items():
+            if mode == "strip_obj":
+                stripped_path = os.path.join(obj_mjcf.tmp_dir, "stripped_" + os.path.basename(archive_name))
+                _strip_obj_materials(src_path, stripped_path)
+                zf.write(stripped_path, archive_name)
+            else:
+                zf.write(src_path, archive_name)
+        for archive_name, image in obj_mjcf.images.items():
+            with zf.open(archive_name, "w") as f:
+                image.save(f, format="png")
+
+
+def validate_mjz(mjz_path):
+    """Compile an archive with MuJoCo, step it forward once, and check that its
+    bounds are finite. Imports MuJoCo lazily, since only --validate needs it."""
+    import mujoco
+
+    with tempfile.TemporaryDirectory() as tmp, zipfile.ZipFile(mjz_path) as zf:
+        zf.extractall(tmp)
+        model = mujoco.MjModel.from_xml_path(os.path.join(tmp, mujoco_common.ARCHIVE_ROOT_FILE))
+    data = mujoco.MjData(model)
+    mujoco.mj_forward(model, data)
+    if not (np.all(np.isfinite(data.geom_xpos)) and np.all(np.isfinite(model.geom_rbound))):
+        raise ValueError(f"{mjz_path}: non-finite geom positions or bounds")
+    if model.ngeom == 0:
+        raise ValueError(f"{mjz_path}: no geoms")
+
+
+def build_object_mjcf(in_obj_dir):
+    """Build an object's MJCF from its URDF directory (objects/{category}/{model}).
+
+    Returns:
+        ObjectMjcf. The caller removes its tmp_dir.
+    """
     urdf_files = glob.glob(in_obj_dir + "/urdf/*.urdf")
     assert (
         len(urdf_files) == 1
@@ -291,6 +443,7 @@ def urdf_to_mjz(in_obj_dir, out_obj_dir):
     urdf_file = urdf_files[0]
     urdf_dir = os.path.dirname(urdf_file)
     model_id = os.path.splitext(os.path.basename(urdf_file))[0]
+    category = pathlib.Path(in_obj_dir).parts[-2]
 
     metadata = {}
     metadata_file = os.path.join(in_obj_dir, "misc", "metadata.json")
@@ -299,6 +452,8 @@ def urdf_to_mjz(in_obj_dir, out_obj_dir):
             metadata = json.load(f)
     link_tags = metadata.get("link_tags") or {}
     meta_links = metadata.get("meta_links") or {}
+    # Every meta element written, for b1k_metadata (see _record_meta_element).
+    meta_records = {}
 
     robot = URDF.load(urdf_file)
     tmp_dir = tempfile.mkdtemp(prefix=f"mjcf_{model_id}_")
@@ -445,12 +600,14 @@ def urdf_to_mjz(in_obj_dir, out_obj_dir):
             ET.SubElement(body_xml, "geom", geom_attrs)
 
         # Meta links stored in metadata.json become sites/lights.
-        _add_meta_sites_from_metadata(body_xml, link.name, meta_links.get(link.name) or {})
+        _add_meta_sites_from_metadata(body_xml, link.name, meta_links.get(link.name) or {}, meta_records)
 
     def add_volume_meta_link(body_xml, link):
         """Fillable/openfillable meta links: the convex volume meshes become
         non-colliding massless geoms, plus a box site fitted to their AABB so
         MuJoCo's insidesite sensor can be used for containment checks."""
+        meta_match = META_LINK_NAME_PATTERN.fullmatch(link.name)
+        meta_type, meta_id, parent = meta_match["type"], meta_match["id"], meta_match["parent"]
         bounds = []
         for i, visual in enumerate(link.visuals):
             if visual.geometry.mesh is None:
@@ -467,7 +624,8 @@ def urdf_to_mjz(in_obj_dir, out_obj_dir):
             )
             geom_attrs = {"class": "meta_volume", "type": "mesh", "mesh": mesh_name, "name": mesh_name}
             geom_attrs.update(_pose_attrs(visual.origin))
-            ET.SubElement(body_xml, "geom", geom_attrs)
+            geom_xml = ET.SubElement(body_xml, "geom", geom_attrs)
+            _record_meta_element(meta_records, meta_type, meta_id, parent, link.name, geom_xml)
             pose = visual.origin.copy()
             S = np.eye(4)
             S[:3, :3] = np.diag(scale)
@@ -479,7 +637,7 @@ def urdf_to_mjz(in_obj_dir, out_obj_dir):
         if bounds:
             bounds = np.array(bounds)
             lo, hi = bounds[:, 0].min(axis=0), bounds[:, 1].max(axis=0)
-            ET.SubElement(
+            site_xml = ET.SubElement(
                 body_xml,
                 "site",
                 {
@@ -490,6 +648,7 @@ def urdf_to_mjz(in_obj_dir, out_obj_dir):
                     "size": _fmt(np.maximum((hi - lo) / 2.0, 1e-4)),
                 },
             )
+            _record_meta_element(meta_records, meta_type, meta_id, parent, link.name, site_xml)
 
     # Recursively build the body tree following the URDF articulation.
     children = {}  # parent link name -> list of (joint, child link)
@@ -534,32 +693,97 @@ def urdf_to_mjz(in_obj_dir, out_obj_dir):
     for child_joint in children.get(robot.base_link.name, []):
         add_body(base_body_xml, link_map[child_joint.child], child_joint)
 
-    # Validate the assembled MJCF only contains scalable element types before
-    # writing the MJZ, so problems are caught at export time.
-    _validate_scalable_mjcf(root)
+    # Scenes scale objects with frame scales. Uniform scales always work, but
+    # anisotropic ones need the object to be stretchable along its base link's
+    # axes: record whether it is, so that scene exporters can assert it for
+    # the objects they scale anisotropically.
+    scaling_problems = anisotropic_scaling_problems(root)
 
-    # Write the MJZ: the MJCF plus all referenced assets and per-link GLBs. The
-    # mjz subdirectory mirrors the usd subdirectory of the USD dataset layout,
-    # and is where the scene MJCFs (export_scenes_mujoco.py) expect to find it.
-    mjcf_str = minidom.parseString(ET.tostring(root)).toprettyxml(indent="  ")
-    mjz_dir = os.path.join(out_obj_dir, "mjz")
-    os.makedirs(mjz_dir, exist_ok=True)
-    out_file = os.path.join(mjz_dir, f"{model_id}.mjz")
+    # Contact bitmasks of structure and of the moving parts of structural doors
+    # (see mujoco_common.STRUCTURE_CONTACT).
+    if category in mujoco_common.STRUCTURE_CATEGORIES:
+        for geom in worldbody_xml.iter("geom"):
+            if geom.attrib.get("class") == "collision":
+                geom.attrib.update(mujoco_common.STRUCTURE_CONTACT)
+    elif category in mujoco_common.STRUCTURAL_DOOR_CATEGORIES:
+
+        def mark_moving(body_xml, moving):
+            moving = moving or body_xml.find("joint") is not None
+            if moving:
+                for geom in body_xml.findall("geom"):
+                    if geom.attrib.get("class") == "collision":
+                        geom.attrib.update(mujoco_common.STRUCTURAL_DOOR_CONTACT)
+            for child in body_xml.findall("body"):
+                mark_moving(child, moving)
+
+        mark_moving(base_body_xml, False)
+
+    # OmniGibson disables self-collisions of dataset objects. MuJoCo already
+    # skips a body's contacts with its parent unless the parent is static,
+    # which a fixed object's base link is, so exclude every pair of links that
+    # carry collision geoms.
+    colliding_bodies = [
+        body.attrib["name"]
+        for body in worldbody_xml.iter("body")
+        if any(g.attrib.get("class") == "collision" for g in body.findall("geom"))
+    ]
+    if len(colliding_bodies) > 1:
+        contact_xml = ET.SubElement(root, "contact")
+        for i, body1 in enumerate(colliding_bodies):
+            for body2 in colliding_bodies[i + 1 :]:
+                ET.SubElement(contact_xml, "exclude", {"body1": body1, "body2": body2})
+
+    # BEHAVIOR metadata that MJCF can't express. All lengths are unscaled: in a
+    # scene, multiply them by the instance's scale.
+    joint_names = [
+        joint.name for joint in robot.joints if joint.joint_type in ("revolute", "continuous", "prismatic")
+    ]
+    synset, abilities = _taxonomy_info(category)
+    b1k_metadata = {
+        "format": mujoco_common.METADATA_FORMAT,
+        "dataset_version": mujoco_common.DATASET_VERSION,
+        "category": category,
+        "model": model_id,
+        "synset": synset,
+        "abilities": abilities,
+        "structure": category in mujoco_common.STRUCTURE_CATEGORIES,
+        "bbox_size": metadata.get("bbox_size"),
+        "base_link_offset": metadata.get("base_link_offset"),
+        "mass": category_mass,
+        "joints": joint_names,
+        "anisotropic_scaling": {"ok": not scaling_problems, "problems": scaling_problems},
+        "openable": _openable_metadata(metadata, joint_names),
+        "meta_links": meta_records,
+        "link_tags": link_tags,
+        "object_parts": metadata.get("object_parts") or [],
+        "groups": mujoco_common.GROUPS,
+    }
+    custom_xml = ET.SubElement(root, "custom")
+    ET.SubElement(
+        custom_xml,
+        "text",
+        {"name": mujoco_common.METADATA_TEXT, "data": mujoco_common.metadata_json(b1k_metadata)},
+    )
+
+    return ObjectMjcf(root=root, files=archive_files, images=archive_images, metadata=b1k_metadata, tmp_dir=tmp_dir)
+
+
+def urdf_to_mjz(in_obj_dir, out_obj_dir, validate=False):
+    """Export an object's MJZ to {out_obj_dir}/mjz/{model}.mjz.
+
+    The mjz subdirectory mirrors the usd subdirectory of the USD dataset
+    layout. The archive holds model.xml plus all referenced assets and the
+    per-link GLBs."""
+    obj_mjcf = build_object_mjcf(in_obj_dir)
+    model_id = obj_mjcf.root.attrib["model"]
+    out_file = os.path.join(out_obj_dir, "mjz", f"{model_id}.mjz")
     try:
-        with zipfile.ZipFile(out_file, "w", zipfile.ZIP_DEFLATED) as zf:
-            zf.writestr(f"{model_id}.xml", mjcf_str)
-            for archive_name, (mode, src_path) in archive_files.items():
-                if mode == "strip_obj":
-                    stripped_path = os.path.join(tmp_dir, os.path.basename(archive_name))
-                    _strip_obj_materials(src_path, stripped_path)
-                    zf.write(stripped_path, archive_name)
-                else:
-                    zf.write(src_path, archive_name)
-            for archive_name, image in archive_images.items():
-                with zf.open(archive_name, "w") as f:
-                    image.save(f, format="png")
+        write_mjz(obj_mjcf, out_file)
     finally:
-        shutil.rmtree(tmp_dir, ignore_errors=True)
+        shutil.rmtree(obj_mjcf.tmp_dir, ignore_errors=True)
+    if validate:
+        validate_mjz(out_file)
+    return obj_mjcf.metadata["anisotropic_scaling"]["problems"]
 
 
 OBJECTS_ZIP_PATH = b1k_pipeline.utils.PIPELINE_ROOT / "artifacts" / "parallels" / "objects.zip"
@@ -574,17 +798,32 @@ def _get_source_zip():
     return _SOURCE_ZIP
 
 
-def process_object(obj_prefix, members, out_obj_dir):
+def process_object(obj_prefix, members, out_obj_dir, validate=False):
     """Extract one object's files straight from objects.zip into a scratch
     directory and export its MJZ."""
     b1k_pipeline.utils.TMP_DIR.mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(dir=str(b1k_pipeline.utils.TMP_DIR)) as scratch_dir:
         _get_source_zip().extractall(scratch_dir, members)
-        urdf_to_mjz(os.path.join(scratch_dir, obj_prefix), out_obj_dir)
+        return urdf_to_mjz(os.path.join(scratch_dir, obj_prefix), out_obj_dir, validate=validate)
 
 
 def main():
-    with b1k_pipeline.utils.ParallelZipFS("objects_mujoco.zip", write=True) as out_fs:
+    parser = argparse.ArgumentParser(description="Export every object as a MuJoCo MJZ archive.")
+    parser.add_argument(
+        "--validate",
+        action="store_true",
+        help="Compile each archive with MuJoCo, run mj_forward, and check that its bounds are finite.",
+    )
+    parser.add_argument(
+        "--objects",
+        nargs="*",
+        help="Only export these objects, given as category/model, into objects_mujoco_debug.zip.",
+    )
+    parser.add_argument("--workers", type=int, default=multiprocessing.cpu_count())
+    args = parser.parse_args()
+
+    out_name = "objects_mujoco_debug.zip" if args.objects else "objects_mujoco.zip"
+    with b1k_pipeline.utils.ParallelZipFS(out_name, write=True) as out_fs:
         # Group the zip members by object directory (objects/{category}/{model}).
         members_by_object = {}
         with zipfile.ZipFile(OBJECTS_ZIP_PATH) as zf:
@@ -600,16 +839,19 @@ def main():
             for prefix, members in members_by_object.items()
             if any(m.startswith(f"{prefix}/urdf/") and m.endswith(".urdf") for m in members)
         }
+        if args.objects:
+            wanted = {f"objects/{o}" for o in args.objects}
+            members_by_object = {p: m for p, m in members_by_object.items() if p in wanted}
 
-
-        errors = {}
-        with futures.ProcessPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
+        errors, warnings = {}, {}
+        with futures.ProcessPoolExecutor(max_workers=args.workers) as executor:
             obj_futures = {
                 executor.submit(
                     process_object,
                     prefix,
                     members,
                     out_fs.makedirs(prefix).getsyspath("/"),
+                    args.validate,
                 ): prefix
                 for prefix, members in members_by_object.items()
             }
@@ -620,7 +862,11 @@ def main():
                 desc="Processing objects",
             ):
                 try:
-                    future.result()
+                    scaling_problems = future.result()
+                    if scaling_problems:
+                        warnings[obj_futures[future]] = "not anisotropically scalable: " + "; ".join(
+                            scaling_problems
+                        )
                 except:
                     errors[obj_futures[future]] = traceback.format_exc()
                     traceback.print_exc()
@@ -628,8 +874,9 @@ def main():
         print("Finished processing")
 
     pipeline_fs = b1k_pipeline.utils.PipelineFS()
-    with pipeline_fs.pipeline_output().open("export_objects_mujoco.json", "w") as f:
-        json.dump({"success": not errors, "errors": errors}, f)
+    out_json = "export_objects_mujoco_debug.json" if args.objects else "export_objects_mujoco.json"
+    with pipeline_fs.pipeline_output().open(out_json, "w") as f:
+        json.dump({"success": not errors, "errors": errors, "warnings": warnings}, f, indent=1)
 
 
 if __name__ == "__main__":

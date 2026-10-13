@@ -10,3 +10,5 @@ b1k_pipeline/docker/isaac_cache/
 b1k_pipeline/docker/scheduler-logs/
 tmp/
 logs/
+/2026-challenge-tasks.jsonl
+/2026-challenge-task-instances.zip
