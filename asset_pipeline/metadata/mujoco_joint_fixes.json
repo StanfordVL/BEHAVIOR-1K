@@ -6,11 +6,11 @@
  "snap_tolerance_deg": 10.0,
  "scale_sources": [
   "2026-challenge-task-instances.zip",
-  "previous MuJoCo scene export (attach scales)"
+  "scenes.zip (scene URDFs)"
  ],
  "summary": {
-  "objects": 13,
-  "snapped_joints": 8,
+  "objects": 11,
+  "snapped_joints": 6,
   "fixed_joints": 7,
   "openable_joints_affected": [
    "openable_window/subxdn:j_link_0",
@@ -18,260 +18,6 @@
   ]
  },
  "objects": {
-  "carton/hhlmbi": {
-   "joints": {
-    "j_link0": {
-     "action": "snap",
-     "type": "revolute",
-     "child_link": "link0",
-     "openable": false,
-     "off_axis_deg": 2.1,
-     "nearest_base_axis": "-y",
-     "axis": [
-      0.036581444,
-      -0.999330601,
-      -0.000384806
-     ],
-     "axis_in_base_frame": [
-      0.036581444,
-      -0.999330601,
-      -0.000384806
-     ],
-     "limit": [
-      0.0,
-      2.2689279496206503
-     ]
-    }
-   },
-   "num_anisotropic_uses": 25,
-   "anisotropic_uses": [
-    {
-     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
-     "object": "carton-hhlmbi-0",
-     "scale": [
-      1.000139,
-      0.999878,
-      0.99979
-     ]
-    },
-    {
-     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
-     "object": "carton-hhlmbi-1",
-     "scale": [
-      1.000139,
-      0.999878,
-      0.99979
-     ]
-    },
-    {
-     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
-     "object": "carton-hhlmbi-10",
-     "scale": [
-      1.000139,
-      0.999878,
-      0.99979
-     ]
-    },
-    {
-     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
-     "object": "carton-hhlmbi-11",
-     "scale": [
-      1.000139,
-      0.999878,
-      0.99979
-     ]
-    },
-    {
-     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
-     "object": "carton-hhlmbi-12",
-     "scale": [
-      1.000139,
-      0.999878,
-      0.99979
-     ]
-    },
-    {
-     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
-     "object": "carton-hhlmbi-13",
-     "scale": [
-      1.000139,
-      0.999878,
-      0.99979
-     ]
-    },
-    {
-     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
-     "object": "carton-hhlmbi-14",
-     "scale": [
-      1.000139,
-      0.999878,
-      0.99979
-     ]
-    },
-    {
-     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
-     "object": "carton-hhlmbi-15",
-     "scale": [
-      1.000139,
-      0.999878,
-      0.99979
-     ]
-    },
-    {
-     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
-     "object": "carton-hhlmbi-16",
-     "scale": [
-      1.000139,
-      0.999878,
-      0.99979
-     ]
-    },
-    {
-     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
-     "object": "carton-hhlmbi-17",
-     "scale": [
-      1.000139,
-      0.999878,
-      0.99979
-     ]
-    },
-    {
-     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
-     "object": "carton-hhlmbi-18",
-     "scale": [
-      1.000139,
-      0.999878,
-      0.99979
-     ]
-    },
-    {
-     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
-     "object": "carton-hhlmbi-19",
-     "scale": [
-      1.000139,
-      0.999878,
-      0.99979
-     ]
-    },
-    {
-     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
-     "object": "carton-hhlmbi-2",
-     "scale": [
-      1.000139,
-      0.999878,
-      0.99979
-     ]
-    },
-    {
-     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
-     "object": "carton-hhlmbi-20",
-     "scale": [
-      1.000139,
-      0.999878,
-      0.99979
-     ]
-    },
-    {
-     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
-     "object": "carton-hhlmbi-21",
-     "scale": [
-      1.000139,
-      0.999878,
-      0.99979
-     ]
-    },
-    {
-     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
-     "object": "carton-hhlmbi-22",
-     "scale": [
-      1.000139,
-      0.999878,
-      0.99979
-     ]
-    },
-    {
-     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
-     "object": "carton-hhlmbi-23",
-     "scale": [
-      1.000139,
-      0.999878,
-      0.99979
-     ]
-    },
-    {
-     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
-     "object": "carton-hhlmbi-24",
-     "scale": [
-      1.000139,
-      0.999878,
-      0.99979
-     ]
-    },
-    {
-     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
-     "object": "carton-hhlmbi-3",
-     "scale": [
-      1.000139,
-      0.999878,
-      0.99979
-     ]
-    },
-    {
-     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
-     "object": "carton-hhlmbi-4",
-     "scale": [
-      1.000139,
-      0.999878,
-      0.99979
-     ]
-    },
-    {
-     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
-     "object": "carton-hhlmbi-5",
-     "scale": [
-      1.000139,
-      0.999878,
-      0.99979
-     ]
-    },
-    {
-     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
-     "object": "carton-hhlmbi-6",
-     "scale": [
-      1.000139,
-      0.999878,
-      0.99979
-     ]
-    },
-    {
-     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
-     "object": "carton-hhlmbi-7",
-     "scale": [
-      1.000139,
-      0.999878,
-      0.99979
-     ]
-    },
-    {
-     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
-     "object": "carton-hhlmbi-8",
-     "scale": [
-      1.000139,
-      0.999878,
-      0.99979
-     ]
-    },
-    {
-     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
-     "object": "carton-hhlmbi-9",
-     "scale": [
-      1.000139,
-      0.999878,
-      0.99979
-     ]
-    }
-   ]
-  },
   "coffee_maker/pyttso": {
    "joints": {
     "j_link_6": {
@@ -297,10 +43,10 @@
      ]
     }
    },
-   "num_anisotropic_uses": 4,
+   "num_anisotropic_uses": 2,
    "anisotropic_uses": [
     {
-     "source": "scenes/Wainscott_0_garden/mjcf/Wainscott_0_garden_best.xml",
+     "source": "scenes/Wainscott_0_garden/urdf/Wainscott_0_garden_best.urdf",
      "object": "coffee_maker-pyttso-0",
      "scale": [
       2.431304,
@@ -309,25 +55,7 @@
      ]
     },
     {
-     "source": "scenes/Wainscott_0_garden/mjcf/Wainscott_0_garden_with_clutter.xml",
-     "object": "coffee_maker-pyttso-0",
-     "scale": [
-      2.431304,
-      1.479625,
-      1.35498
-     ]
-    },
-    {
-     "source": "scenes/Wainscott_0_int/mjcf/Wainscott_0_int_best.xml",
-     "object": "coffee_maker-pyttso-0",
-     "scale": [
-      2.431304,
-      1.479625,
-      1.35498
-     ]
-    },
-    {
-     "source": "scenes/Wainscott_0_int/mjcf/Wainscott_0_int_with_clutter.xml",
+     "source": "scenes/Wainscott_0_int/urdf/Wainscott_0_int_best.urdf",
      "object": "coffee_maker-pyttso-0",
      "scale": [
       2.431304,
@@ -362,107 +90,15 @@
      ]
     }
    },
-   "num_anisotropic_uses": 2,
+   "num_anisotropic_uses": 1,
    "anisotropic_uses": [
     {
-     "source": "scenes/Pomaria_0_garden/mjcf/Pomaria_0_garden_best.xml",
+     "source": "scenes/Pomaria_0_garden/urdf/Pomaria_0_garden_best.urdf",
      "object": "door-ofgpit-0",
      "scale": [
       0.999848,
       0.99996,
       1.000018
-     ]
-    },
-    {
-     "source": "scenes/Pomaria_0_garden/mjcf/Pomaria_0_garden_with_clutter.xml",
-     "object": "door-ofgpit-0",
-     "scale": [
-      0.999848,
-      0.99996,
-      1.000018
-     ]
-    }
-   ]
-  },
-  "hinged_jar/gqtsam": {
-   "joints": {
-    "j_cap": {
-     "action": "snap",
-     "type": "revolute",
-     "child_link": "cap",
-     "openable": false,
-     "off_axis_deg": 5.0,
-     "nearest_base_axis": "-y",
-     "axis": [
-      0.087155918,
-      -0.996194683,
-      -2.547e-06
-     ],
-     "axis_in_base_frame": [
-      0.087155918,
-      -0.996194683,
-      -2.547e-06
-     ],
-     "limit": [
-      0.0,
-      2.6179936390781617
-     ]
-    }
-   },
-   "num_anisotropic_uses": 6,
-   "anisotropic_uses": [
-    {
-     "source": "scenes/restaurant_brunch/mjcf/restaurant_brunch_with_clutter.xml",
-     "object": "hinged_jar-gqtsam-0",
-     "scale": [
-      0.999904,
-      1.000288,
-      0.999936
-     ]
-    },
-    {
-     "source": "scenes/restaurant_brunch/mjcf/restaurant_brunch_with_clutter.xml",
-     "object": "hinged_jar-gqtsam-1",
-     "scale": [
-      0.999904,
-      1.000288,
-      0.999936
-     ]
-    },
-    {
-     "source": "scenes/restaurant_hotel/mjcf/restaurant_hotel_with_clutter.xml",
-     "object": "hinged_jar-gqtsam-0",
-     "scale": [
-      0.999904,
-      1.000288,
-      0.999936
-     ]
-    },
-    {
-     "source": "scenes/restaurant_hotel/mjcf/restaurant_hotel_with_clutter.xml",
-     "object": "hinged_jar-gqtsam-1",
-     "scale": [
-      0.999904,
-      1.000288,
-      0.999936
-     ]
-    },
-    {
-     "source": "scenes/restaurant_urban/mjcf/restaurant_urban_with_clutter.xml",
-     "object": "hinged_jar-gqtsam-0",
-     "scale": [
-      0.999904,
-      1.000288,
-      0.999936
-     ]
-    },
-    {
-     "source": "scenes/restaurant_urban/mjcf/restaurant_urban_with_clutter.xml",
-     "object": "hinged_jar-gqtsam-1",
-     "scale": [
-      0.999904,
-      1.000288,
-      0.999936
      ]
     }
    ]
@@ -514,10 +150,10 @@
      ]
     }
    },
-   "num_anisotropic_uses": 6,
+   "num_anisotropic_uses": 3,
    "anisotropic_uses": [
     {
-     "source": "scenes/Wainscott_0_garden/mjcf/Wainscott_0_garden_best.xml",
+     "source": "scenes/Wainscott_0_garden/urdf/Wainscott_0_garden_best.urdf",
      "object": "openable_window-ntlgsx-0",
      "scale": [
       1.000175,
@@ -526,7 +162,7 @@
      ]
     },
     {
-     "source": "scenes/Wainscott_0_garden/mjcf/Wainscott_0_garden_best.xml",
+     "source": "scenes/Wainscott_0_garden/urdf/Wainscott_0_garden_best.urdf",
      "object": "openable_window-ntlgsx-1",
      "scale": [
       1.000175,
@@ -535,34 +171,7 @@
      ]
     },
     {
-     "source": "scenes/Wainscott_0_garden/mjcf/Wainscott_0_garden_best.xml",
-     "object": "openable_window-ntlgsx-2",
-     "scale": [
-      1.000175,
-      1.000051,
-      0.99997
-     ]
-    },
-    {
-     "source": "scenes/Wainscott_0_garden/mjcf/Wainscott_0_garden_with_clutter.xml",
-     "object": "openable_window-ntlgsx-0",
-     "scale": [
-      1.000175,
-      1.000051,
-      0.99997
-     ]
-    },
-    {
-     "source": "scenes/Wainscott_0_garden/mjcf/Wainscott_0_garden_with_clutter.xml",
-     "object": "openable_window-ntlgsx-1",
-     "scale": [
-      1.000175,
-      1.000051,
-      0.99997
-     ]
-    },
-    {
-     "source": "scenes/Wainscott_0_garden/mjcf/Wainscott_0_garden_with_clutter.xml",
+     "source": "scenes/Wainscott_0_garden/urdf/Wainscott_0_garden_best.urdf",
      "object": "openable_window-ntlgsx-2",
      "scale": [
       1.000175,
@@ -619,10 +228,10 @@
      ]
     }
    },
-   "num_anisotropic_uses": 4,
+   "num_anisotropic_uses": 2,
    "anisotropic_uses": [
     {
-     "source": "scenes/Beechwood_0_garden/mjcf/Beechwood_0_garden_best.xml",
+     "source": "scenes/Beechwood_0_garden/urdf/Beechwood_0_garden_best.urdf",
      "object": "openable_window-subxdn-0",
      "scale": [
       1.050224,
@@ -631,25 +240,7 @@
      ]
     },
     {
-     "source": "scenes/Beechwood_0_garden/mjcf/Beechwood_0_garden_best.xml",
-     "object": "openable_window-subxdn-1",
-     "scale": [
-      1.050224,
-      0.969515,
-      1.555305
-     ]
-    },
-    {
-     "source": "scenes/Beechwood_0_garden/mjcf/Beechwood_0_garden_with_clutter.xml",
-     "object": "openable_window-subxdn-0",
-     "scale": [
-      1.050224,
-      0.969515,
-      1.555305
-     ]
-    },
-    {
-     "source": "scenes/Beechwood_0_garden/mjcf/Beechwood_0_garden_with_clutter.xml",
+     "source": "scenes/Beechwood_0_garden/urdf/Beechwood_0_garden_best.urdf",
      "object": "openable_window-subxdn-1",
      "scale": [
       1.050224,
@@ -722,7 +313,7 @@
      ]
     }
    },
-   "num_anisotropic_uses": 14,
+   "num_anisotropic_uses": 10,
    "anisotropic_uses": [
     {
      "source": "2026-challenge-task-instances.zip:scenes/hotel_suite_large/json/hotel_suite_large_stable.json",
@@ -779,7 +370,7 @@
      ]
     },
     {
-     "source": "scenes/hotel_gym_spa/mjcf/hotel_gym_spa_best.xml",
+     "source": "scenes/hotel_gym_spa/urdf/hotel_gym_spa_best.urdf",
      "object": "toilet-aapttl-0",
      "scale": [
       1.068285,
@@ -788,7 +379,7 @@
      ]
     },
     {
-     "source": "scenes/hotel_gym_spa/mjcf/hotel_gym_spa_best.xml",
+     "source": "scenes/hotel_gym_spa/urdf/hotel_gym_spa_best.urdf",
      "object": "toilet-aapttl-1",
      "scale": [
       1.068285,
@@ -797,25 +388,7 @@
      ]
     },
     {
-     "source": "scenes/hotel_gym_spa/mjcf/hotel_gym_spa_with_clutter.xml",
-     "object": "toilet-aapttl-0",
-     "scale": [
-      1.068285,
-      0.848031,
-      1.358042
-     ]
-    },
-    {
-     "source": "scenes/hotel_gym_spa/mjcf/hotel_gym_spa_with_clutter.xml",
-     "object": "toilet-aapttl-1",
-     "scale": [
-      1.068285,
-      0.848031,
-      1.358042
-     ]
-    },
-    {
-     "source": "scenes/hotel_suite_large/mjcf/hotel_suite_large_best.xml",
+     "source": "scenes/hotel_suite_large/urdf/hotel_suite_large_best.urdf",
      "object": "toilet-aapttl-0",
      "scale": [
       1.18377,
@@ -824,25 +397,7 @@
      ]
     },
     {
-     "source": "scenes/hotel_suite_large/mjcf/hotel_suite_large_with_clutter.xml",
-     "object": "toilet-aapttl-0",
-     "scale": [
-      1.18377,
-      1.01998,
-      1.528368
-     ]
-    },
-    {
-     "source": "scenes/hotel_suite_small/mjcf/hotel_suite_small_best.xml",
-     "object": "toilet-aapttl-0",
-     "scale": [
-      1.378082,
-      0.858747,
-      1.502056
-     ]
-    },
-    {
-     "source": "scenes/hotel_suite_small/mjcf/hotel_suite_small_with_clutter.xml",
+     "source": "scenes/hotel_suite_small/urdf/hotel_suite_small_best.urdf",
      "object": "toilet-aapttl-0",
      "scale": [
       1.378082,
@@ -877,19 +432,10 @@
      ]
     }
    },
-   "num_anisotropic_uses": 2,
+   "num_anisotropic_uses": 1,
    "anisotropic_uses": [
     {
-     "source": "scenes/Benevolence_2_int/mjcf/Benevolence_2_int_best.xml",
-     "object": "toilet-chuack-0",
-     "scale": [
-      1.166903,
-      1.131779,
-      1.17334
-     ]
-    },
-    {
-     "source": "scenes/Benevolence_2_int/mjcf/Benevolence_2_int_with_clutter.xml",
+     "source": "scenes/Benevolence_2_int/urdf/Benevolence_2_int_best.urdf",
      "object": "toilet-chuack-0",
      "scale": [
       1.166903,
@@ -924,10 +470,10 @@
      ]
     }
    },
-   "num_anisotropic_uses": 28,
+   "num_anisotropic_uses": 14,
    "anisotropic_uses": [
     {
-     "source": "scenes/Beechwood_0_garden/mjcf/Beechwood_0_garden_best.xml",
+     "source": "scenes/Beechwood_0_garden/urdf/Beechwood_0_garden_best.urdf",
      "object": "toilet-kfmkbm-0",
      "scale": [
       1.252614,
@@ -936,7 +482,7 @@
      ]
     },
     {
-     "source": "scenes/Beechwood_0_garden/mjcf/Beechwood_0_garden_with_clutter.xml",
+     "source": "scenes/Beechwood_0_int/urdf/Beechwood_0_int_best.urdf",
      "object": "toilet-kfmkbm-0",
      "scale": [
       1.252614,
@@ -945,25 +491,7 @@
      ]
     },
     {
-     "source": "scenes/Beechwood_0_int/mjcf/Beechwood_0_int_best.xml",
-     "object": "toilet-kfmkbm-0",
-     "scale": [
-      1.252614,
-      1.267737,
-      1.320131
-     ]
-    },
-    {
-     "source": "scenes/Beechwood_0_int/mjcf/Beechwood_0_int_with_clutter.xml",
-     "object": "toilet-kfmkbm-0",
-     "scale": [
-      1.252614,
-      1.267737,
-      1.320131
-     ]
-    },
-    {
-     "source": "scenes/Beechwood_1_int/mjcf/Beechwood_1_int_best.xml",
+     "source": "scenes/Beechwood_1_int/urdf/Beechwood_1_int_best.urdf",
      "object": "toilet-kfmkbm-0",
      "scale": [
       0.967773,
@@ -972,7 +500,7 @@
      ]
     },
     {
-     "source": "scenes/Beechwood_1_int/mjcf/Beechwood_1_int_best.xml",
+     "source": "scenes/Beechwood_1_int/urdf/Beechwood_1_int_best.urdf",
      "object": "toilet-kfmkbm-1",
      "scale": [
       1.081709,
@@ -981,25 +509,7 @@
      ]
     },
     {
-     "source": "scenes/Beechwood_1_int/mjcf/Beechwood_1_int_with_clutter.xml",
-     "object": "toilet-kfmkbm-0",
-     "scale": [
-      0.967773,
-      1.158582,
-      1.072554
-     ]
-    },
-    {
-     "source": "scenes/Beechwood_1_int/mjcf/Beechwood_1_int_with_clutter.xml",
-     "object": "toilet-kfmkbm-1",
-     "scale": [
-      1.081709,
-      1.191727,
-      1.072554
-     ]
-    },
-    {
-     "source": "scenes/Benevolence_2_int/mjcf/Benevolence_2_int_best.xml",
+     "source": "scenes/Benevolence_2_int/urdf/Benevolence_2_int_best.urdf",
      "object": "toilet-kfmkbm-0",
      "scale": [
       1.183942,
@@ -1008,16 +518,7 @@
      ]
     },
     {
-     "source": "scenes/Benevolence_2_int/mjcf/Benevolence_2_int_with_clutter.xml",
-     "object": "toilet-kfmkbm-0",
-     "scale": [
-      1.183942,
-      1.367172,
-      1.155136
-     ]
-    },
-    {
-     "source": "scenes/Merom_0_garden/mjcf/Merom_0_garden_best.xml",
+     "source": "scenes/Merom_0_garden/urdf/Merom_0_garden_best.urdf",
      "object": "toilet-kfmkbm-0",
      "scale": [
       1.149692,
@@ -1026,7 +527,7 @@
      ]
     },
     {
-     "source": "scenes/Merom_0_garden/mjcf/Merom_0_garden_with_clutter.xml",
+     "source": "scenes/Merom_0_int/urdf/Merom_0_int_best.urdf",
      "object": "toilet-kfmkbm-0",
      "scale": [
       1.149692,
@@ -1035,25 +536,7 @@
      ]
     },
     {
-     "source": "scenes/Merom_0_int/mjcf/Merom_0_int_best.xml",
-     "object": "toilet-kfmkbm-0",
-     "scale": [
-      1.149692,
-      1.14338,
-      1.237717
-     ]
-    },
-    {
-     "source": "scenes/Merom_0_int/mjcf/Merom_0_int_with_clutter.xml",
-     "object": "toilet-kfmkbm-0",
-     "scale": [
-      1.149692,
-      1.14338,
-      1.237717
-     ]
-    },
-    {
-     "source": "scenes/Merom_1_int/mjcf/Merom_1_int_best.xml",
+     "source": "scenes/Merom_1_int/urdf/Merom_1_int_best.urdf",
      "object": "toilet-kfmkbm-0",
      "scale": [
       1.02956,
@@ -1062,16 +545,7 @@
      ]
     },
     {
-     "source": "scenes/Merom_1_int/mjcf/Merom_1_int_with_clutter.xml",
-     "object": "toilet-kfmkbm-0",
-     "scale": [
-      1.02956,
-      1.118459,
-      1.237717
-     ]
-    },
-    {
-     "source": "scenes/Pomaria_1_int/mjcf/Pomaria_1_int_best.xml",
+     "source": "scenes/Pomaria_1_int/urdf/Pomaria_1_int_best.urdf",
      "object": "toilet-kfmkbm-0",
      "scale": [
       1.084979,
@@ -1080,16 +554,7 @@
      ]
     },
     {
-     "source": "scenes/Pomaria_1_int/mjcf/Pomaria_1_int_with_clutter.xml",
-     "object": "toilet-kfmkbm-0",
-     "scale": [
-      1.084979,
-      1.385614,
-      1.320131
-     ]
-    },
-    {
-     "source": "scenes/Wainscott_0_garden/mjcf/Wainscott_0_garden_best.xml",
+     "source": "scenes/Wainscott_0_garden/urdf/Wainscott_0_garden_best.urdf",
      "object": "toilet-kfmkbm-0",
      "scale": [
       1.195474,
@@ -1098,7 +563,7 @@
      ]
     },
     {
-     "source": "scenes/Wainscott_0_garden/mjcf/Wainscott_0_garden_best.xml",
+     "source": "scenes/Wainscott_0_garden/urdf/Wainscott_0_garden_best.urdf",
      "object": "toilet-kfmkbm-1",
      "scale": [
       1.166903,
@@ -1107,7 +572,7 @@
      ]
     },
     {
-     "source": "scenes/Wainscott_0_garden/mjcf/Wainscott_0_garden_with_clutter.xml",
+     "source": "scenes/Wainscott_0_int/urdf/Wainscott_0_int_best.urdf",
      "object": "toilet-kfmkbm-0",
      "scale": [
       1.195474,
@@ -1116,7 +581,7 @@
      ]
     },
     {
-     "source": "scenes/Wainscott_0_garden/mjcf/Wainscott_0_garden_with_clutter.xml",
+     "source": "scenes/Wainscott_0_int/urdf/Wainscott_0_int_best.urdf",
      "object": "toilet-kfmkbm-1",
      "scale": [
       1.166903,
@@ -1125,52 +590,7 @@
      ]
     },
     {
-     "source": "scenes/Wainscott_0_int/mjcf/Wainscott_0_int_best.xml",
-     "object": "toilet-kfmkbm-0",
-     "scale": [
-      1.195474,
-      1.223876,
-      1.155136
-     ]
-    },
-    {
-     "source": "scenes/Wainscott_0_int/mjcf/Wainscott_0_int_best.xml",
-     "object": "toilet-kfmkbm-1",
-     "scale": [
-      1.166903,
-      1.217895,
-      1.155136
-     ]
-    },
-    {
-     "source": "scenes/Wainscott_0_int/mjcf/Wainscott_0_int_with_clutter.xml",
-     "object": "toilet-kfmkbm-0",
-     "scale": [
-      1.195474,
-      1.223876,
-      1.155136
-     ]
-    },
-    {
-     "source": "scenes/Wainscott_0_int/mjcf/Wainscott_0_int_with_clutter.xml",
-     "object": "toilet-kfmkbm-1",
-     "scale": [
-      1.166903,
-      1.217895,
-      1.155136
-     ]
-    },
-    {
-     "source": "scenes/Wainscott_1_int/mjcf/Wainscott_1_int_best.xml",
-     "object": "toilet-kfmkbm-0",
-     "scale": [
-      1.046771,
-      1.068866,
-      1.155136
-     ]
-    },
-    {
-     "source": "scenes/Wainscott_1_int/mjcf/Wainscott_1_int_with_clutter.xml",
+     "source": "scenes/Wainscott_1_int/urdf/Wainscott_1_int_best.urdf",
      "object": "toilet-kfmkbm-0",
      "scale": [
       1.046771,
@@ -1205,19 +625,10 @@
      ]
     }
    },
-   "num_anisotropic_uses": 2,
+   "num_anisotropic_uses": 1,
    "anisotropic_uses": [
     {
-     "source": "scenes/Ihlen_1_int/mjcf/Ihlen_1_int_best.xml",
-     "object": "toilet-sjjweo-0",
-     "scale": [
-      1.287724,
-      1.338588,
-      1.347466
-     ]
-    },
-    {
-     "source": "scenes/Ihlen_1_int/mjcf/Ihlen_1_int_with_clutter.xml",
+     "source": "scenes/Ihlen_1_int/urdf/Ihlen_1_int_best.urdf",
      "object": "toilet-sjjweo-0",
      "scale": [
       1.287724,
@@ -1252,7 +663,7 @@
      ]
     }
    },
-   "num_anisotropic_uses": 13,
+   "num_anisotropic_uses": 10,
    "anisotropic_uses": [
     {
      "source": "2026-challenge-task-instances.zip:scenes/Rs_int/json/Rs_int_stable.json",
@@ -1318,7 +729,7 @@
      ]
     },
     {
-     "source": "scenes/Benevolence_0_int/mjcf/Benevolence_0_int_best.xml",
+     "source": "scenes/Benevolence_0_int/urdf/Benevolence_0_int_best.urdf",
      "object": "toilet-vtqdev-0",
      "scale": [
       1.250032,
@@ -1327,16 +738,7 @@
      ]
     },
     {
-     "source": "scenes/Benevolence_0_int/mjcf/Benevolence_0_int_with_clutter.xml",
-     "object": "toilet-vtqdev-0",
-     "scale": [
-      1.250032,
-      1.218708,
-      1.309853
-     ]
-    },
-    {
-     "source": "scenes/Rs_garden/mjcf/Rs_garden_best.xml",
+     "source": "scenes/Rs_garden/urdf/Rs_garden_best.urdf",
      "object": "toilet-vtqdev-0",
      "scale": [
       1.404243,
@@ -1345,25 +747,7 @@
      ]
     },
     {
-     "source": "scenes/Rs_garden/mjcf/Rs_garden_with_clutter.xml",
-     "object": "toilet-vtqdev-0",
-     "scale": [
-      1.404243,
-      1.322389,
-      1.309853
-     ]
-    },
-    {
-     "source": "scenes/Rs_int/mjcf/Rs_int_best.xml",
-     "object": "toilet-vtqdev-0",
-     "scale": [
-      1.404243,
-      1.322389,
-      1.309853
-     ]
-    },
-    {
-     "source": "scenes/Rs_int/mjcf/Rs_int_with_clutter.xml",
+     "source": "scenes/Rs_int/urdf/Rs_int_best.urdf",
      "object": "toilet-vtqdev-0",
      "scale": [
       1.404243,
@@ -1398,10 +782,10 @@
      ]
     }
    },
-   "num_anisotropic_uses": 8,
+   "num_anisotropic_uses": 4,
    "anisotropic_uses": [
     {
-     "source": "scenes/Ihlen_0_int/mjcf/Ihlen_0_int_best.xml",
+     "source": "scenes/Ihlen_0_int/urdf/Ihlen_0_int_best.urdf",
      "object": "toilet-wusctd-0",
      "scale": [
       1.137301,
@@ -1410,16 +794,7 @@
      ]
     },
     {
-     "source": "scenes/Ihlen_0_int/mjcf/Ihlen_0_int_with_clutter.xml",
-     "object": "toilet-wusctd-0",
-     "scale": [
-      1.137301,
-      1.286268,
-      1.471648
-     ]
-    },
-    {
-     "source": "scenes/Pomaria_0_garden/mjcf/Pomaria_0_garden_best.xml",
+     "source": "scenes/Pomaria_0_garden/urdf/Pomaria_0_garden_best.urdf",
      "object": "toilet-wusctd-0",
      "scale": [
       1.269653,
@@ -1428,7 +803,7 @@
      ]
     },
     {
-     "source": "scenes/Pomaria_0_garden/mjcf/Pomaria_0_garden_with_clutter.xml",
+     "source": "scenes/Pomaria_0_int/urdf/Pomaria_0_int_best.urdf",
      "object": "toilet-wusctd-0",
      "scale": [
       1.269653,
@@ -1437,34 +812,7 @@
      ]
     },
     {
-     "source": "scenes/Pomaria_0_int/mjcf/Pomaria_0_int_best.xml",
-     "object": "toilet-wusctd-0",
-     "scale": [
-      1.269653,
-      1.269585,
-      1.308003
-     ]
-    },
-    {
-     "source": "scenes/Pomaria_0_int/mjcf/Pomaria_0_int_with_clutter.xml",
-     "object": "toilet-wusctd-0",
-     "scale": [
-      1.269653,
-      1.269585,
-      1.308003
-     ]
-    },
-    {
-     "source": "scenes/Pomaria_2_int/mjcf/Pomaria_2_int_best.xml",
-     "object": "toilet-wusctd-0",
-     "scale": [
-      1.17396,
-      1.269302,
-      1.308003
-     ]
-    },
-    {
-     "source": "scenes/Pomaria_2_int/mjcf/Pomaria_2_int_with_clutter.xml",
+     "source": "scenes/Pomaria_2_int/urdf/Pomaria_2_int_best.urdf",
      "object": "toilet-wusctd-0",
      "scale": [
       1.17396,

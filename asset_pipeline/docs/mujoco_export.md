@@ -122,7 +122,6 @@ Each scene is split into **parts**, following OmniGibson's loading rule
 - One part per distinct room set of the other objects. Most parts are a single
   room, such as `kitchen_0`, but objects that span rooms get their own part,
   such as `kitchen_0-living_room_0`. Each part holds its rooms' cameras.
-- `{part}.clutter`: the objects that `_with_clutter` adds.
 
 A part is a scene MJCF of its own, at `scenes/{scene}/mjcf/parts/{part}/model.xml`:
 
@@ -149,10 +148,10 @@ composed scene:
 </mujoco>
 ```
 
-`{scene}_best.xml` attaches every part, and `{scene}_with_clutter.xml` adds the
-clutter parts on top. Poses, scales and fixedness come from the scene's settled
+`{scene}_best.xml` attaches every part; the `_with_clutter` variant isn't
+exported. Poses, scales and fixedness come from the scene's settled
 `{scene}_stable.json` in the task-instance archive when it has one, and from
-the scene URDF otherwise.
+the scene's `_best` URDF otherwise. Cameras come from the URDF.
 
 `{scene}_parts.json` describes the scene:
 
@@ -161,12 +160,12 @@ the scene URDF otherwise.
   "format": "b1k_mujoco_scene/1",
   "scene": "house_single_floor",
   "pose_source": "stable.json",
-  "scenes": {"best": "house_single_floor_best.xml", "with_clutter": "house_single_floor_with_clutter.xml"},
-  "parts": {"kitchen_0": {"file": "parts/kitchen_0/model.xml", "rooms": ["kitchen_0"], "clutter": false,
+  "scenes": {"best": "house_single_floor_best.xml"},
+  "parts": {"kitchen_0": {"file": "parts/kitchen_0/model.xml", "rooms": ["kitchen_0"],
                           "objects": ["…"], "inlined": ["floors_…_0"], "cameras": ["camera_…"]}},
   "objects": {"bottom_cabinet_qacthv_0": {"category": "bottom_cabinet", "model": "qacthv", "scale": [1, 1, 1],
               "fixed": true, "visual_only": false, "rooms": ["kitchen_0"], "part": "kitchen_0",
-              "inlined": false, "archive": "objects/bottom_cabinet/qacthv/mjz/qacthv.mjz", "clutter": false}},
+              "inlined": false, "archive": "objects/bottom_cabinet/qacthv/mjz/qacthv.mjz"}},
   "issues": []
 }
 ```

@@ -16,7 +16,8 @@ It writes metadata/mujoco_joint_fixes.json, which export_objects_mujoco.py
 applies and which documents the changes for the dataset's authors.
 
 Scales come from the task-instance archive (settled scenes and task
-templates) and from the base scenes: the scene URDFs in scenes.zip when it's
+templates) and from the base scenes (`_best`; `_with_clutter` isn't exported): the scene
+URDFs in scenes.zip when it's
 available, or else the `scale` attributes of a previous MuJoCo scene export
 given with --scene_mjcf_dir.
 
@@ -76,11 +77,11 @@ def scales_from_instances(instances_zip):
 
 
 def scales_from_scene_urdfs(scenes_zip, objects_zf):
-    """(category, model) -> [use] from the base-scene URDFs (bbox ratios, as DatasetObject)."""
+    """(category, model) -> [use] from the `_best` scene URDFs (bbox ratios, as DatasetObject)."""
     uses, native = {}, {}
     with zipfile.ZipFile(scenes_zip) as zf:
         for member in sorted(zf.namelist()):
-            if not re.match(r"^scenes/[^/]+/urdf/[^/]+_(best|with_clutter)\.urdf$", member):
+            if not re.match(r"^scenes/[^/]+/urdf/[^/]+_best\.urdf$", member):
                 continue
             root = ET.fromstring(zf.read(member))
             for link in root.findall("link"):
@@ -104,7 +105,7 @@ def scales_from_scene_urdfs(scenes_zip, objects_zf):
 def scales_from_scene_mjcf(dataset_dir):
     """(category, model) -> [use] from a previous MuJoCo scene export's attach scales."""
     uses = {}
-    for path in sorted(glob.glob(os.path.join(dataset_dir, "scenes", "*", "mjcf", "*.xml"))):
+    for path in sorted(glob.glob(os.path.join(dataset_dir, "scenes", "*", "mjcf", "*_best.xml"))):
         root = ET.parse(path).getroot()
         for parent in root.iter():
             attach = parent.find("attach")

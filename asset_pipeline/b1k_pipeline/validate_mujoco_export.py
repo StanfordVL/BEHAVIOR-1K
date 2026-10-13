@@ -206,9 +206,7 @@ def validate_scene(root, manifest_path, args):
             report["problems"].append(f"[{kind}] doesn't compile: {e}")
             continue
         entry.update(model_stats(model, seconds))
-        objects = {
-            n: o for n, o in manifest["objects"].items() if kind == "with_clutter" or not o["clutter"]
-        }
+        objects = manifest["objects"]
         report["problems"] += [f"[{kind}] {p}" for p in check_objects_in_model(model, objects)]
         data = mujoco.MjData(model)
         entry["contacts"] = contact_report(model, data)
@@ -229,6 +227,99 @@ def validate_scene(root, manifest_path, args):
     return report
 
 
+def _key_id(model, name):
+    return mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_KEY, name)
+
+
+def check_task_xml_order(path):
+    """Robot frames come after every body and attachment in the worldbody."""
+    worldbody = ET.parse(path).getroot().find("worldbody")
+    seen_frame = False
+    for child in worldbody:
+        if child.tag == "frame" and child.attrib.get("name", "").startswith("robot_"):
+            seen_frame = True
+        elif seen_frame and child.tag in ("body", "attach"):
+            return [f"{path}: <{child.tag}> after robot frames"]
+    return []
+
+
+def validate_task(root, sidecar_path, args, instances_zf):
+    """Check a task sidecar's scenes: compile, layout, keyframes, frames, states."""
+    scene_dir = os.path.dirname(sidecar_path)
+    with open(sidecar_path) as f:
+        sidecar = json.load(f)
+    report = {"activity": sidecar["activity"], "scene": sidecar["scene"], "modes": {}, "problems": []}
+    instances = sidecar["instances"]
+    loose_scope = {
+        inst: e["object"]
+        for inst, e in sidecar["scope"].items()
+        if e["kind"] == "object" and sidecar["objects"][e["object"]]["freejoint"]
+    }
+    for mode_name, mode in sidecar["modes"].items():
+        path = os.path.join(scene_dir, mode["xml"])
+        entry = {}
+        report["problems"] += check_task_xml_order(path)
+        try:
+            model, seconds = _compile(path)
+        except Exception as e:  # pylint: disable=broad-except
+            report["problems"].append(f"[{mode_name}] doesn't compile: {e}")
+            continue
+        entry.update(model_stats(model, seconds))
+        if model.nq != mode["nq"]:
+            report["problems"].append(f"[{mode_name}] nq {model.nq} != sidecar {mode['nq']}")
+        for name, jtype, adr, size in mode["qpos_layout"]:
+            jid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, name)
+            if jid < 0 or model.jnt_qposadr[jid] != adr:
+                report["problems"].append(f"[{mode_name}] qpos_layout: {name} at {adr}, model has {jid}")
+                break
+        labels = ["template"] + [i["keyframe"] for i in instances]
+        xml_frames = {
+            f.attrib.get("name") for f in ET.parse(path).getroot().find("worldbody").findall("frame")
+        }
+        for label in labels:
+            if _key_id(model, label) < 0:
+                report["problems"].append(f"[{mode_name}] no keyframe {label}")
+            if f"robot_{label}" not in xml_frames:
+                report["problems"].append(f"[{mode_name}] no robot frame robot_{label}")
+
+        # Keyframes reproduce the instance states of loose scope objects.
+        data = mujoco.MjData(model)
+        if instances_zf is not None:
+            worst = 0.0
+            for inst in instances:
+                state = json.loads(instances_zf.read(inst["source"]))
+                mujoco.mj_resetDataKeyframe(model, data, _key_id(model, inst["keyframe"]))
+                for scope_name, obj in loose_scope.items():
+                    if scope_name not in state:
+                        continue
+                    jid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, f"{obj}_freejoint")
+                    adr = model.jnt_qposadr[jid]
+                    pos = np.asarray(state[scope_name]["root_link"]["pos"])
+                    x, y, z, w = state[scope_name]["root_link"]["ori"]
+                    quat = np.array([w, x, y, z]) / np.linalg.norm([w, x, y, z])
+                    err = max(
+                        float(np.max(np.abs(data.qpos[adr : adr + 3] - pos))),
+                        float(min(np.max(np.abs(data.qpos[adr + 3 : adr + 7] - quat)),
+                                  np.max(np.abs(data.qpos[adr + 3 : adr + 7] + quat)))),
+                    )
+                    worst = max(worst, err)
+            entry["keyframe_max_error"] = worst
+            if worst > 1e-6:
+                report["problems"].append(f"[{mode_name}] keyframes differ from instance states by {worst:.2e}")
+
+        # Contacts and stability from the template and a few instances.
+        mujoco.mj_resetDataKeyframe(model, data, _key_id(model, "template"))
+        entry["contacts"] = contact_report(model, data)
+        objects = {n: {"fixed": o["freejoint"] is None} for n, o in sidecar["objects"].items()}
+        if args.stability_steps:
+            stab = {}
+            for label in labels[: 1 + args.task_stability_samples]:
+                stab[label] = stability_report(model, objects, args.stability_steps, args.timestep, _key_id(model, label))
+            entry["stability"] = stab
+        report["modes"][mode_name] = entry
+    return report
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--root", required=True, help="Packed dataset directory or zip.")
@@ -236,6 +327,10 @@ def main():
     parser.add_argument("--stability_steps", type=int, default=100)
     parser.add_argument("--timestep", type=float, default=0.002)
     parser.add_argument("--check_objects", action="store_true")
+    parser.add_argument("--tasks", action="store_true", help="Also validate task scenes and their sidecars.")
+    parser.add_argument("--activities", nargs="*", help="Only these activities.")
+    parser.add_argument("--instances_zip", help="Task-instance archive, to check keyframes against instance states.")
+    parser.add_argument("--task_stability_samples", type=int, default=2)
     parser.add_argument("--report", help="Write the JSON report here.")
     args = parser.parse_args()
 
@@ -265,6 +360,27 @@ def main():
                 )
             for problem in report["problems"][:20]:
                 print("  !", problem)
+        if args.tasks:
+            instances_zf = zipfile.ZipFile(args.instances_zip) if args.instances_zip else None
+            sidecars = sorted(glob.glob(os.path.join(root, "scenes", "*", "mjcf", "*_task_*.json")))
+            for sidecar in sidecars:
+                scene = os.path.basename(os.path.dirname(os.path.dirname(sidecar)))
+                activity = json.load(open(sidecar))["activity"]
+                if (args.scenes and scene not in args.scenes) or (args.activities and activity not in args.activities):
+                    continue
+                report = validate_task(root, sidecar, args, instances_zf)
+                reports.append(report)
+                print(f"== task {report['activity']} ({report['scene']}): {len(report['problems'])} problems")
+                for mode, entry in report["modes"].items():
+                    moved = {k: v["num_moved"] for k, v in entry.get("stability", {}).items()}
+                    print(
+                        f"  {mode}: compile {entry['compile_seconds']}s nq={entry['nq']} "
+                        f"tex={entry['tex_bytes'] / 1e9:.2f}GB deepest={entry['contacts']['deepest'] * 1000:.1f}mm "
+                        f"penetrating={entry['contacts']['num_flagged']} key_err={entry.get('keyframe_max_error')} "
+                        f"moved={moved}"
+                    )
+                for problem in report["problems"][:20]:
+                    print("  !", problem)
         if args.report:
             with open(args.report, "w") as f:
                 json.dump(reports, f, indent=1)

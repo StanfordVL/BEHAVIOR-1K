@@ -42,6 +42,7 @@ MUJOCO_PARALLELS = [
     "objects_mujoco.zip",
     "metadata.zip",
     "scenes_mujoco.zip",
+    "tasks_mujoco.zip",
     "systems.zip",
 ]
 

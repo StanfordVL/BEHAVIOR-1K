@@ -957,6 +957,31 @@ stages:
     - b1k_pipeline/check_success.py
     outs:
     - artifacts/pipeline/export_scenes_mujoco.success
+  export_tasks_mujoco:
+    cmd: python -m b1k_pipeline.export_tasks_mujoco
+    deps:
+    - artifacts/parallels/scenes_mujoco.zip
+    - artifacts/parallels/objects_mujoco.zip
+    - artifacts/parallels/objects.zip
+    - artifacts/pipeline/export_scenes_mujoco.success
+    - 2026-challenge-task-instances.zip
+    - 2026-challenge-tasks.jsonl
+    - ../bddl3/bddl
+    - ../joylo/gello/utils/og_teleop_cfg.py
+    - b1k_pipeline/export_tasks_mujoco.py
+    - b1k_pipeline/mujoco_common.py
+    - b1k_pipeline/mujoco_scene_utils.py
+    outs:
+    - artifacts/parallels/tasks_mujoco.zip
+    - artifacts/pipeline/export_tasks_mujoco.json
+  export_tasks_mujoco_success:
+    cmd: python -m b1k_pipeline.check_success artifacts/pipeline/export_tasks_mujoco.json
+      artifacts/pipeline/export_tasks_mujoco.success
+    deps:
+    - artifacts/pipeline/export_tasks_mujoco.json
+    - b1k_pipeline/check_success.py
+    outs:
+    - artifacts/pipeline/export_tasks_mujoco.success
   file_manifest:
     do:
       cmd: python b1k_pipeline/batch_3dsmax.py cad/${item}/processed.max b1k_pipeline/max/file_manifest.py
@@ -1314,11 +1339,13 @@ stages:
     - artifacts/pipeline/aggregate_metadata.success
     - artifacts/pipeline/export_objects_mujoco.success
     - artifacts/pipeline/export_scenes_mujoco.success
+    - artifacts/pipeline/export_tasks_mujoco.success
     - artifacts/pipeline/generate_systems.success
     - artifacts/parallels/metadata.zip
     - artifacts/parallels/objects.zip
     - artifacts/parallels/objects_mujoco.zip
     - artifacts/parallels/scenes_mujoco.zip
+    - artifacts/parallels/tasks_mujoco.zip
     - artifacts/parallels/systems.zip
     - VERSION
     - b1k_pipeline/pack_dataset.py

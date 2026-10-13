@@ -17,15 +17,13 @@ an empty attach prefix, so every object keeps its name N, its root body
 
 Poses, scales and fixedness come from the scene's settled `{scene}_stable.json`
 when the task-instance archive has one (the state task templates were built
-from), and from the scene URDF otherwise. Clutter objects (the
-`_with_clutter` URDF minus `_best`) go into `{part}.clutter` parts, and
-`{scene}_with_clutter.xml` attaches them on top of the best parts.
+from), and from the scene's `_best` URDF otherwise. Cameras come from the URDF.
+The `_with_clutter` variant isn't exported.
 
 Output layout, in scenes_mujoco.zip:
 
     skybox.png
     scenes/{scene}/mjcf/{scene}_best.xml
-    scenes/{scene}/mjcf/{scene}_with_clutter.xml
     scenes/{scene}/mjcf/{scene}_parts.json
     scenes/{scene}/mjcf/parts/{part}/model.xml
     scenes/{scene}/mjcf/parts/{part}/structure/{category}_{model}/...
@@ -64,7 +62,6 @@ SKYBOX_GRIDSIZE = "3 4"
 SKYBOX_GRIDLAYOUT = ".U..LFRB.D.."
 
 SCENE_MANIFEST_FORMAT = "b1k_mujoco_scene/1"
-CLUTTER_SUFFIX = ".clutter"
 
 # Tolerance when cross-checking stable.json against the scene URDF.
 SCALE_CHECK_TOLERANCE = 1e-3
@@ -349,14 +346,9 @@ def process_scene(scene, out_root, instances_zip, texture_max_size, objects_mujo
         cameras = []
         if scenes_zip.exists():
             with b1k_pipeline.utils.ParallelZipFS("scenes.zip") as scenes_fs:
-                for suffix in ("best", "with_clutter"):
-                    urdf[suffix], suffix_cameras = load_urdf_scene(
-                        scenes_fs, objects_fs, scene, suffix, metadata_cache
-                    )
-                    if suffix == "best":
-                        cameras = suffix_cameras
+                urdf["best"], cameras = load_urdf_scene(scenes_fs, objects_fs, scene, "best", metadata_cache)
         else:
-            issues.append("scenes.zip is missing: no cameras and no clutter")
+            issues.append("scenes.zip is missing: no cameras")
 
         best = load_stable_objects(instances_zip, scene)
         pose_source = "stable.json"
@@ -366,22 +358,22 @@ def process_scene(scene, out_root, instances_zip, texture_max_size, objects_mujo
             best = urdf["best"]
             pose_source = "urdf"
         elif "best" in urdf:
-            # Cross-check the settled state against the URDF.
-            if set(best) != set(urdf["best"]):
-                raise ValueError(
-                    f"{scene}: stable.json and the URDF disagree on objects: "
-                    f"{sorted(set(best) ^ set(urdf['best']))[:10]}"
-                )
+            # Cross-check the settled state against the URDF. The settled state
+            # is what task templates were built from, so it wins.
+            only_urdf = sorted(set(urdf["best"]) - set(best))
+            only_stable = sorted(set(best) - set(urdf["best"]))
+            if only_urdf:
+                issues.append(f"objects in the URDF but not stable.json, dropped: {only_urdf}")
+            if only_stable:
+                issues.append(f"objects in stable.json but not the URDF: {only_stable}")
             for name, record in best.items():
+                if name not in urdf["best"]:
+                    continue
                 ref = urdf["best"][name]
                 if (record["category"], record["model"]) != (ref["category"], ref["model"]):
                     raise ValueError(f"{scene}: {name} has a different model in stable.json")
                 if np.max(np.abs(record["scale"] - ref["scale"])) > SCALE_CHECK_TOLERANCE:
                     issues.append(f"{name}: stable.json scale {record['scale']} vs URDF {ref['scale']}")
-
-        clutter = {}
-        if "with_clutter" in urdf:
-            clutter = {n: r for n, r in urdf["with_clutter"].items() if n not in best}
 
         # Parts start with every joint at 0; settled joint positions can only be
         # restored by keyframes (task scenes do).
@@ -408,32 +400,30 @@ def process_scene(scene, out_root, instances_zip, texture_max_size, objects_mujo
             return parts[part]
 
         manifest_objects = {}
-        for objects, suffix in ((best, ""), (clutter, CLUTTER_SUFFIX)):
-            for name in sorted(objects):
-                record = objects[name]
-                part = mujoco_scene_utils.part_for_object(record["category"], record["rooms"]) + suffix
-                builder = part_builder(part)
-                if _inlined(record):
-                    builder.add_inlined_object(
-                        name, record, _object_mjz(objects_mujoco_zf, record["category"], record["model"])
-                    )
-                else:
-                    builder.add_catalog_object(name, record)
-                builder.add_rooms_text(name, record["rooms"])
-                manifest_objects[name] = {
-                    "category": record["category"],
-                    "model": record["model"],
-                    "scale": record["scale"].tolist(),
-                    "fixed": record["fixed"],
-                    "visual_only": record["visual_only"],
-                    "rooms": record["rooms"],
-                    "part": part,
-                    "inlined": _inlined(record),
-                    "archive": None
-                    if _inlined(record)
-                    else mujoco_common.object_archive_path(record["category"], record["model"]),
-                    "clutter": bool(suffix),
-                }
+        for name in sorted(best):
+            record = best[name]
+            part = mujoco_scene_utils.part_for_object(record["category"], record["rooms"])
+            builder = part_builder(part)
+            if _inlined(record):
+                builder.add_inlined_object(
+                    name, record, _object_mjz(objects_mujoco_zf, record["category"], record["model"])
+                )
+            else:
+                builder.add_catalog_object(name, record)
+            builder.add_rooms_text(name, record["rooms"])
+            manifest_objects[name] = {
+                "category": record["category"],
+                "model": record["model"],
+                "scale": record["scale"].tolist(),
+                "fixed": record["fixed"],
+                "visual_only": record["visual_only"],
+                "rooms": record["rooms"],
+                "part": part,
+                "inlined": _inlined(record),
+                "archive": None
+                if _inlined(record)
+                else mujoco_common.object_archive_path(record["category"], record["model"]),
+            }
 
         for camera in cameras:
             part = (
@@ -446,26 +436,18 @@ def process_scene(scene, out_root, instances_zip, texture_max_size, objects_mujo
         for builder in parts.values():
             builder.write(out_root)
 
-        best_parts = sorted(p for p in parts if not p.endswith(CLUTTER_SUFFIX))
-        clutter_parts = sorted(p for p in parts if p.endswith(CLUTTER_SUFFIX))
-        write_composed_scene(out_root, scene, f"{scene}_best", best_parts)
-        if clutter:
-            write_composed_scene(out_root, scene, f"{scene}_with_clutter", best_parts + clutter_parts)
+        write_composed_scene(out_root, scene, f"{scene}_best", sorted(parts))
 
         manifest = {
             "format": SCENE_MANIFEST_FORMAT,
             "dataset_version": mujoco_common.DATASET_VERSION,
             "scene": scene,
             "pose_source": pose_source,
-            "scenes": {
-                "best": f"{scene}_best.xml",
-                **({"with_clutter": f"{scene}_with_clutter.xml"} if clutter else {}),
-            },
+            "scenes": {"best": f"{scene}_best.xml"},
             "parts": {
                 part: {
                     "file": f"parts/{part}/{mujoco_common.ARCHIVE_ROOT_FILE}",
-                    "rooms": mujoco_scene_utils.part_rooms(part.removesuffix(CLUTTER_SUFFIX)),
-                    "clutter": part.endswith(CLUTTER_SUFFIX),
+                    "rooms": mujoco_scene_utils.part_rooms(part),
                     "objects": builder.objects,
                     "inlined": builder.inlined,
                     "cameras": builder.cameras,
