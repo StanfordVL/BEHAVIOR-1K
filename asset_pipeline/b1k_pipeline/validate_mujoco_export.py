@@ -162,15 +162,22 @@ def stability_report(model, objects, steps, timestep, key=None):
 
 
 def check_object_archive(root, archive):
-    """Compile an object archive under an anisotropic frame scale."""
+    """Compile an object archive, under an anisotropic frame scale unless its
+    metadata says it can't be stretched (scenes then only scale it uniformly)."""
     with tempfile.TemporaryDirectory() as tmp:
         with zipfile.ZipFile(os.path.join(root, archive)) as zf:
             zf.extractall(tmp)
+        metadata_text = None
+        for text in ET.parse(os.path.join(tmp, "model.xml")).getroot().iter("text"):
+            if text.attrib.get("name") == METADATA_TEXT:
+                metadata_text = text.attrib["data"]
+        scalable = json.loads(metadata_text).get("anisotropic_scaling", {}).get("ok", True) if metadata_text else True
+        scale = TEST_SCALE if scalable else "1.1"
         wrapper = os.path.join(tmp, "_scaled.xml")
         with open(wrapper, "w") as f:
             f.write(
                 '<mujoco><asset><model name="o" file="model.xml"/></asset><worldbody>'
-                f'<frame scale="{TEST_SCALE}" scaling="geometry" massscale="1">'
+                f'<frame scale="{scale}" scaling="geometry" massscale="1">'
                 '<attach model="o" body="base_link" prefix="o_"/></frame></worldbody></mujoco>'
             )
         model = mujoco.MjModel.from_xml_path(wrapper)

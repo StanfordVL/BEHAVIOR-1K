@@ -73,6 +73,10 @@ VISUAL_GROUP = str(mujoco_common.VISUAL_GROUP)
 COLLISION_GROUP = str(mujoco_common.COLLISION_GROUP)
 META_GROUP = str(mujoco_common.META_GROUP)
 
+# Collision pieces thinner than this along an axis, in meters, are dropped:
+# MuJoCo can't compute their convex hull.
+DEGENERATE_EXTENT = 1e-5
+
 # Volume meta link types: their meshes become geoms rather than sites.
 VOLUME_META_TYPES = ("fillable", "openfillable")
 
@@ -466,6 +470,8 @@ def build_object_mjcf(in_obj_dir):
     meta_links = metadata.get("meta_links") or {}
     # Every meta element written, for b1k_metadata (see _record_meta_element).
     meta_records = {}
+    # Collision pieces too flat for MuJoCo's convex hull.
+    dropped_collisions = []
 
     robot = URDF.load(urdf_file)
     tmp_dir = tempfile.mkdtemp(prefix=f"mjcf_{model_id}_")
@@ -590,6 +596,13 @@ def build_object_mjcf(in_obj_dir):
                 continue
             scale = collision.geometry.mesh.scale if collision.geometry.mesh.scale is not None else np.ones(3)
             obj_path = os.path.normpath(os.path.join(urdf_dir, collision.geometry.mesh.filename))
+            # MuJoCo can't take the convex hull of a flat piece (some CoACD
+            # pieces are scaled to nothing along an axis): drop it.
+            extents = np.max([np.ptp(m.vertices, axis=0) for m in collision.geometry.meshes], axis=0)
+            extents = extents * np.abs(scale)
+            if np.min(extents) < DEGENERATE_EXTENT:
+                dropped_collisions.append(os.path.basename(obj_path))
+                continue
             volume = sum(abs(mesh.volume) for mesh in collision.geometry.meshes) * abs(np.prod(scale))
             collision_specs.append((obj_path, scale, collision.origin, volume))
 
@@ -788,6 +801,7 @@ def build_object_mjcf(in_obj_dir):
         "mass": category_mass,
         "joints": joint_names,
         "anisotropic_scaling": {"ok": not scaling_problems, "problems": scaling_problems},
+        "dropped_collisions": dropped_collisions,
         "joint_fixes": {
             name: {"action": fix["action"], "off_axis_deg": fix["off_axis_deg"]}
             for name, fix in sorted(applied_fixes.items())
