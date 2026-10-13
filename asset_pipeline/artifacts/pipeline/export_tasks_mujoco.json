@@ -2,309 +2,87 @@
  "success": true,
  "errors": {},
  "warnings": {
-  "sorting_bottles_cans_and_paper": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, bottom_cabinet/rhdbzv, dishwasher/ynrhuk, oven/ffitak"
+  "make_pizza": [
+   "systems (particles) are passed through raw; they aren't simulated"
   ],
-  "putting_dishes_away_after_cleaning": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): dishwasher/ynrhuk"
+  "make_microwave_popcorn": [
+   "systems (particles) are passed through raw; they aren't simulated"
   ],
-  "installing_smoke_detectors": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, dishwasher/ynrhuk, oven/ffitak"
+  "spraying_fruit_trees": [
+   "systems (particles) are passed through raw; they aren't simulated"
   ],
-  "putting_away_toys": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/xqmipa, bottom_cabinet_no_top/gjrero, dishwasher/ynrhuk"
-  ],
-  "preparing_lunch_box": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): dishwasher/ynrhuk, oven/ffitak"
-  ],
-  "hiding_Easter_eggs": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, bottom_cabinet/rhdbzv, dishwasher/ynrhuk, fridge/petcxr"
-  ],
-  "picking_up_toys": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): dishwasher/ynrhuk"
-  ],
-  "hanging_pictures": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, bottom_cabinet/rhdbzv, dishwasher/ynrhuk"
-  ],
-  "outfit_a_basic_toolbox": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): dishwasher/ynrhuk"
-  ],
-  "chopping_wood": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, bottom_cabinet/rhdbzv, dishwasher/ynrhuk, fridge/petcxr"
-  ],
-  "organizing_school_stuff": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/xqmipa, bottom_cabinet_no_top/gjrero, dishwasher/ynrhuk"
+  "scrubbing_bathroom_floor": [
+   "systems (particles) are passed through raw; they aren't simulated"
   ],
   "collecting_aluminum_cans": [
-   "joints made fixed (mujoco_joint_fixes.json) have nonzero values, which are dropped: toilet_aapttl_0:j_link_0",
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): toilet/aapttl"
+   "joints made fixed (mujoco_joint_fixes.json) have nonzero values, which are dropped: toilet_aapttl_0:j_link_0"
   ],
-  "halve_an_egg": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/xqmipa, bottom_cabinet_no_top/gjrero, dishwasher/ynrhuk"
+  "clean_a_patio": [
+   "systems (particles) are passed through raw; they aren't simulated"
   ],
-  "loading_the_car": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, dishwasher/ynrhuk, fridge/petcxr"
+  "composting_waste": [
+   "joints made fixed (mujoco_joint_fixes.json) have nonzero values, which are dropped: toilet_vtqdev_0:j_link_0"
   ],
-  "chop_an_onion": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, bottom_cabinet/rhdbzv, dishwasher/ynrhuk"
+  "store_batteries": [
+   "joints made fixed (mujoco_joint_fixes.json) have nonzero values, which are dropped: toilet_vtqdev_0:j_link_0"
   ],
-  "clearing_food_from_table_into_fridge": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, bottom_cabinet/rhdbzv, dishwasher/ynrhuk"
+  "make_cabinet_doors": [
+   "joints made fixed (mujoco_joint_fixes.json) have nonzero values, which are dropped: toilet_vtqdev_0:j_link_0"
   ],
-  "bringing_paper_to_recycling": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, bottom_cabinet/rhdbzv, dishwasher/ynrhuk"
+  "clean_your_rusty_garden_tools": [
+   "systems (particles) are passed through raw; they aren't simulated"
   ],
-  "freeze_pies": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): dishwasher/ynrhuk"
+  "tidying_bathroom": [
+   "joints made fixed (mujoco_joint_fixes.json) have nonzero values, which are dropped: toilet_aapttl_0:j_link_0"
+  ],
+  "make_gift_bags_for_baby_showers": [
+   "joints made fixed (mujoco_joint_fixes.json) have nonzero values, which are dropped: toilet_vtqdev_0:j_link_0"
+  ],
+  "clean_boxing_gloves": [
+   "systems (particles) are passed through raw; they aren't simulated"
+  ],
+  "installing_a_modem": [
+   "joints made fixed (mujoco_joint_fixes.json) have nonzero values, which are dropped: toilet_vtqdev_0:j_link_0"
+  ],
+  "vacuuming_floors": [
+   "systems (particles) are passed through raw; they aren't simulated"
+  ],
+  "clean_a_trumpet": [
+   "systems (particles) are passed through raw; they aren't simulated"
+  ],
+  "store_honey": [
+   "joints made fixed (mujoco_joint_fixes.json) have nonzero values, which are dropped: toilet_vtqdev_0:j_link_0"
   ],
   "polishing_shoes": [
    "systems (particles) are passed through raw; they aren't simulated",
-   "joints made fixed (mujoco_joint_fixes.json) have nonzero values, which are dropped: toilet_aapttl_0:j_link_0",
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): toilet/aapttl"
-  ],
-  "cleaning_up_branches_and_twigs": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, bottom_cabinet/rhdbzv, dishwasher/ynrhuk, fridge/petcxr"
-  ],
-  "freeze_fruit": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/xqmipa, bottom_cabinet_no_top/gjeoer, bottom_cabinet_no_top/gjrero, dishwasher/ynrhuk"
-  ],
-  "cook_hot_dogs": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): dishwasher/ynrhuk, oven/ffitak"
-  ],
-  "bringing_in_wood": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, bottom_cabinet/rhdbzv, dishwasher/ynrhuk, fridge/petcxr"
-  ],
-  "clean_a_patio": [
-   "systems (particles) are passed through raw; they aren't simulated",
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, bottom_cabinet/rhdbzv, dishwasher/ynrhuk, fridge/petcxr"
-  ],
-  "cook_cabbage": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): dishwasher/ynrhuk"
-  ],
-  "cook_bacon": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): dishwasher/ynrhuk"
-  ],
-  "collecting_childrens_toys": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): dishwasher/ynrhuk"
-  ],
-  "store_batteries": [
-   "joints made fixed (mujoco_joint_fixes.json) have nonzero values, which are dropped: toilet_vtqdev_0:j_link_0",
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/dajebq, bottom_cabinet/jhymlr, door/ktydvs, door/lvgliq, openable_window/ulnafj, oven/wuinhm, toilet/vtqdev"
-  ],
-  "cleaning_up_plates_and_food": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, bottom_cabinet/rhdbzv, dishwasher/ynrhuk"
-  ],
-  "clean_your_rusty_garden_tools": [
-   "systems (particles) are passed through raw; they aren't simulated",
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/xqmipa, bottom_cabinet_no_top/gjrero, dishwasher/ynrhuk"
-  ],
-  "clean_up_your_desk": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): dishwasher/ynrhuk"
-  ],
-  "composting_waste": [
-   "joints made fixed (mujoco_joint_fixes.json) have nonzero values, which are dropped: toilet_vtqdev_0:j_link_0",
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/dajebq, bottom_cabinet/jhymlr, door/lvgliq, openable_window/ulnafj, oven/wuinhm, toilet/vtqdev"
-  ],
-  "make_cabinet_doors": [
-   "joints made fixed (mujoco_joint_fixes.json) have nonzero values, which are dropped: toilet_vtqdev_0:j_link_0",
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/dajebq, bottom_cabinet/jhymlr, door/ktydvs, door/lvgliq, openable_window/ulnafj, oven/wuinhm, toilet/vtqdev"
-  ],
-  "clean_boxing_gloves": [
-   "systems (particles) are passed through raw; they aren't simulated",
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): dishwasher/ynrhuk"
-  ],
-  "carrying_out_garden_furniture": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/xqmipa, bottom_cabinet_no_top/gjrero, dishwasher/ynrhuk"
-  ],
-  "canning_food": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): dishwasher/ynrhuk"
-  ],
-  "tidying_bathroom": [
-   "joints made fixed (mujoco_joint_fixes.json) have nonzero values, which are dropped: toilet_aapttl_0:j_link_0",
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): toilet/aapttl"
-  ],
-  "can_meat": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): dishwasher/ynrhuk"
-  ],
-  "make_gift_bags_for_baby_showers": [
-   "joints made fixed (mujoco_joint_fixes.json) have nonzero values, which are dropped: toilet_vtqdev_0:j_link_0",
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/dajebq, bottom_cabinet/jhymlr, openable_window/ithrgo, openable_window/ulnafj, oven/wuinhm, toilet/vtqdev"
-  ],
-  "bringing_water": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): dishwasher/ynrhuk"
-  ],
-  "boxing_food_after_dinner": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/xqmipa, bottom_cabinet_no_top/gjrero, bottom_cabinet_no_top/rkgjer, dishwasher/ynrhuk, top_cabinet/lkxmne"
-  ],
-  "vacuuming_floors": [
-   "systems (particles) are passed through raw; they aren't simulated",
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet_no_top/ncgmqr"
-  ],
-  "tidying_living_room": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): desk/aduafr"
-  ],
-  "setting_mousetraps": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet_no_top/ncgmqr, desk/aduafr"
-  ],
-  "carrying_in_groceries": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, bottom_cabinet/rhdbzv, dishwasher/ynrhuk"
-  ],
-  "installing_a_modem": [
-   "joints made fixed (mujoco_joint_fixes.json) have nonzero values, which are dropped: toilet_vtqdev_0:j_link_0",
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/dajebq, bottom_cabinet/jhymlr, door/ktydvs, door/lvgliq, openable_window/ulnafj, oven/wuinhm, toilet/vtqdev"
-  ],
-  "re_shelving_library_books": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): desk/aduafr"
-  ],
-  "sorting_books_on_shelf": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): desk/aduafr"
-  ],
-  "organizing_art_supplies": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet_no_top/ncgmqr"
-  ],
-  "cook_a_brisket": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, bottom_cabinet/rhdbzv, dishwasher/ynrhuk, fridge/petcxr, oven/ffitak"
-  ],
-  "clean_a_trumpet": [
-   "systems (particles) are passed through raw; they aren't simulated",
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): desk/aduafr"
-  ],
-  "boxing_books_up_for_storage": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): desk/aduafr"
-  ],
-  "unloading_the_car": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, dishwasher/ynrhuk, fridge/petcxr"
-  ],
-  "thawing_frozen_food": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, bottom_cabinet/rhdbzv, dishwasher/ynrhuk, fridge/petcxr, oven/ffitak"
-  ],
-  "sweeping_garage": [
-   "systems (particles) are passed through raw; they aren't simulated",
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, bottom_cabinet/rhdbzv, dishwasher/ynrhuk, fridge/petcxr"
-  ],
-  "spraying_fruit_trees": [
-   "systems (particles) are passed through raw; they aren't simulated",
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, bottom_cabinet/rhdbzv, dishwasher/ynrhuk, fridge/petcxr"
-  ],
-  "setting_the_fire": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, dishwasher/ynrhuk, fridge/petcxr"
-  ],
-  "rearranging_kitchen_furniture": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, bottom_cabinet/rhdbzv, dishwasher/ynrhuk"
+   "joints made fixed (mujoco_joint_fixes.json) have nonzero values, which are dropped: toilet_aapttl_0:j_link_0"
   ],
   "spraying_for_bugs": [
-   "systems (particles) are passed through raw; they aren't simulated",
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, bottom_cabinet/rhdbzv, dishwasher/ynrhuk, fridge/petcxr"
+   "systems (particles) are passed through raw; they aren't simulated"
   ],
-  "putting_shoes_on_rack": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, bottom_cabinet/rhdbzv, dishwasher/ynrhuk, fridge/petcxr"
-  ],
-  "putting_away_Halloween_decorations": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, dishwasher/ynrhuk, fridge/petcxr"
-  ],
-  "put_together_a_basic_pruning_kit": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, bottom_cabinet/rhdbzv, dishwasher/ynrhuk, fridge/petcxr"
-  ],
-  "sorting_household_items": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): dishwasher/ynrhuk"
-  ],
-  "picking_up_trash": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, dishwasher/ynrhuk"
-  ],
-  "store_honey": [
-   "joints made fixed (mujoco_joint_fixes.json) have nonzero values, which are dropped: toilet_vtqdev_0:j_link_0",
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/dajebq, bottom_cabinet/jhymlr, door/ktydvs, door/lvgliq, openable_window/ulnafj, oven/wuinhm, toilet/vtqdev"
-  ],
-  "slicing_vegetables": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): dishwasher/ynrhuk"
+  "sweeping_garage": [
+   "systems (particles) are passed through raw; they aren't simulated"
   ],
   "rearrange_your_room": [
-   "joints made fixed (mujoco_joint_fixes.json) have nonzero values, which are dropped: toilet_aapttl_0:j_link_0",
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): toilet/aapttl"
-  ],
-  "setting_the_table": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/xqmipa, bottom_cabinet_no_top/gjrero, dishwasher/ynrhuk, top_cabinet/lkxmne"
-  ],
-  "turning_on_radio": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, dishwasher/ynrhuk, fridge/petcxr"
-  ],
-  "moving_boxes_to_storage": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, dishwasher/ynrhuk, fridge/petcxr"
-  ],
-  "make_rose_centerpieces": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, dishwasher/ynrhuk, fridge/petcxr"
-  ],
-  "scrubbing_bathroom_floor": [
-   "systems (particles) are passed through raw; they aren't simulated",
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet_no_top/gjrero, dishwasher/ynrhuk"
-  ],
-  "make_pizza": [
-   "systems (particles) are passed through raw; they aren't simulated",
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, bottom_cabinet/rhdbzv, dishwasher/ynrhuk, fridge/petcxr, top_cabinet/tynnnw"
-  ],
-  "dispose_of_glass": [
-   "joints made fixed (mujoco_joint_fixes.json) have nonzero values, which are dropped: toilet_aapttl_0:j_link_0",
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): toilet/aapttl"
-  ],
-  "make_microwave_popcorn": [
-   "systems (particles) are passed through raw; they aren't simulated",
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, bottom_cabinet/rhdbzv, dishwasher/ynrhuk"
-  ],
-  "set_up_a_coffee_station_in_your_kitchen": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): dishwasher/ynrhuk"
+   "joints made fixed (mujoco_joint_fixes.json) have nonzero values, which are dropped: toilet_aapttl_0:j_link_0"
   ],
   "tidying_bedroom": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): dishwasher/ynrhuk",
    "the template has no robot poses; its frame uses available_tasks.yaml's start pose"
   ],
-  "sorting_vegetables": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): dishwasher/ynrhuk, oven/ffitak"
-  ],
-  "turning_out_all_lights_before_sleep": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): dishwasher/ynrhuk"
-  ],
-  "putting_up_Christmas_decorations_inside": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): dishwasher/ynrhuk"
-  ],
-  "dispose_of_batteries": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/immwzb, bottom_cabinet/jhymlr, bottom_cabinet/rvunhj"
-  ],
-  "installing_a_scanner": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/immwzb, bottom_cabinet/jhymlr, bottom_cabinet/rvunhj"
-  ],
-  "laying_tile_floors": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/immwzb, bottom_cabinet/jhymlr, bottom_cabinet/rvunhj"
+  "dispose_of_glass": [
+   "joints made fixed (mujoco_joint_fixes.json) have nonzero values, which are dropped: toilet_aapttl_0:j_link_0"
   ],
   "clean_a_keyboard": [
-   "systems (particles) are passed through raw; they aren't simulated",
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/immwzb, bottom_cabinet/jhymlr, bottom_cabinet/rvunhj"
-  ],
-  "clean_up_broken_glass": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): door/adejun"
-  ],
-  "installing_a_fax_machine": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/immwzb, bottom_cabinet/jhymlr, bottom_cabinet/rvunhj"
+   "systems (particles) are passed through raw; they aren't simulated"
   ],
   "wash_a_baseball_cap": [
-   "systems (particles) are passed through raw; they aren't simulated",
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/xqmipa, bottom_cabinet_no_top/gjeoer, dishwasher/ynrhuk"
-  ],
-  "wash_dog_toys": [
-   "systems (particles) are passed through raw; they aren't simulated",
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/xqmipa, bottom_cabinet_no_top/gjeoer, bottom_cabinet_no_top/gjrero, dishwasher/ynrhuk"
+   "systems (particles) are passed through raw; they aren't simulated"
   ],
   "putting_dirty_dishes_in_sink": [
-   "systems (particles) are passed through raw; they aren't simulated",
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): door/adejun"
+   "systems (particles) are passed through raw; they aren't simulated"
   ],
-  "stacking_wood": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/xqmipa, bottom_cabinet_no_top/gjrero, dishwasher/ynrhuk"
-  ],
-  "assembling_gift_baskets": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): bottom_cabinet/qacthv, dishwasher/ynrhuk, fridge/petcxr"
-  ],
-  "storing_food": [
-   "joint order assumed to follow the URDF (no mujoco_joint_order.json entry): dishwasher/ynrhuk"
+  "wash_dog_toys": [
+   "systems (particles) are passed through raw; they aren't simulated"
   ]
  }
 }
