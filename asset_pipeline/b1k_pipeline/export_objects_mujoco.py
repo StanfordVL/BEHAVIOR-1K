@@ -357,6 +357,18 @@ def _openable_metadata(metadata, joint_names):
     }
 
 
+JOINT_FIXES_FILE = b1k_pipeline.utils.PIPELINE_ROOT / "metadata" / "mujoco_joint_fixes.json"
+_JOINT_FIXES = None
+
+
+def _joint_fixes():
+    """Per-object joint fixes, from metadata/mujoco_joint_fixes.json."""
+    global _JOINT_FIXES
+    if _JOINT_FIXES is None:
+        _JOINT_FIXES = json.loads(JOINT_FIXES_FILE.read_text())["objects"] if JOINT_FIXES_FILE.exists() else {}
+    return _JOINT_FIXES
+
+
 _TAXONOMY = None
 
 
@@ -656,15 +668,30 @@ def build_object_mjcf(in_obj_dir):
         children.setdefault(joint.parent, []).append(joint)
     link_map = {link.name: link for link in robot.links}
 
-    def add_body(parent_xml, link, joint):
+    def add_body(parent_xml, link, joint, parent_rotation):
         body_xml = ET.SubElement(parent_xml, "body", {"name": link.name})
+        rotation = parent_rotation
         if joint is not None:
             body_xml.attrib.update(_pose_attrs(joint.origin))
-            if joint.joint_type in ("revolute", "continuous", "prismatic"):
+            rotation = parent_rotation @ joint.origin[:3, :3]
+            fix = joint_fixes.get(joint.name)
+            if fix is not None and fix["action"] == "fix":
+                applied_fixes[joint.name] = fix
+            elif joint.joint_type in ("revolute", "continuous", "prismatic"):
+                axis = np.asarray(joint.axis, dtype=np.float64)
+                if fix is not None:
+                    # Snap the axis onto the nearest base-link axis, expressed
+                    # in the joint frame.
+                    assert fix["action"] == "snap", fix
+                    k = "xyz".index(fix["nearest_base_axis"][1])
+                    snapped = np.zeros(3)
+                    snapped[k] = 1.0 if fix["nearest_base_axis"][0] == "+" else -1.0
+                    axis = rotation.T @ snapped
+                    applied_fixes[joint.name] = fix
                 joint_attrs = {
                     "name": joint.name,
                     "type": "slide" if joint.joint_type == "prismatic" else "hinge",
-                    "axis": _fmt(joint.axis),
+                    "axis": _fmt(axis),
                 }
                 if joint.joint_type != "continuous" and joint.limit is not None:
                     joint_attrs["range"] = _fmt([joint.limit.lower, joint.limit.upper])
@@ -680,7 +707,11 @@ def build_object_mjcf(in_obj_dir):
             add_regular_link(body_xml, link)
 
         for child_joint in children.get(link.name, []):
-            add_body(body_xml, link_map[child_joint.child], child_joint)
+            add_body(body_xml, link_map[child_joint.child], child_joint, rotation)
+
+    # Joint fixes for anisotropic scaling (see find_mujoco_joint_fixes.py).
+    joint_fixes = _joint_fixes().get(f"{category}/{model_id}", {}).get("joints", {})
+    applied_fixes = {}
 
     # No freejoint on the base body: scene MJCFs (export_scenes_mujoco.py) add
     # one at attach time for loose objects, while fixed objects are attached
@@ -691,7 +722,9 @@ def build_object_mjcf(in_obj_dir):
     assert not meta_match, f"Base link {robot.base_link.name} should not be a meta link"
     add_regular_link(base_body_xml, robot.base_link)
     for child_joint in children.get(robot.base_link.name, []):
-        add_body(base_body_xml, link_map[child_joint.child], child_joint)
+        add_body(base_body_xml, link_map[child_joint.child], child_joint, np.eye(3))
+    missing = set(joint_fixes) - set(applied_fixes)
+    assert not missing, f"Joint fixes for unknown joints of {category}/{model_id}: {sorted(missing)}"
 
     # Scenes scale objects with frame scales. Uniform scales always work, but
     # anisotropic ones need the object to be stretchable along its base link's
@@ -736,7 +769,10 @@ def build_object_mjcf(in_obj_dir):
     # BEHAVIOR metadata that MJCF can't express. All lengths are unscaled: in a
     # scene, multiply them by the instance's scale.
     joint_names = [
-        joint.name for joint in robot.joints if joint.joint_type in ("revolute", "continuous", "prismatic")
+        joint.name
+        for joint in robot.joints
+        if joint.joint_type in ("revolute", "continuous", "prismatic")
+        and applied_fixes.get(joint.name, {}).get("action") != "fix"
     ]
     synset, abilities = _taxonomy_info(category)
     b1k_metadata = {
@@ -752,6 +788,10 @@ def build_object_mjcf(in_obj_dir):
         "mass": category_mass,
         "joints": joint_names,
         "anisotropic_scaling": {"ok": not scaling_problems, "problems": scaling_problems},
+        "joint_fixes": {
+            name: {"action": fix["action"], "off_axis_deg": fix["off_axis_deg"]}
+            for name, fix in sorted(applied_fixes.items())
+        },
         "openable": _openable_metadata(metadata, joint_names),
         "meta_links": meta_records,
         "link_tags": link_tags,

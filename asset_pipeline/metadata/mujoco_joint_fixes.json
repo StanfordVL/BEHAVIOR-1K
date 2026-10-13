@@ -1,0 +1,1478 @@
+{
+ "format": "b1k_mujoco_joint_fixes/1",
+ "dataset_version": "3.9.0",
+ "description": "Joints of objects that some scene or task instance scales non-uniformly, whose axes aren't aligned with the object's base-link axes. A non-uniform scale can't stretch such a joint exactly, so the MuJoCo export snaps joints within snap_tolerance_deg of a base-link axis onto it ('snap', axis replaced by nearest_base_axis) and makes the others fixed at their zero position ('fix'). Axes are unit vectors: 'axis' in the joint frame as in the URDF, 'axis_in_base_frame' in the base link's frame. Limits are in the URDF's units.",
+ "alignment_tolerance_deg": 1.9,
+ "snap_tolerance_deg": 10.0,
+ "scale_sources": [
+  "2026-challenge-task-instances.zip",
+  "previous MuJoCo scene export (attach scales)"
+ ],
+ "summary": {
+  "objects": 13,
+  "snapped_joints": 8,
+  "fixed_joints": 7,
+  "openable_joints_affected": [
+   "openable_window/subxdn:j_link_0",
+   "openable_window/subxdn:j_link_1"
+  ]
+ },
+ "objects": {
+  "carton/hhlmbi": {
+   "joints": {
+    "j_link0": {
+     "action": "snap",
+     "type": "revolute",
+     "child_link": "link0",
+     "openable": false,
+     "off_axis_deg": 2.1,
+     "nearest_base_axis": "-y",
+     "axis": [
+      0.036581444,
+      -0.999330601,
+      -0.000384806
+     ],
+     "axis_in_base_frame": [
+      0.036581444,
+      -0.999330601,
+      -0.000384806
+     ],
+     "limit": [
+      0.0,
+      2.2689279496206503
+     ]
+    }
+   },
+   "num_anisotropic_uses": 25,
+   "anisotropic_uses": [
+    {
+     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
+     "object": "carton-hhlmbi-0",
+     "scale": [
+      1.000139,
+      0.999878,
+      0.99979
+     ]
+    },
+    {
+     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
+     "object": "carton-hhlmbi-1",
+     "scale": [
+      1.000139,
+      0.999878,
+      0.99979
+     ]
+    },
+    {
+     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
+     "object": "carton-hhlmbi-10",
+     "scale": [
+      1.000139,
+      0.999878,
+      0.99979
+     ]
+    },
+    {
+     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
+     "object": "carton-hhlmbi-11",
+     "scale": [
+      1.000139,
+      0.999878,
+      0.99979
+     ]
+    },
+    {
+     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
+     "object": "carton-hhlmbi-12",
+     "scale": [
+      1.000139,
+      0.999878,
+      0.99979
+     ]
+    },
+    {
+     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
+     "object": "carton-hhlmbi-13",
+     "scale": [
+      1.000139,
+      0.999878,
+      0.99979
+     ]
+    },
+    {
+     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
+     "object": "carton-hhlmbi-14",
+     "scale": [
+      1.000139,
+      0.999878,
+      0.99979
+     ]
+    },
+    {
+     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
+     "object": "carton-hhlmbi-15",
+     "scale": [
+      1.000139,
+      0.999878,
+      0.99979
+     ]
+    },
+    {
+     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
+     "object": "carton-hhlmbi-16",
+     "scale": [
+      1.000139,
+      0.999878,
+      0.99979
+     ]
+    },
+    {
+     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
+     "object": "carton-hhlmbi-17",
+     "scale": [
+      1.000139,
+      0.999878,
+      0.99979
+     ]
+    },
+    {
+     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
+     "object": "carton-hhlmbi-18",
+     "scale": [
+      1.000139,
+      0.999878,
+      0.99979
+     ]
+    },
+    {
+     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
+     "object": "carton-hhlmbi-19",
+     "scale": [
+      1.000139,
+      0.999878,
+      0.99979
+     ]
+    },
+    {
+     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
+     "object": "carton-hhlmbi-2",
+     "scale": [
+      1.000139,
+      0.999878,
+      0.99979
+     ]
+    },
+    {
+     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
+     "object": "carton-hhlmbi-20",
+     "scale": [
+      1.000139,
+      0.999878,
+      0.99979
+     ]
+    },
+    {
+     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
+     "object": "carton-hhlmbi-21",
+     "scale": [
+      1.000139,
+      0.999878,
+      0.99979
+     ]
+    },
+    {
+     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
+     "object": "carton-hhlmbi-22",
+     "scale": [
+      1.000139,
+      0.999878,
+      0.99979
+     ]
+    },
+    {
+     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
+     "object": "carton-hhlmbi-23",
+     "scale": [
+      1.000139,
+      0.999878,
+      0.99979
+     ]
+    },
+    {
+     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
+     "object": "carton-hhlmbi-24",
+     "scale": [
+      1.000139,
+      0.999878,
+      0.99979
+     ]
+    },
+    {
+     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
+     "object": "carton-hhlmbi-3",
+     "scale": [
+      1.000139,
+      0.999878,
+      0.99979
+     ]
+    },
+    {
+     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
+     "object": "carton-hhlmbi-4",
+     "scale": [
+      1.000139,
+      0.999878,
+      0.99979
+     ]
+    },
+    {
+     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
+     "object": "carton-hhlmbi-5",
+     "scale": [
+      1.000139,
+      0.999878,
+      0.99979
+     ]
+    },
+    {
+     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
+     "object": "carton-hhlmbi-6",
+     "scale": [
+      1.000139,
+      0.999878,
+      0.99979
+     ]
+    },
+    {
+     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
+     "object": "carton-hhlmbi-7",
+     "scale": [
+      1.000139,
+      0.999878,
+      0.99979
+     ]
+    },
+    {
+     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
+     "object": "carton-hhlmbi-8",
+     "scale": [
+      1.000139,
+      0.999878,
+      0.99979
+     ]
+    },
+    {
+     "source": "scenes/school_biology/mjcf/school_biology_with_clutter.xml",
+     "object": "carton-hhlmbi-9",
+     "scale": [
+      1.000139,
+      0.999878,
+      0.99979
+     ]
+    }
+   ]
+  },
+  "coffee_maker/pyttso": {
+   "joints": {
+    "j_link_6": {
+     "action": "fix",
+     "type": "revolute",
+     "child_link": "link_6",
+     "openable": false,
+     "off_axis_deg": 30.47,
+     "nearest_base_axis": "-y",
+     "axis": [
+      -0.020975994,
+      -0.86186461,
+      0.506704452
+     ],
+     "axis_in_base_frame": [
+      -0.020975994,
+      -0.86186461,
+      0.506704452
+     ],
+     "limit": [
+      0.0,
+      0.837758681632329
+     ]
+    }
+   },
+   "num_anisotropic_uses": 4,
+   "anisotropic_uses": [
+    {
+     "source": "scenes/Wainscott_0_garden/mjcf/Wainscott_0_garden_best.xml",
+     "object": "coffee_maker-pyttso-0",
+     "scale": [
+      2.431304,
+      1.479625,
+      1.35498
+     ]
+    },
+    {
+     "source": "scenes/Wainscott_0_garden/mjcf/Wainscott_0_garden_with_clutter.xml",
+     "object": "coffee_maker-pyttso-0",
+     "scale": [
+      2.431304,
+      1.479625,
+      1.35498
+     ]
+    },
+    {
+     "source": "scenes/Wainscott_0_int/mjcf/Wainscott_0_int_best.xml",
+     "object": "coffee_maker-pyttso-0",
+     "scale": [
+      2.431304,
+      1.479625,
+      1.35498
+     ]
+    },
+    {
+     "source": "scenes/Wainscott_0_int/mjcf/Wainscott_0_int_with_clutter.xml",
+     "object": "coffee_maker-pyttso-0",
+     "scale": [
+      2.431304,
+      1.479625,
+      1.35498
+     ]
+    }
+   ]
+  },
+  "door/ofgpit": {
+   "joints": {
+    "j_leaf": {
+     "action": "snap",
+     "type": "revolute",
+     "child_link": "leaf",
+     "openable": false,
+     "off_axis_deg": 2.88,
+     "nearest_base_axis": "-z",
+     "axis": [
+      -0.050295765,
+      -2.2476e-05,
+      -0.998734367
+     ],
+     "axis_in_base_frame": [
+      -0.050295765,
+      -2.2476e-05,
+      -0.998734367
+     ],
+     "limit": [
+      0.0,
+      2.3561956992938815
+     ]
+    }
+   },
+   "num_anisotropic_uses": 2,
+   "anisotropic_uses": [
+    {
+     "source": "scenes/Pomaria_0_garden/mjcf/Pomaria_0_garden_best.xml",
+     "object": "door-ofgpit-0",
+     "scale": [
+      0.999848,
+      0.99996,
+      1.000018
+     ]
+    },
+    {
+     "source": "scenes/Pomaria_0_garden/mjcf/Pomaria_0_garden_with_clutter.xml",
+     "object": "door-ofgpit-0",
+     "scale": [
+      0.999848,
+      0.99996,
+      1.000018
+     ]
+    }
+   ]
+  },
+  "hinged_jar/gqtsam": {
+   "joints": {
+    "j_cap": {
+     "action": "snap",
+     "type": "revolute",
+     "child_link": "cap",
+     "openable": false,
+     "off_axis_deg": 5.0,
+     "nearest_base_axis": "-y",
+     "axis": [
+      0.087155918,
+      -0.996194683,
+      -2.547e-06
+     ],
+     "axis_in_base_frame": [
+      0.087155918,
+      -0.996194683,
+      -2.547e-06
+     ],
+     "limit": [
+      0.0,
+      2.6179936390781617
+     ]
+    }
+   },
+   "num_anisotropic_uses": 6,
+   "anisotropic_uses": [
+    {
+     "source": "scenes/restaurant_brunch/mjcf/restaurant_brunch_with_clutter.xml",
+     "object": "hinged_jar-gqtsam-0",
+     "scale": [
+      0.999904,
+      1.000288,
+      0.999936
+     ]
+    },
+    {
+     "source": "scenes/restaurant_brunch/mjcf/restaurant_brunch_with_clutter.xml",
+     "object": "hinged_jar-gqtsam-1",
+     "scale": [
+      0.999904,
+      1.000288,
+      0.999936
+     ]
+    },
+    {
+     "source": "scenes/restaurant_hotel/mjcf/restaurant_hotel_with_clutter.xml",
+     "object": "hinged_jar-gqtsam-0",
+     "scale": [
+      0.999904,
+      1.000288,
+      0.999936
+     ]
+    },
+    {
+     "source": "scenes/restaurant_hotel/mjcf/restaurant_hotel_with_clutter.xml",
+     "object": "hinged_jar-gqtsam-1",
+     "scale": [
+      0.999904,
+      1.000288,
+      0.999936
+     ]
+    },
+    {
+     "source": "scenes/restaurant_urban/mjcf/restaurant_urban_with_clutter.xml",
+     "object": "hinged_jar-gqtsam-0",
+     "scale": [
+      0.999904,
+      1.000288,
+      0.999936
+     ]
+    },
+    {
+     "source": "scenes/restaurant_urban/mjcf/restaurant_urban_with_clutter.xml",
+     "object": "hinged_jar-gqtsam-1",
+     "scale": [
+      0.999904,
+      1.000288,
+      0.999936
+     ]
+    }
+   ]
+  },
+  "openable_window/ntlgsx": {
+   "joints": {
+    "j_left_wing": {
+     "action": "snap",
+     "type": "prismatic",
+     "child_link": "left_wing",
+     "openable": false,
+     "off_axis_deg": 4.69,
+     "nearest_base_axis": "+y",
+     "axis": [
+      -0.081671714,
+      0.996647121,
+      0.004924108
+     ],
+     "axis_in_base_frame": [
+      -0.081671714,
+      0.996647121,
+      0.004924108
+     ],
+     "limit": [
+      0.0,
+      0.2884062498184839
+     ]
+    },
+    "j_right_wing": {
+     "action": "snap",
+     "type": "prismatic",
+     "child_link": "right_wing",
+     "openable": false,
+     "off_axis_deg": 4.69,
+     "nearest_base_axis": "-y",
+     "axis": [
+      0.081671714,
+      -0.996647121,
+      -0.004924108
+     ],
+     "axis_in_base_frame": [
+      0.081671714,
+      -0.996647121,
+      -0.004924108
+     ],
+     "limit": [
+      0.0,
+      0.2913906254841209
+     ]
+    }
+   },
+   "num_anisotropic_uses": 6,
+   "anisotropic_uses": [
+    {
+     "source": "scenes/Wainscott_0_garden/mjcf/Wainscott_0_garden_best.xml",
+     "object": "openable_window-ntlgsx-0",
+     "scale": [
+      1.000175,
+      1.000051,
+      0.99997
+     ]
+    },
+    {
+     "source": "scenes/Wainscott_0_garden/mjcf/Wainscott_0_garden_best.xml",
+     "object": "openable_window-ntlgsx-1",
+     "scale": [
+      1.000175,
+      1.000051,
+      0.99997
+     ]
+    },
+    {
+     "source": "scenes/Wainscott_0_garden/mjcf/Wainscott_0_garden_best.xml",
+     "object": "openable_window-ntlgsx-2",
+     "scale": [
+      1.000175,
+      1.000051,
+      0.99997
+     ]
+    },
+    {
+     "source": "scenes/Wainscott_0_garden/mjcf/Wainscott_0_garden_with_clutter.xml",
+     "object": "openable_window-ntlgsx-0",
+     "scale": [
+      1.000175,
+      1.000051,
+      0.99997
+     ]
+    },
+    {
+     "source": "scenes/Wainscott_0_garden/mjcf/Wainscott_0_garden_with_clutter.xml",
+     "object": "openable_window-ntlgsx-1",
+     "scale": [
+      1.000175,
+      1.000051,
+      0.99997
+     ]
+    },
+    {
+     "source": "scenes/Wainscott_0_garden/mjcf/Wainscott_0_garden_with_clutter.xml",
+     "object": "openable_window-ntlgsx-2",
+     "scale": [
+      1.000175,
+      1.000051,
+      0.99997
+     ]
+    }
+   ]
+  },
+  "openable_window/subxdn": {
+   "joints": {
+    "j_link_0": {
+     "action": "snap",
+     "type": "prismatic",
+     "child_link": "link_0",
+     "openable": true,
+     "off_axis_deg": 2.0,
+     "nearest_base_axis": "-z",
+     "axis": [
+      -0.034899776,
+      1e-09,
+      -0.999390817
+     ],
+     "axis_in_base_frame": [
+      -0.034899776,
+      1e-09,
+      -0.999390817
+     ],
+     "limit": [
+      0.0,
+      0.35988992466730646
+     ]
+    },
+    "j_link_1": {
+     "action": "snap",
+     "type": "prismatic",
+     "child_link": "link_1",
+     "openable": true,
+     "off_axis_deg": 2.0,
+     "nearest_base_axis": "+z",
+     "axis": [
+      0.034899776,
+      -1e-09,
+      0.999390817
+     ],
+     "axis_in_base_frame": [
+      0.034899776,
+      -1e-09,
+      0.999390817
+     ],
+     "limit": [
+      0.0,
+      0.3598899521602858
+     ]
+    }
+   },
+   "num_anisotropic_uses": 4,
+   "anisotropic_uses": [
+    {
+     "source": "scenes/Beechwood_0_garden/mjcf/Beechwood_0_garden_best.xml",
+     "object": "openable_window-subxdn-0",
+     "scale": [
+      1.050224,
+      0.969515,
+      1.555305
+     ]
+    },
+    {
+     "source": "scenes/Beechwood_0_garden/mjcf/Beechwood_0_garden_best.xml",
+     "object": "openable_window-subxdn-1",
+     "scale": [
+      1.050224,
+      0.969515,
+      1.555305
+     ]
+    },
+    {
+     "source": "scenes/Beechwood_0_garden/mjcf/Beechwood_0_garden_with_clutter.xml",
+     "object": "openable_window-subxdn-0",
+     "scale": [
+      1.050224,
+      0.969515,
+      1.555305
+     ]
+    },
+    {
+     "source": "scenes/Beechwood_0_garden/mjcf/Beechwood_0_garden_with_clutter.xml",
+     "object": "openable_window-subxdn-1",
+     "scale": [
+      1.050224,
+      0.969515,
+      1.555305
+     ]
+    }
+   ]
+  },
+  "recycling_bin/nuoypc": {
+   "joints": {
+    "j_link_2": {
+     "action": "snap",
+     "type": "revolute",
+     "child_link": "link_2",
+     "openable": false,
+     "off_axis_deg": 2.11,
+     "nearest_base_axis": "-y",
+     "axis": [
+      0.036737025,
+      -0.999321996,
+      -0.002436984
+     ],
+     "axis_in_base_frame": [
+      0.036737025,
+      -0.999321996,
+      -0.002436984
+     ],
+     "limit": [
+      0.0,
+      3.124138661497281
+     ]
+    }
+   },
+   "num_anisotropic_uses": 1,
+   "anisotropic_uses": [
+    {
+     "source": "2026-challenge-task-instances.zip:scenes/house_double_floor_lower/json/house_double_floor_lower_task_cleaning_up_branches_and_twigs_0_0_template.json",
+     "object": "recycling_bin_174",
+     "scale": [
+      1.194365,
+      1.199996,
+      1.192295
+     ]
+    }
+   ]
+  },
+  "toilet/aapttl": {
+   "joints": {
+    "j_link_0": {
+     "action": "fix",
+     "type": "revolute",
+     "child_link": "link_0",
+     "openable": false,
+     "off_axis_deg": 44.87,
+     "nearest_base_axis": "-y",
+     "axis": [
+      0.705434435,
+      -0.708770609,
+      0.002546107
+     ],
+     "axis_in_base_frame": [
+      0.705434435,
+      -0.708770609,
+      0.002546107
+     ],
+     "limit": [
+      0.0,
+      0.523559275086177
+     ]
+    }
+   },
+   "num_anisotropic_uses": 14,
+   "anisotropic_uses": [
+    {
+     "source": "2026-challenge-task-instances.zip:scenes/hotel_suite_large/json/hotel_suite_large_stable.json",
+     "object": "toilet_aapttl_0",
+     "scale": [
+      1.18377,
+      1.01998,
+      1.528367
+     ]
+    },
+    {
+     "source": "2026-challenge-task-instances.zip:scenes/hotel_suite_large/json/hotel_suite_large_task_collecting_aluminum_cans_0_0_template.json",
+     "object": "toilet_aapttl_0",
+     "scale": [
+      1.18377,
+      1.01998,
+      1.528367
+     ]
+    },
+    {
+     "source": "2026-challenge-task-instances.zip:scenes/hotel_suite_large/json/hotel_suite_large_task_dispose_of_glass_0_0_template.json",
+     "object": "toilet_aapttl_0",
+     "scale": [
+      1.18377,
+      1.01998,
+      1.528367
+     ]
+    },
+    {
+     "source": "2026-challenge-task-instances.zip:scenes/hotel_suite_large/json/hotel_suite_large_task_polishing_shoes_0_0_template.json",
+     "object": "toilet_aapttl_0",
+     "scale": [
+      1.18377,
+      1.01998,
+      1.528367
+     ]
+    },
+    {
+     "source": "2026-challenge-task-instances.zip:scenes/hotel_suite_large/json/hotel_suite_large_task_rearrange_your_room_0_0_template.json",
+     "object": "toilet_aapttl_0",
+     "scale": [
+      1.18377,
+      1.01998,
+      1.528367
+     ]
+    },
+    {
+     "source": "2026-challenge-task-instances.zip:scenes/hotel_suite_large/json/hotel_suite_large_task_tidying_bathroom_0_0_template.json",
+     "object": "toilet_aapttl_0",
+     "scale": [
+      1.18377,
+      1.01998,
+      1.528367
+     ]
+    },
+    {
+     "source": "scenes/hotel_gym_spa/mjcf/hotel_gym_spa_best.xml",
+     "object": "toilet-aapttl-0",
+     "scale": [
+      1.068285,
+      0.848031,
+      1.358042
+     ]
+    },
+    {
+     "source": "scenes/hotel_gym_spa/mjcf/hotel_gym_spa_best.xml",
+     "object": "toilet-aapttl-1",
+     "scale": [
+      1.068285,
+      0.848031,
+      1.358042
+     ]
+    },
+    {
+     "source": "scenes/hotel_gym_spa/mjcf/hotel_gym_spa_with_clutter.xml",
+     "object": "toilet-aapttl-0",
+     "scale": [
+      1.068285,
+      0.848031,
+      1.358042
+     ]
+    },
+    {
+     "source": "scenes/hotel_gym_spa/mjcf/hotel_gym_spa_with_clutter.xml",
+     "object": "toilet-aapttl-1",
+     "scale": [
+      1.068285,
+      0.848031,
+      1.358042
+     ]
+    },
+    {
+     "source": "scenes/hotel_suite_large/mjcf/hotel_suite_large_best.xml",
+     "object": "toilet-aapttl-0",
+     "scale": [
+      1.18377,
+      1.01998,
+      1.528368
+     ]
+    },
+    {
+     "source": "scenes/hotel_suite_large/mjcf/hotel_suite_large_with_clutter.xml",
+     "object": "toilet-aapttl-0",
+     "scale": [
+      1.18377,
+      1.01998,
+      1.528368
+     ]
+    },
+    {
+     "source": "scenes/hotel_suite_small/mjcf/hotel_suite_small_best.xml",
+     "object": "toilet-aapttl-0",
+     "scale": [
+      1.378082,
+      0.858747,
+      1.502056
+     ]
+    },
+    {
+     "source": "scenes/hotel_suite_small/mjcf/hotel_suite_small_with_clutter.xml",
+     "object": "toilet-aapttl-0",
+     "scale": [
+      1.378082,
+      0.858747,
+      1.502056
+     ]
+    }
+   ]
+  },
+  "toilet/chuack": {
+   "joints": {
+    "j_link_0": {
+     "action": "fix",
+     "type": "revolute",
+     "child_link": "link_0",
+     "openable": false,
+     "off_axis_deg": 14.44,
+     "nearest_base_axis": "+y",
+     "axis": [
+      -0.238934592,
+      0.968389695,
+      0.071635607
+     ],
+     "axis_in_base_frame": [
+      -0.238934592,
+      0.968389695,
+      0.071635607
+     ],
+     "limit": [
+      0.0,
+      0.5235999472617343
+     ]
+    }
+   },
+   "num_anisotropic_uses": 2,
+   "anisotropic_uses": [
+    {
+     "source": "scenes/Benevolence_2_int/mjcf/Benevolence_2_int_best.xml",
+     "object": "toilet-chuack-0",
+     "scale": [
+      1.166903,
+      1.131779,
+      1.17334
+     ]
+    },
+    {
+     "source": "scenes/Benevolence_2_int/mjcf/Benevolence_2_int_with_clutter.xml",
+     "object": "toilet-chuack-0",
+     "scale": [
+      1.166903,
+      1.131779,
+      1.17334
+     ]
+    }
+   ]
+  },
+  "toilet/kfmkbm": {
+   "joints": {
+    "j_link_0": {
+     "action": "fix",
+     "type": "revolute",
+     "child_link": "link_0",
+     "openable": false,
+     "off_axis_deg": 38.7,
+     "nearest_base_axis": "-y",
+     "axis": [
+      0.60542363,
+      -0.780410661,
+      0.156273568
+     ],
+     "axis_in_base_frame": [
+      0.60542363,
+      -0.780410661,
+      0.156273568
+     ],
+     "limit": [
+      0.0,
+      0.5236271767708772
+     ]
+    }
+   },
+   "num_anisotropic_uses": 28,
+   "anisotropic_uses": [
+    {
+     "source": "scenes/Beechwood_0_garden/mjcf/Beechwood_0_garden_best.xml",
+     "object": "toilet-kfmkbm-0",
+     "scale": [
+      1.252614,
+      1.267737,
+      1.320131
+     ]
+    },
+    {
+     "source": "scenes/Beechwood_0_garden/mjcf/Beechwood_0_garden_with_clutter.xml",
+     "object": "toilet-kfmkbm-0",
+     "scale": [
+      1.252614,
+      1.267737,
+      1.320131
+     ]
+    },
+    {
+     "source": "scenes/Beechwood_0_int/mjcf/Beechwood_0_int_best.xml",
+     "object": "toilet-kfmkbm-0",
+     "scale": [
+      1.252614,
+      1.267737,
+      1.320131
+     ]
+    },
+    {
+     "source": "scenes/Beechwood_0_int/mjcf/Beechwood_0_int_with_clutter.xml",
+     "object": "toilet-kfmkbm-0",
+     "scale": [
+      1.252614,
+      1.267737,
+      1.320131
+     ]
+    },
+    {
+     "source": "scenes/Beechwood_1_int/mjcf/Beechwood_1_int_best.xml",
+     "object": "toilet-kfmkbm-0",
+     "scale": [
+      0.967773,
+      1.158582,
+      1.072554
+     ]
+    },
+    {
+     "source": "scenes/Beechwood_1_int/mjcf/Beechwood_1_int_best.xml",
+     "object": "toilet-kfmkbm-1",
+     "scale": [
+      1.081709,
+      1.191727,
+      1.072554
+     ]
+    },
+    {
+     "source": "scenes/Beechwood_1_int/mjcf/Beechwood_1_int_with_clutter.xml",
+     "object": "toilet-kfmkbm-0",
+     "scale": [
+      0.967773,
+      1.158582,
+      1.072554
+     ]
+    },
+    {
+     "source": "scenes/Beechwood_1_int/mjcf/Beechwood_1_int_with_clutter.xml",
+     "object": "toilet-kfmkbm-1",
+     "scale": [
+      1.081709,
+      1.191727,
+      1.072554
+     ]
+    },
+    {
+     "source": "scenes/Benevolence_2_int/mjcf/Benevolence_2_int_best.xml",
+     "object": "toilet-kfmkbm-0",
+     "scale": [
+      1.183942,
+      1.367172,
+      1.155136
+     ]
+    },
+    {
+     "source": "scenes/Benevolence_2_int/mjcf/Benevolence_2_int_with_clutter.xml",
+     "object": "toilet-kfmkbm-0",
+     "scale": [
+      1.183942,
+      1.367172,
+      1.155136
+     ]
+    },
+    {
+     "source": "scenes/Merom_0_garden/mjcf/Merom_0_garden_best.xml",
+     "object": "toilet-kfmkbm-0",
+     "scale": [
+      1.149692,
+      1.14338,
+      1.237717
+     ]
+    },
+    {
+     "source": "scenes/Merom_0_garden/mjcf/Merom_0_garden_with_clutter.xml",
+     "object": "toilet-kfmkbm-0",
+     "scale": [
+      1.149692,
+      1.14338,
+      1.237717
+     ]
+    },
+    {
+     "source": "scenes/Merom_0_int/mjcf/Merom_0_int_best.xml",
+     "object": "toilet-kfmkbm-0",
+     "scale": [
+      1.149692,
+      1.14338,
+      1.237717
+     ]
+    },
+    {
+     "source": "scenes/Merom_0_int/mjcf/Merom_0_int_with_clutter.xml",
+     "object": "toilet-kfmkbm-0",
+     "scale": [
+      1.149692,
+      1.14338,
+      1.237717
+     ]
+    },
+    {
+     "source": "scenes/Merom_1_int/mjcf/Merom_1_int_best.xml",
+     "object": "toilet-kfmkbm-0",
+     "scale": [
+      1.02956,
+      1.118459,
+      1.237717
+     ]
+    },
+    {
+     "source": "scenes/Merom_1_int/mjcf/Merom_1_int_with_clutter.xml",
+     "object": "toilet-kfmkbm-0",
+     "scale": [
+      1.02956,
+      1.118459,
+      1.237717
+     ]
+    },
+    {
+     "source": "scenes/Pomaria_1_int/mjcf/Pomaria_1_int_best.xml",
+     "object": "toilet-kfmkbm-0",
+     "scale": [
+      1.084979,
+      1.385614,
+      1.320131
+     ]
+    },
+    {
+     "source": "scenes/Pomaria_1_int/mjcf/Pomaria_1_int_with_clutter.xml",
+     "object": "toilet-kfmkbm-0",
+     "scale": [
+      1.084979,
+      1.385614,
+      1.320131
+     ]
+    },
+    {
+     "source": "scenes/Wainscott_0_garden/mjcf/Wainscott_0_garden_best.xml",
+     "object": "toilet-kfmkbm-0",
+     "scale": [
+      1.195474,
+      1.223876,
+      1.155136
+     ]
+    },
+    {
+     "source": "scenes/Wainscott_0_garden/mjcf/Wainscott_0_garden_best.xml",
+     "object": "toilet-kfmkbm-1",
+     "scale": [
+      1.166903,
+      1.217895,
+      1.155136
+     ]
+    },
+    {
+     "source": "scenes/Wainscott_0_garden/mjcf/Wainscott_0_garden_with_clutter.xml",
+     "object": "toilet-kfmkbm-0",
+     "scale": [
+      1.195474,
+      1.223876,
+      1.155136
+     ]
+    },
+    {
+     "source": "scenes/Wainscott_0_garden/mjcf/Wainscott_0_garden_with_clutter.xml",
+     "object": "toilet-kfmkbm-1",
+     "scale": [
+      1.166903,
+      1.217895,
+      1.155136
+     ]
+    },
+    {
+     "source": "scenes/Wainscott_0_int/mjcf/Wainscott_0_int_best.xml",
+     "object": "toilet-kfmkbm-0",
+     "scale": [
+      1.195474,
+      1.223876,
+      1.155136
+     ]
+    },
+    {
+     "source": "scenes/Wainscott_0_int/mjcf/Wainscott_0_int_best.xml",
+     "object": "toilet-kfmkbm-1",
+     "scale": [
+      1.166903,
+      1.217895,
+      1.155136
+     ]
+    },
+    {
+     "source": "scenes/Wainscott_0_int/mjcf/Wainscott_0_int_with_clutter.xml",
+     "object": "toilet-kfmkbm-0",
+     "scale": [
+      1.195474,
+      1.223876,
+      1.155136
+     ]
+    },
+    {
+     "source": "scenes/Wainscott_0_int/mjcf/Wainscott_0_int_with_clutter.xml",
+     "object": "toilet-kfmkbm-1",
+     "scale": [
+      1.166903,
+      1.217895,
+      1.155136
+     ]
+    },
+    {
+     "source": "scenes/Wainscott_1_int/mjcf/Wainscott_1_int_best.xml",
+     "object": "toilet-kfmkbm-0",
+     "scale": [
+      1.046771,
+      1.068866,
+      1.155136
+     ]
+    },
+    {
+     "source": "scenes/Wainscott_1_int/mjcf/Wainscott_1_int_with_clutter.xml",
+     "object": "toilet-kfmkbm-0",
+     "scale": [
+      1.046771,
+      1.068866,
+      1.155136
+     ]
+    }
+   ]
+  },
+  "toilet/sjjweo": {
+   "joints": {
+    "j_link_0": {
+     "action": "fix",
+     "type": "revolute",
+     "child_link": "link_0",
+     "openable": false,
+     "off_axis_deg": 13.81,
+     "nearest_base_axis": "-x",
+     "axis": [
+      -0.9710809,
+      -0.201411603,
+      0.128200048
+     ],
+     "axis_in_base_frame": [
+      -0.9710809,
+      -0.201411603,
+      0.128200048
+     ],
+     "limit": [
+      0.0,
+      0.5235890793794908
+     ]
+    }
+   },
+   "num_anisotropic_uses": 2,
+   "anisotropic_uses": [
+    {
+     "source": "scenes/Ihlen_1_int/mjcf/Ihlen_1_int_best.xml",
+     "object": "toilet-sjjweo-0",
+     "scale": [
+      1.287724,
+      1.338588,
+      1.347466
+     ]
+    },
+    {
+     "source": "scenes/Ihlen_1_int/mjcf/Ihlen_1_int_with_clutter.xml",
+     "object": "toilet-sjjweo-0",
+     "scale": [
+      1.287724,
+      1.338588,
+      1.347466
+     ]
+    }
+   ]
+  },
+  "toilet/vtqdev": {
+   "joints": {
+    "j_link_0": {
+     "action": "fix",
+     "type": "revolute",
+     "child_link": "link_0",
+     "openable": false,
+     "off_axis_deg": 41.29,
+     "nearest_base_axis": "-y",
+     "axis": [
+      -0.655604066,
+      -0.751360455,
+      -0.075105096
+     ],
+     "axis_in_base_frame": [
+      -0.655604066,
+      -0.751360455,
+      -0.075105096
+     ],
+     "limit": [
+      0.0,
+      0.5235703330308977
+     ]
+    }
+   },
+   "num_anisotropic_uses": 13,
+   "anisotropic_uses": [
+    {
+     "source": "2026-challenge-task-instances.zip:scenes/Rs_int/json/Rs_int_stable.json",
+     "object": "toilet_vtqdev_0",
+     "scale": [
+      1.404243,
+      1.322389,
+      1.309853
+     ]
+    },
+    {
+     "source": "2026-challenge-task-instances.zip:scenes/Rs_int/json/Rs_int_task_composting_waste_0_0_template.json",
+     "object": "toilet_vtqdev_0",
+     "scale": [
+      1.404243,
+      1.322389,
+      1.309853
+     ]
+    },
+    {
+     "source": "2026-challenge-task-instances.zip:scenes/Rs_int/json/Rs_int_task_installing_a_modem_0_0_template.json",
+     "object": "toilet_vtqdev_0",
+     "scale": [
+      1.404243,
+      1.322389,
+      1.309853
+     ]
+    },
+    {
+     "source": "2026-challenge-task-instances.zip:scenes/Rs_int/json/Rs_int_task_make_cabinet_doors_0_0_template.json",
+     "object": "toilet_vtqdev_0",
+     "scale": [
+      1.404243,
+      1.322389,
+      1.309853
+     ]
+    },
+    {
+     "source": "2026-challenge-task-instances.zip:scenes/Rs_int/json/Rs_int_task_make_gift_bags_for_baby_showers_0_0_template.json",
+     "object": "toilet_vtqdev_0",
+     "scale": [
+      1.404243,
+      1.322389,
+      1.309853
+     ]
+    },
+    {
+     "source": "2026-challenge-task-instances.zip:scenes/Rs_int/json/Rs_int_task_store_batteries_0_0_template.json",
+     "object": "toilet_vtqdev_0",
+     "scale": [
+      1.404243,
+      1.322389,
+      1.309853
+     ]
+    },
+    {
+     "source": "2026-challenge-task-instances.zip:scenes/Rs_int/json/Rs_int_task_store_honey_0_0_template.json",
+     "object": "toilet_vtqdev_0",
+     "scale": [
+      1.404243,
+      1.322389,
+      1.309853
+     ]
+    },
+    {
+     "source": "scenes/Benevolence_0_int/mjcf/Benevolence_0_int_best.xml",
+     "object": "toilet-vtqdev-0",
+     "scale": [
+      1.250032,
+      1.218708,
+      1.309853
+     ]
+    },
+    {
+     "source": "scenes/Benevolence_0_int/mjcf/Benevolence_0_int_with_clutter.xml",
+     "object": "toilet-vtqdev-0",
+     "scale": [
+      1.250032,
+      1.218708,
+      1.309853
+     ]
+    },
+    {
+     "source": "scenes/Rs_garden/mjcf/Rs_garden_best.xml",
+     "object": "toilet-vtqdev-0",
+     "scale": [
+      1.404243,
+      1.322389,
+      1.309853
+     ]
+    },
+    {
+     "source": "scenes/Rs_garden/mjcf/Rs_garden_with_clutter.xml",
+     "object": "toilet-vtqdev-0",
+     "scale": [
+      1.404243,
+      1.322389,
+      1.309853
+     ]
+    },
+    {
+     "source": "scenes/Rs_int/mjcf/Rs_int_best.xml",
+     "object": "toilet-vtqdev-0",
+     "scale": [
+      1.404243,
+      1.322389,
+      1.309853
+     ]
+    },
+    {
+     "source": "scenes/Rs_int/mjcf/Rs_int_with_clutter.xml",
+     "object": "toilet-vtqdev-0",
+     "scale": [
+      1.404243,
+      1.322389,
+      1.309853
+     ]
+    }
+   ]
+  },
+  "toilet/wusctd": {
+   "joints": {
+    "j_link_0": {
+     "action": "fix",
+     "type": "revolute",
+     "child_link": "link_0",
+     "openable": false,
+     "off_axis_deg": 25.25,
+     "nearest_base_axis": "+x",
+     "axis": [
+      0.904461424,
+      -0.424949652,
+      -0.036977355
+     ],
+     "axis_in_base_frame": [
+      0.904461424,
+      -0.424949652,
+      -0.036977355
+     ],
+     "limit": [
+      0.0,
+      0.28909786605098275
+     ]
+    }
+   },
+   "num_anisotropic_uses": 8,
+   "anisotropic_uses": [
+    {
+     "source": "scenes/Ihlen_0_int/mjcf/Ihlen_0_int_best.xml",
+     "object": "toilet-wusctd-0",
+     "scale": [
+      1.137301,
+      1.286268,
+      1.471648
+     ]
+    },
+    {
+     "source": "scenes/Ihlen_0_int/mjcf/Ihlen_0_int_with_clutter.xml",
+     "object": "toilet-wusctd-0",
+     "scale": [
+      1.137301,
+      1.286268,
+      1.471648
+     ]
+    },
+    {
+     "source": "scenes/Pomaria_0_garden/mjcf/Pomaria_0_garden_best.xml",
+     "object": "toilet-wusctd-0",
+     "scale": [
+      1.269653,
+      1.269585,
+      1.308003
+     ]
+    },
+    {
+     "source": "scenes/Pomaria_0_garden/mjcf/Pomaria_0_garden_with_clutter.xml",
+     "object": "toilet-wusctd-0",
+     "scale": [
+      1.269653,
+      1.269585,
+      1.308003
+     ]
+    },
+    {
+     "source": "scenes/Pomaria_0_int/mjcf/Pomaria_0_int_best.xml",
+     "object": "toilet-wusctd-0",
+     "scale": [
+      1.269653,
+      1.269585,
+      1.308003
+     ]
+    },
+    {
+     "source": "scenes/Pomaria_0_int/mjcf/Pomaria_0_int_with_clutter.xml",
+     "object": "toilet-wusctd-0",
+     "scale": [
+      1.269653,
+      1.269585,
+      1.308003
+     ]
+    },
+    {
+     "source": "scenes/Pomaria_2_int/mjcf/Pomaria_2_int_best.xml",
+     "object": "toilet-wusctd-0",
+     "scale": [
+      1.17396,
+      1.269302,
+      1.308003
+     ]
+    },
+    {
+     "source": "scenes/Pomaria_2_int/mjcf/Pomaria_2_int_with_clutter.xml",
+     "object": "toilet-wusctd-0",
+     "scale": [
+      1.17396,
+      1.269302,
+      1.308003
+     ]
+    }
+   ]
+  }
+ }
+}

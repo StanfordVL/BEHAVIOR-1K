@@ -577,6 +577,7 @@ stages:
     - b1k_pipeline/export_glbs.py
     - b1k_pipeline/mujoco_common.py
     - ../bddl3/bddl/generated_data/output_hierarchy_properties.json
+    - metadata/mujoco_joint_fixes.json
     - VERSION
     outs:
     - artifacts/parallels/objects_mujoco.zip

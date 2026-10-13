@@ -265,3 +265,29 @@ def test_inliner_prefixes_contact_excludes():
     )
     inliner.add(ET.SubElement(part, "worldbody"), "w_0", "walls", "abc", buf, [0, 0, 0], [1, 0, 0, 0])
     assert inliner.excludes == [("w_0_base_link", "w_0_link_1")]
+
+
+def test_decide_joint_fixes():
+    from b1k_pipeline import find_mujoco_joint_fixes
+
+    urdf = ET.fromstring(
+        """
+        <robot name="toy">
+          <link name="base_link"/><link name="lid"/><link name="lever"/><link name="knob"/>
+          <joint name="j_lid" type="revolute"><parent link="base_link"/><child link="lid"/>
+            <origin xyz="0 0 0" rpy="0 0 0.05"/><axis xyz="0 1 0"/><limit lower="0" upper="1"/></joint>
+          <joint name="j_lever" type="revolute"><parent link="base_link"/><child link="lever"/>
+            <axis xyz="0.7071 -0.7071 0"/><limit lower="0" upper="0.5"/></joint>
+          <joint name="j_knob" type="continuous"><parent link="base_link"/><child link="knob"/>
+            <origin rpy="0 0 1.5707963"/><axis xyz="1 0 0"/></joint>
+        </robot>
+        """
+    )
+    fixes = find_mujoco_joint_fixes.decide_fixes(urdf, {"openable_joint_ids": [[0, "j_lid"]]}, 10.0)
+    # The lid's axis is y rotated 0.05 rad (2.9 degrees) about z: snapped.
+    assert fixes["j_lid"]["action"] == "snap" and fixes["j_lid"]["openable"]
+    assert fixes["j_lid"]["nearest_base_axis"] == "+y"
+    # The lever is 45 degrees off: fixed.
+    assert fixes["j_lever"]["action"] == "fix"
+    # The knob's x axis, rotated 90 degrees about z, is aligned with y.
+    assert "j_knob" not in fixes

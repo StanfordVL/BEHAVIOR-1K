@@ -76,6 +76,18 @@ The object exporter records whether an object meets them in
 `b1k_metadata.anisotropic_scaling` and lists the ones that don't as warnings.
 The scene exporter asserts it for every object it scales anisotropically.
 
+**Joint fixes.** `find_mujoco_joint_fixes.py` finds every object that a scene or
+task instance scales anisotropically and that has unaligned joints. It writes
+the list to `metadata/mujoco_joint_fixes.json`, which the object exporter
+applies:
+
+| Off-axis angle | Fix | `action` |
+| --- | --- | --- |
+| Within 10° | The joint's axis is rotated onto the nearest base-link axis. | `snap` |
+| More than 10° | The joint is made fixed at its zero position. These are cosmetic parts mounted at an angle, such as toilet flush levers. | `fix` |
+
+`b1k_metadata.joint_fixes` records what the exporter did to each object.
+
 ### `b1k_metadata`
 
 The archive embeds a compact JSON object as `<custom><text name="b1k_metadata" data="…"/></custom>`.
