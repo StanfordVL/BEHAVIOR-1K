@@ -96,20 +96,11 @@ m.NEWTON_TRUNK_POSITION_KD = 2000.0
 m.NEWTON_GRIPPER_POSITION_KP = 30.0
 m.NEWTON_GRIPPER_POSITION_KD = 3.0
 
-# Passive damping/stiffness for a holonomic base's unactuated z/rx/ry virtual joints under Newton --
-# see _newton_passive_base_dofs() for why these need it at all. Damping alone was measured to only
-# halve the tip-over (peak pitch 109deg -> 61deg, still climbing) because a damper supplies no
-# restoring torque against a standing gravity moment, so the roll/pitch axes also get a spring holding
-# them level -- a real 3-wheeled base cannot pitch without lifting a wheel, so "held level" is the
-# more faithful model of flat-floor driving than "free to topple". Heave (z) stays damping-only: a
-# spring there would fight the base's need to rest on whatever the floor height actually is.
+# Passive damping for a holonomic base's unactuated z/rx/ry virtual joints under Newton -- see
+# _newton_passive_base_dofs() for why these need anything at all. Damping is all they get now; the
+# leveling spring that used to sit alongside it is disabled just below, with the measurements.
 m.NEWTON_PASSIVE_BASE_DOF_KD = 500.0
-# Measured on r1pro in Rs_int (trunk deployed, base commanded to hold still, 600 steps): peak pitch
-# was 109deg with neither term, 61deg with damping alone, 5.4deg at kp=5e3, and 0.84deg at 2e4 (heave
-# also settles to +-2cm from +-30cm). NOTE the spring's target is whatever joint_q the base was built
-# at (level), so it actively returns the base to level -- fine for BEHAVIOR's flat floors, but it
-# would also resist a genuinely tilted resting pose (e.g. a ramp) if one ever shows up.
-m.NEWTON_PASSIVE_BASE_TILT_KP = 20000.0
+m.NEWTON_PASSIVE_BASE_TILT_KP = 0.0
 
 # NOTE: deliberately NO base-specific velocity-kd override here. feat/newton drives its holonomic
 # base with a small velocity_kd (60-80), but it can only afford that because it ALSO lowers the
