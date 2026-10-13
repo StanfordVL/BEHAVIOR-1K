@@ -80,25 +80,34 @@ def check_xml_files(paths):
     return problems
 
 
-def check_objects_in_model(model, objects):
+def _object_prefix(name, info, composed):
+    if info.get("prefix"):
+        return info["prefix"]
+    if composed and info.get("part"):
+        return f"{info['part']}__{name}_"
+    return f"{name}_"
+
+
+def check_objects_in_model(model, objects, composed=False):
     """Root bodies, free joints and metadata texts of the manifest's objects."""
     problems = []
     for name, info in objects.items():
-        body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, f"{name}_root")
+        prefix = _object_prefix(name, info, composed)
+        body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, f"{prefix}root")
         if body_id < 0:
-            problems.append(f"{name}: no {name}_root body")
+            problems.append(f"{name}: no {prefix}root body")
             continue
-        joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, f"{name}_freejoint")
+        joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, f"{prefix}freejoint")
         if info["fixed"]:
             if model.body_jntnum[body_id] != 0:
                 problems.append(f"{name}: fixed object has a joint on its root")
         elif joint_id < 0 or model.jnt_type[joint_id] != mujoco.mjtJoint.mjJNT_FREE:
-            problems.append(f"{name}: loose object has no free joint {name}_freejoint")
+            problems.append(f"{name}: loose object has no free joint {prefix}freejoint")
         elif model.jnt_bodyid[joint_id] != body_id:
-            problems.append(f"{name}: {name}_freejoint isn't on {name}_root")
-        text = _text(model, f"{name}_{METADATA_TEXT}")
+            problems.append(f"{name}: {prefix}freejoint isn't on {prefix}root")
+        text = _text(model, f"{prefix}{METADATA_TEXT}")
         if text is None:
-            problems.append(f"{name}: no {name}_{METADATA_TEXT} text")
+            problems.append(f"{name}: no {prefix}{METADATA_TEXT} text")
             continue
         try:
             metadata = json.loads(text)
@@ -132,7 +141,7 @@ def contact_report(model, data, limit=10):
     }
 
 
-def stability_report(model, objects, steps, timestep, key=None):
+def stability_report(model, objects, steps, timestep, key=None, composed=False):
     """Displacement of loose objects after stepping without a robot."""
     data = mujoco.MjData(model)
     if key is not None:
@@ -142,7 +151,8 @@ def stability_report(model, objects, steps, timestep, key=None):
     for name, info in objects.items():
         if info["fixed"]:
             continue
-        joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, f"{name}_freejoint")
+        fj = info.get("freejoint") or f"{_object_prefix(name, info, composed)}freejoint"
+        joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, fj)
         if joint_id >= 0:
             loose[name] = model.jnt_qposadr[joint_id]
     start = {n: data.qpos[a : a + 3].copy() for n, a in loose.items()}
@@ -214,11 +224,13 @@ def validate_scene(root, manifest_path, args):
             continue
         entry.update(model_stats(model, seconds))
         objects = manifest["objects"]
-        report["problems"] += [f"[{kind}] {p}" for p in check_objects_in_model(model, objects)]
+        report["problems"] += [f"[{kind}] {p}" for p in check_objects_in_model(model, objects, composed=True)]
         data = mujoco.MjData(model)
         entry["contacts"] = contact_report(model, data)
         if args.stability_steps:
-            entry["stability"] = stability_report(model, objects, args.stability_steps, args.timestep)
+            entry["stability"] = stability_report(
+                model, objects, args.stability_steps, args.timestep, composed=True
+            )
         report["scenes"][kind] = entry
 
     if args.check_objects:
@@ -299,7 +311,9 @@ def validate_task(root, sidecar_path, args, instances_zf):
                 for scope_name, obj in loose_scope.items():
                     if scope_name not in state:
                         continue
-                    jid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, f"{obj}_freejoint")
+                    jid = mujoco.mj_name2id(
+                        model, mujoco.mjtObj.mjOBJ_JOINT, sidecar["objects"][obj]["freejoint"]
+                    )
                     adr = model.jnt_qposadr[jid]
                     pos = np.asarray(state[scope_name]["root_link"]["pos"])
                     x, y, z, w = state[scope_name]["root_link"]["ori"]
@@ -317,7 +331,10 @@ def validate_task(root, sidecar_path, args, instances_zf):
         # Contacts and stability from the template and a few instances.
         mujoco.mj_resetDataKeyframe(model, data, _key_id(model, "template"))
         entry["contacts"] = contact_report(model, data)
-        objects = {n: {"fixed": o["freejoint"] is None} for n, o in sidecar["objects"].items()}
+        objects = {
+            n: {"fixed": o["freejoint"] is None, "freejoint": o["freejoint"]}
+            for n, o in sidecar["objects"].items()
+        }
         if args.stability_steps:
             stab = {}
             for label in labels[: 1 + args.task_stability_samples]:

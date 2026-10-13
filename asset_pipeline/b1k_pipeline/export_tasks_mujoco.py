@@ -10,7 +10,7 @@ next to the scene's base-scene parts (export_scenes_mujoco.py):
   intersect them;
 * `{scene}_task_{activity}_full.xml`: every part.
 
-Each attaches its parts with an empty prefix, adds the objects that the task
+Each attaches its parts with prefix `{part}__`, adds the objects that the task
 template adds to the settled scene (as `N_root`, with frame scales), then the
 robot frames, then keyframes: `template`, `train_0007`, `test_0301`, ... Each
 key holds the scene's full qpos. Task semantics live in the sidecar
@@ -423,6 +423,18 @@ class ActivityExporter:
         joint_order_assumed = set()
         fixed_with_values = set()
 
+        def object_part_prefix(record):
+            return mujoco_common.part_attach_prefix(record["part"]) if record.get("part") else ""
+
+        def object_prefix(name, record):
+            return object_part_prefix(record) + mujoco_common.attach_prefix(name)
+
+        def object_root(name, record):
+            return object_part_prefix(record) + mujoco_common.root_body_name(name)
+
+        def object_freejoint(name, record):
+            return object_part_prefix(record) + mujoco_common.freejoint_name(name)
+
         def joint_values(name, record, state, qpos_index, qpos):
             """Write an object's joint positions from an OmniGibson state."""
             values = state.get("joint_pos") or []
@@ -442,7 +454,7 @@ class ActivityExporter:
                     if abs(v) > 1e-3:
                         fixed_with_values.add(f"{name}:{jn}")
                     continue
-                full = mujoco_common.attach_prefix(name) + jn
+                full = object_prefix(name, record) + jn
                 if full not in qpos_index:
                     raise ValueError(f"{name}: no joint {full} in the scene")
                 qpos[qpos_index[full][0]] = v
@@ -500,7 +512,11 @@ class ActivityExporter:
             for part in mode["parts"]:
                 asset = f"part-{part}"
                 ET.SubElement(asset_xml, "model", {"name": asset, "file": manifest["parts"][part]["file"]})
-                ET.SubElement(worldbody_xml, "attach", {"model": asset, "prefix": ""})
+                ET.SubElement(
+                    worldbody_xml,
+                    "attach",
+                    {"model": asset, "prefix": mujoco_common.part_attach_prefix(part)},
+                )
                 resolve_table[asset] = ("part", part_root(part))
             declared = set()
             for name in mode["added"]:
@@ -542,7 +558,7 @@ class ActivityExporter:
                 for name in mode["objects"]:
                     record = base.get(name) or added[name]
                     state = states[name]
-                    fj = mujoco_common.freejoint_name(name)
+                    fj = object_freejoint(name, record)
                     if fj in qpos_index:
                         adr = qpos_index[fj][0]
                         qpos[adr : adr + 3] = state["root_link"]["pos"]
@@ -685,12 +701,15 @@ class ActivityExporter:
                 name: {
                     **{k: (v.tolist() if isinstance(v, np.ndarray) else v) for k, v in (base.get(name) or added[name]).items()},
                     "task_added": name in added,
-                    "prefix": mujoco_common.attach_prefix(name),
-                    "root": mujoco_common.root_body_name(name),
+                    "prefix": object_prefix(name, base.get(name) or added[name]),
+                    "root": object_root(name, base.get(name) or added[name]),
                     "freejoint": None
                     if (base.get(name) or added[name])["fixed"]
-                    else mujoco_common.freejoint_name(name),
-                    "joints": [mujoco_common.attach_prefix(name) + j for j, _ in (object_joints(name) or [])],
+                    else object_freejoint(name, base.get(name) or added[name]),
+                    "joints": [
+                        object_prefix(name, base.get(name) or added[name]) + j
+                        for j, _ in (object_joints(name) or [])
+                    ],
                 }
                 for name in sorted({e["object"] for e in scope.values() if e["kind"] == "object"} | set(added))
             },

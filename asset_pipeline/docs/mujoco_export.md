@@ -24,13 +24,13 @@ This needs a MuJoCo with anisotropic frame scaling.
 | Thing | Name |
 | --- | --- |
 | Object instance N | OmniGibson's name, e.g. `bottom_cabinet_qacthv_0` (the scene URDF's `bottom_cabinet-qacthv-0` with `-` replaced by `_`) |
-| Root body | `N_root`, at the object's base link pose. Static if the object is fixed; loose objects have `<freejoint name="N_freejoint"/>` |
-| Object contents | `N_base_link`, `N_link_1`, `N_j_link_1`, … (attach prefix `N_`) |
-| Object metadata | custom text `b1k_metadata` in an object archive; `N_b1k_metadata` in scenes |
+| Root body | `N_root` in a part or for task-added objects; `{part}__N_root` when part `{part}` is attached into a composed scene. Static if the object is fixed; loose objects have `<freejoint name="…_freejoint"/>` |
+| Object contents | `N_base_link`, `N_link_1`, `N_j_link_1`, … in a part (`{part}__N_…` in a composed scene) |
+| Object metadata | custom text `b1k_metadata` in an object archive; `N_b1k_metadata` in a part (`{part}__N_b1k_metadata` in a composed scene) |
 | Catalog model asset | `{category}-{model}` |
 | Inlined structure assets | `{part}__{category}-{model}-{original}` |
-| Cameras | `camera_{name}`, with `rooms::camera_{name}` texts for room cameras |
-| Rooms of an object | custom text `rooms::N` (comma-separated) |
+| Cameras | `camera_{name}` in a part (`{part}__camera_{name}` in a composed scene), with `rooms::camera_{name}` texts for room cameras |
+| Rooms of an object | custom text `rooms::N` in a part (`{part}__rooms::N` in a composed scene) |
 
 Structure objects (walls, floors, ceilings, lawn, driveway, fence, roof and
 background) and visual-only objects are inlined into scenes rather than
@@ -132,8 +132,8 @@ A part is a scene MJCF of its own, at `scenes/{scene}/mjcf/parts/{part}/model.xm
   and its textures capped at 1024 px;
 - it has no skybox.
 
-Parts compose with an empty attach prefix, so objects keep their names in any
-composed scene:
+Parts compose with attach prefix `{part}__`, so each part's elements are
+namespaced by its part name in any composed scene:
 
 ```xml
 <mujoco model="house_single_floor_best">
@@ -144,8 +144,8 @@ composed scene:
     <model name="part-kitchen_0" file="parts/kitchen_0/model.xml"/>
   </asset>
   <worldbody>
-    <attach model="part-shell" prefix=""/>
-    <attach model="part-kitchen_0" prefix=""/>
+    <attach model="part-shell" prefix="shell__"/>
+    <attach model="part-kitchen_0" prefix="kitchen_0__"/>
   </worldbody>
 </mujoco>
 ```
@@ -190,7 +190,7 @@ instances. It writes these files next to the scene's parts:
 
 Each task scene contains, in this order:
 
-1. its parts, attached with an empty prefix;
+1. its parts, attached with prefix `{part}__`;
 2. the objects that the template adds to the settled scene, as `N_root`;
 3. the robot frames `robot_template`, `robot_train_0007`, `robot_test_0301`, …
    These are yaw-only, worldbody `<frame>`s placed after every body.

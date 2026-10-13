@@ -17,7 +17,7 @@ def test_qpos_layout_follows_document_order_through_attachments():
     )
     scene = ET.fromstring(
         """<mujoco><worldbody>
-             <attach model="part-shell" prefix=""/>
+             <attach model="part-shell" prefix="shell__"/>
              <body name="t_0_root"><attach model="cab-y" body="base_link" prefix="t_0_"/></body>
              <frame name="robot_template"/>
            </worldbody></mujoco>"""
@@ -32,9 +32,9 @@ def test_qpos_layout_follows_document_order_through_attachments():
 
     layout = tasks.qpos_layout(scene, resolve)
     assert [(n, t, a, s) for n, t, a, s in layout] == [
-        ("a_0_freejoint", "free", 0, 7),
-        ("a_0_j_lid", "hinge", 7, 1),
-        ("w_0_j", "slide", 8, 1),
+        ("shell__a_0_freejoint", "free", 0, 7),
+        ("shell__a_0_j_lid", "hinge", 7, 1),
+        ("shell__w_0_j", "slide", 8, 1),
         ("t_0_j_door", "hinge", 9, 1),
         ("t_0_j_drawer", "slide", 10, 1),
     ]

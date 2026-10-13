@@ -10,8 +10,8 @@ mujoco_scene_utils.part_for_object):
 
 Each part is a scene MJCF of its own: catalog objects are attached from their
 archives (export_objects_mujoco.py) and structure is inlined. Parts compose with
-an empty attach prefix, so every object keeps its name N, its root body
-`N_root` and its contents `N_*` in any scene built from them. The composed
+attach prefix `{part}__`, so an object N in part P has root body `P__N_root`
+and contents `P__N_*` in any scene built from them. The composed
 `{scene}_best.xml` attaches every part, after a skybox; task scenes
 (export_tasks_mujoco.py) attach a subset.
 
@@ -314,7 +314,11 @@ def write_composed_scene(out_root, scene, model_name, parts):
                 ),
             },
         )
-        ET.SubElement(worldbody_xml, "attach", {"model": f"part-{part}", "prefix": ""})
+        ET.SubElement(
+            worldbody_xml,
+            "attach",
+            {"model": f"part-{part}", "prefix": mujoco_common.part_attach_prefix(part)},
+        )
     out = os.path.join(out_root, scene_dir(scene), f"{model_name}.xml")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     with open(out, "w") as f:

@@ -95,6 +95,10 @@ def attach_prefix(name):
     return f"{name}_"
 
 
+def part_attach_prefix(part):
+    return f"{part}__"
+
+
 def model_asset_name(category, model):
     return f"{category}-{model}"
 
