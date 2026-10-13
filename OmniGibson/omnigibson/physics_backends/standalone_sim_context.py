@@ -40,6 +40,10 @@ class StandaloneSimulationContext:
             self._stage = lazy.isaacsim.core.utils.stage.get_current_stage()
         else:
             self._stage = lazy.pxr.Usd.Stage.CreateInMemory()
+            # Kit's create_new_stage() authors these. A bare stage falls back to Y-up, and Newton's
+            # add_usd() then turns every frame it imports 90 degrees about x to convert to Z-up.
+            lazy.pxr.UsdGeom.SetStageUpAxis(self._stage, lazy.pxr.UsdGeom.Tokens.z)
+            lazy.pxr.UsdGeom.SetStageMetersPerUnit(self._stage, 1.0)
 
         self._initial_physics_dt = physics_dt
         self._initial_rendering_dt = rendering_dt
