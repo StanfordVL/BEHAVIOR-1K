@@ -56,6 +56,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--host", default="127.0.0.1", help="Policy websocket server host.")
     parser.add_argument("--port", type=int, default=8000, help="Policy websocket server port.")
     parser.add_argument(
+        "--policy-scheme", choices=("ws", "wss"), default="ws", help="WebSocket transport for all policy endpoints."
+    )
+    parser.add_argument(
         "--policy-endpoints",
         nargs="+",
         metavar="HOST:PORT",
@@ -170,6 +173,7 @@ def main() -> None:
             model_cfg = {
                 "_target_": "omnigibson.eval.policies.MultiWebsocketPolicy",
                 "endpoints": endpoints,
+                "scheme": args.policy_scheme,
                 "allow_reconnect": True,
                 "action_chunk_size": args.replay_action_chunk_size,
             }
@@ -178,6 +182,7 @@ def main() -> None:
                 "_target_": "omnigibson.eval.policies.WebsocketPolicy",
                 "host": args.host,
                 "port": args.port,
+                "scheme": args.policy_scheme,
                 "allow_reconnect": True,
                 "action_chunk_size": args.replay_action_chunk_size,
             }
