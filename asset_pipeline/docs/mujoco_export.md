@@ -193,7 +193,8 @@ Each task scene contains, in this order:
 1. its parts, attached with prefix `{part}__`;
 2. the objects that the template adds to the settled scene, as `N_root`;
 3. the robot frames `robot_template`, `robot_train_0007`, `robot_test_0301`, …
-   These are yaw-only, worldbody `<frame>`s placed after every body.
+   These are yaw-only, worldbody `<frame>`s placed after every body. A few are
+   shifted so that Huba fits (see [Robot frames](#robot-frames)).
 4. keyframes named `template`, `train_0007`, `test_0301`, … Each holds the
    scene's full `qpos`.
 
@@ -222,8 +223,51 @@ The sidecar (`format: b1k_mujoco_task/1`) holds:
 | `scope` | scope instance → `{kind: object, object, synset}`, `{kind: agent}`, `{kind: system, system}` or `{kind: future}` |
 | `objects` | for scope and task-added objects: category, model, scale, fixedness, rooms, part, archive, `prefix`, `root`, `freejoint` and `joints` |
 | `initial_nonkin`, `nonkin_varies` | the template's non-kinematic states of scope objects, and which states some instance changes |
-| `instances` | per instance: `id`, `split`, `keyframe`, `robot_frame`, `source` (the instance file), `robot_pose` (key, position, orientation, tilt), `nonkin` (differences only), `systems` (raw particle data) and `issues` |
+| `instances` | per instance: `id`, `split`, `keyframe`, `robot_frame`, `source` (the instance file), `robot_pose` (BEHAVIOR's pose: key, position, orientation, tilt), `robot_frame_pose` (the XML frame's `position`, `quat_wxyz` and its `shift`, or `null`), `nonkin` (differences only), `systems` (raw particle data) and `issues` |
 | `issues`, `warnings` | for example, that systems aren't simulated, or that the joint order of a model was assumed |
+
+### Robot frames
+
+Each robot frame starts from BEHAVIOR's R1Pro base pose for that instance,
+reduced to its yaw. The evaluated robot, though, is Huba (Automaton), whose
+footprint and home pose differ from R1Pro's: at some initial states, Huba
+standing at R1Pro's pose would penetrate furniture or the objects that the
+instance spawned next to the robot.
+
+`metadata/mujoco_robot_frame_offsets.json` lists, for those initial states
+only, the smallest shift that makes Huba fit (1,500 of the 21,120 initial
+states of the 66 activities that google3's mjdb tasks use; median 8 cm):
+
+```json
+{"activities": {"turning_on_radio": {"scene": "house_double_floor_lower",
+  "frames": {"train_0081": [0.08, 0.0, 0.0], "train_0100": [0.02, -0.02, 0.0]}}}}
+```
+
+A shift `[dx, dy, dyaw_deg]` is in the frame's own coordinates: `dx` forward,
+`dy` left, and a turn about the frame's z. The exporter applies it when it
+writes the frame, and records the result in the sidecar's
+`robot_frame_pose` (`robot_pose` stays BEHAVIOR's pose); the validator checks
+that the two agree. Every other frame is BEHAVIOR's pose, unshifted.
+
+google3's `check_robot_fit --search` (in
+`prototypes/gdm/robotics/simulation/external_benchmark_conversions/behavior_1k`)
+writes the file. It stands Huba in its home pose at each initial state's frame,
+in the partial-rooms task scene at that keyframe, and collides only the pairs
+that MuJoCo would. An initial state needs a shift if Huba penetrates a
+non-ground geom by more than 1 mm, or the ground (floors, lawn, driveway,
+carpet) by more than 5 mm. A shifted pose fits if Huba keeps 2 cm from every
+non-ground geom, its base's footprint stands on the ground of the loaded rooms,
+and the straight path from the original frame doesn't cross a wall. The search
+tries, in order, and keeps the first pose that fits:
+
+1. translations on a 2 cm grid out to 0.5 m, nearest first, keeping the yaw;
+   then the same with the frame turned by 5°, 10° and 15° either way;
+2. the same with only 1 cm, then 5 mm, of clearance;
+3. as a last resort, steps 1 and 2 again with translations out to 0.8 m and
+   turns of up to 90°.
+
+The search's report lists the clearance of every shift and which needed the
+last resort. Shifts are never applied to frames that already fit.
 
 **Instance joint values.** Instances store `joint_pos` in OmniGibson's joint
 order. `metadata/mujoco_joint_order.json`, written by `dump_joint_order_og.py`,

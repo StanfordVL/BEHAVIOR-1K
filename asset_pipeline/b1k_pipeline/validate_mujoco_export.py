@@ -293,13 +293,23 @@ def validate_task(root, sidecar_path, args, instances_zf):
                 break
         labels = ["template"] + [i["keyframe"] for i in instances]
         xml_frames = {
-            f.attrib.get("name") for f in ET.parse(path).getroot().find("worldbody").findall("frame")
+            f.attrib.get("name"): f for f in ET.parse(path).getroot().find("worldbody").findall("frame")
         }
         for label in labels:
             if _key_id(model, label) < 0:
                 report["problems"].append(f"[{mode_name}] no keyframe {label}")
             if f"robot_{label}" not in xml_frames:
                 report["problems"].append(f"[{mode_name}] no robot frame robot_{label}")
+        # The sidecar's robot frame poses are the XML's.
+        for inst in instances:
+            frame = xml_frames.get(inst["robot_frame"])
+            expected = inst.get("robot_frame_pose")
+            if frame is None or expected is None:
+                continue
+            pos = np.array(frame.attrib["pos"].split(), dtype=np.float64)
+            quat = np.array(frame.attrib["quat"].split(), dtype=np.float64)
+            if np.max(np.abs(pos - expected["position"])) > 1e-6 or np.max(np.abs(quat - expected["quat_wxyz"])) > 1e-6:
+                report["problems"].append(f"[{mode_name}] {inst['robot_frame']} differs from the sidecar's robot_frame_pose")
 
         # Keyframes reproduce the instance states of loose scope objects.
         data = mujoco.MjData(model)

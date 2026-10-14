@@ -63,3 +63,37 @@ def test_robot_pose_lookup_and_yaw_frame():
     assert tilt < 1e-9
     key, _ = tasks.robot_pose({"robot": poses["R1Pro"], "R1Pro": []}, "R1Pro")
     assert key == "robot"
+
+
+def test_shift_frame_moves_in_the_frames_own_coordinates():
+    yaw = np.pi / 2  # Facing +y: forward is +y and left is -x.
+    quat = np.array([np.cos(yaw / 2), 0, 0, np.sin(yaw / 2)])
+    pos, new_quat = tasks.shift_frame([1.0, 2.0, 0.1], quat, [-0.1, 0.04, 0.0])
+    np.testing.assert_allclose(pos, [1.0 - 0.04, 2.0 - 0.1, 0.1], atol=1e-12)
+    np.testing.assert_allclose(new_quat, quat, atol=1e-12)
+    _, turned = tasks.shift_frame([0, 0, 0], quat, [0, 0, 10.0])
+    new_yaw = yaw + np.radians(10.0)
+    np.testing.assert_allclose(turned, [np.cos(new_yaw / 2), 0, 0, np.sin(new_yaw / 2)], atol=1e-12)
+
+
+def test_load_robot_frame_offsets(tmp_path):
+    assert tasks.load_robot_frame_offsets(tmp_path / "missing.json") == {}
+    path = tmp_path / "offsets.json"
+    path.write_text('{"activities": {"a": {"scene": "s", "frames": {"test_0301": [-0.1, 0.0, 0.0]}}}}')
+    assert tasks.load_robot_frame_offsets(path) == {"a": {"scene": "s", "frames": {"test_0301": [-0.1, 0.0, 0.0]}}}
+    path.write_text('{"activities": {"a": {"scene": "s", "frames": {"test_0301": [-0.1, 0.0]}}}}')
+    try:
+        tasks.load_robot_frame_offsets(path)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("a two-element shift should be rejected")
+
+
+def test_checked_in_robot_frame_offsets_are_small():
+    offsets = tasks.load_robot_frame_offsets()
+    for activity, entry in offsets.items():
+        for label, (dx, dy, dyaw) in entry["frames"].items():
+            # check_robot_fit's last-resort limits (docs/mujoco_export.md).
+            assert np.hypot(dx, dy) <= 0.8 + 1e-9, (activity, label)
+            assert abs(dyaw) <= 90, (activity, label)

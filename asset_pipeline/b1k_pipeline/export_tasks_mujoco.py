@@ -48,6 +48,7 @@ PARALLELS = ROOT / "artifacts" / "parallels"
 DEFAULT_INSTANCES_ZIP = ROOT / "2026-challenge-task-instances.zip"
 DEFAULT_INSTRUCTIONS = ROOT / "2026-challenge-tasks.jsonl"
 JOINT_ORDER_FILE = ROOT / "metadata" / "mujoco_joint_order.json"
+ROBOT_FRAME_OFFSETS_FILE = ROOT / "metadata" / "mujoco_robot_frame_offsets.json"
 OG_TELEOP_CFG = ROOT.parent / "joylo" / "gello" / "utils" / "og_teleop_cfg.py"
 
 SIDECAR_FORMAT = "b1k_mujoco_task/1"
@@ -279,6 +280,38 @@ def yaw_frame(pose):
     return np.asarray(pose["position"], dtype=np.float64), np.asarray(quat), tilt
 
 
+def shift_frame(pos, quat_wxyz, shift):
+    """A yaw-only frame shifted by [dx, dy, dyaw_deg] in its own coordinates.
+
+    x is the frame's forward and y its left; the frame turns about its own z.
+    """
+    dx, dy, dyaw_deg = shift
+    yaw = 2.0 * np.arctan2(quat_wxyz[3], quat_wxyz[0])
+    new_pos = np.asarray(pos, dtype=np.float64) + [
+        np.cos(yaw) * dx - np.sin(yaw) * dy,
+        np.sin(yaw) * dx + np.cos(yaw) * dy,
+        0.0,
+    ]
+    new_yaw = yaw + np.radians(dyaw_deg)
+    return new_pos, np.array([np.cos(new_yaw / 2), 0.0, 0.0, np.sin(new_yaw / 2)])
+
+
+def load_robot_frame_offsets(path=ROBOT_FRAME_OFFSETS_FILE):
+    """activity -> {scene, frames: keyframe label -> [dx, dy, dyaw_deg]}.
+
+    See metadata/mujoco_robot_frame_offsets.json and docs/mujoco_export.md.
+    """
+    if not os.path.exists(path):
+        return {}
+    with open(path) as f:
+        activities = json.load(f)["activities"]
+    for activity, entry in activities.items():
+        for label, shift in entry["frames"].items():
+            if len(shift) != 3:
+                raise ValueError(f"{activity} {label}: a frame shift is [dx, dy, dyaw_deg], got {shift}")
+    return activities
+
+
 def _pose_delta(a, b):
     dpos = float(np.linalg.norm(np.asarray(a["pos"]) - np.asarray(b["pos"])))
     rel = R.from_quat(a["ori"]).inv() * R.from_quat(b["ori"])
@@ -294,6 +327,7 @@ class ActivityExporter:
         self.kb = KnowledgeBase()
         self.archive_joint_cache = {}
         self.urdf_joint_cache = {}
+        self.robot_frame_offsets = load_robot_frame_offsets(args.robot_frame_offsets)
 
     def og_joint_names(self, objects_zf, category, model):
         """OmniGibson's joint order for a model, and whether it's known."""
@@ -491,6 +525,25 @@ class ActivityExporter:
             robot_frames.append((label, f"robot_{label}", key, pose))
             instance_states.append((split, inst_id, member, label, state))
 
+        # Robot frames: BEHAVIOR's R1Pro base poses reduced to their yaw, then
+        # shifted where metadata/mujoco_robot_frame_offsets.json says so that
+        # Huba fits there.
+        offsets = self.robot_frame_offsets.get(activity)
+        shifts = {}
+        if offsets is not None:
+            if offsets["scene"] != scene:
+                raise ValueError(f"robot frame offsets are for scene {offsets['scene']}, not {scene}")
+            shifts = offsets["frames"]
+            unknown = set(shifts) - {label for label, _, _, _ in robot_frames}
+            if unknown:
+                raise ValueError(f"robot frame offsets for unknown keyframes: {sorted(unknown)}")
+        frame_poses = {}
+        for label, _, _, pose in robot_frames:
+            pos, quat, _ = yaw_frame(pose)
+            if label in shifts:
+                pos, quat = shift_frame(pos, quat, shifts[label])
+            frame_poses[label] = (pos, quat, shifts.get(label))
+
         sidecar_modes = {}
         for mode_name, mode in modes.items():
             root = ET.Element("mujoco", {"model": f"{base_name}_{mode_name}"})
@@ -532,8 +585,8 @@ class ActivityExporter:
                 mujoco_scene_utils.add_object(
                     worldbody_xml, name, asset, state["pos"], _quat_wxyz(state["ori"]), record["fixed"], record["scale"]
                 )
-            for _, frame_name, _, pose in robot_frames:
-                pos, quat, _ = yaw_frame(pose)
+            for label, frame_name, _, _ in robot_frames:
+                pos, quat, _ = frame_poses[label]
                 mujoco_scene_utils.add_robot_frame(worldbody_xml, frame_name, pos, quat)
 
             # Resolve attach models for the qpos layout: parts, and the
@@ -634,7 +687,8 @@ class ActivityExporter:
                     systems[inst] = value
                     has_systems = True
             key, pose = frames[label]
-            pos, quat, tilt = yaw_frame(pose)
+            _, _, tilt = yaw_frame(pose)
+            frame_pos, frame_quat, frame_shift = frame_poses[label]
             sidecar_instances.append(
                 {
                     "id": inst_id,
@@ -647,6 +701,11 @@ class ActivityExporter:
                         "position": pose["position"],
                         "orientation_xyzw": pose["orientation"],
                         "tilt_deg": round(tilt, 3),
+                    },
+                    "robot_frame_pose": {
+                        "position": [float(v) for v in mujoco_common.fmt(frame_pos).split()],
+                        "quat_wxyz": [float(v) for v in mujoco_common.fmt(frame_quat).split()],
+                        "shift": frame_shift,
                     },
                     "nonkin": nonkin,
                     "systems": systems,
@@ -771,6 +830,11 @@ def main():
     parser.add_argument("--splits", default="train,test")
     parser.add_argument("--max_instances_per_split", type=int, default=0)
     parser.add_argument("--robot_pose_key", default="R1Pro")
+    parser.add_argument(
+        "--robot_frame_offsets",
+        default=str(ROBOT_FRAME_OFFSETS_FILE),
+        help="Per-keyframe robot frame shifts (metadata/mujoco_robot_frame_offsets.json)",
+    )
     parser.add_argument("--workers", type=int, default=16)
     args = parser.parse_args()
     args.splits = set(args.splits.split(","))

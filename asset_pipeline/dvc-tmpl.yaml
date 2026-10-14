@@ -407,6 +407,7 @@ stages:
     - b1k_pipeline/export_tasks_mujoco.py
     - b1k_pipeline/mujoco_common.py
     - b1k_pipeline/mujoco_scene_utils.py
+    - metadata/mujoco_robot_frame_offsets.json
     outs:
     - artifacts/parallels/tasks_mujoco.zip
     - artifacts/pipeline/export_tasks_mujoco.json
