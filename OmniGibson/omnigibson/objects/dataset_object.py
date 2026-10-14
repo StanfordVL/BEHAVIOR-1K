@@ -370,9 +370,10 @@ class DatasetObject(USDObject):
     def _apply_usd_hotfixes(self, stage, default_prim):
         super()._apply_usd_hotfixes(stage, default_prim)
 
-        # Apply this model's hotfix, if it has one
+        # Apply this model's hotfix, if it has one and it isn't already baked into the asset (bake version >= 2)
         hotfix = MODEL_USD_HOTFIXES.get(self.model, None)
-        if hotfix is not None:
+        bake_version = default_prim.GetAttribute("ig:bakeVersion")
+        if hotfix is not None and not (bake_version and bake_version.HasAuthoredValue() and bake_version.Get() >= 2):
             log.info(f"Applying USD hotfix for {self.category}/{self.model}")
             hotfix(stage, default_prim)
 
@@ -451,19 +452,33 @@ class DatasetObject(USDObject):
 
             prismatic_joints = find_all_prim_children_with_type(prim_type="PhysicsPrismaticJoint", root_prim=self._prim)
             revolute_joints = find_all_prim_children_with_type(prim_type="PhysicsRevoluteJoint", root_prim=self._prim)
+
+            def _set_if_changed(joint_prim, attr_name, value):
+                # Skip writes the asset already has (e.g. baked assets): authoring even an unchanged value creates
+                # an opinion on the stage, which resyncs the joint and makes the Newton backend rebuild its model
+                attr = joint_prim.GetAttribute(attr_name)
+                current = attr.Get()
+                same = (
+                    current == value
+                    if isinstance(value, str)
+                    else current is not None and math.isclose(current, value, rel_tol=1e-6, abs_tol=1e-12)
+                )
+                if not same:
+                    attr.Set(value)
+
             with og.sim.editing_usd():
                 for prismatic_joint in prismatic_joints:
-                    prismatic_joint.GetAttribute("drive:linear:physics:type").Set("acceleration")
-                    prismatic_joint.GetAttribute("drive:linear:physics:damping").Set(DEFAULT_PRISMATIC_JOINT_DAMPING)
-                    prismatic_joint.GetAttribute("drive:linear:physics:stiffness").Set(0.0)
-                    prismatic_joint.GetAttribute("drive:linear:physics:targetPosition").Set(0.0)
-                    prismatic_joint.GetAttribute("drive:linear:physics:targetVelocity").Set(0.0)
+                    _set_if_changed(prismatic_joint, "drive:linear:physics:type", "acceleration")
+                    _set_if_changed(prismatic_joint, "drive:linear:physics:damping", DEFAULT_PRISMATIC_JOINT_DAMPING)
+                    _set_if_changed(prismatic_joint, "drive:linear:physics:stiffness", 0.0)
+                    _set_if_changed(prismatic_joint, "drive:linear:physics:targetPosition", 0.0)
+                    _set_if_changed(prismatic_joint, "drive:linear:physics:targetVelocity", 0.0)
                 for revolute_joint in revolute_joints:
-                    revolute_joint.GetAttribute("drive:angular:physics:type").Set("acceleration")
-                    revolute_joint.GetAttribute("drive:angular:physics:damping").Set(DEFAULT_REVOLUTE_JOINT_DAMPING)
-                    revolute_joint.GetAttribute("drive:angular:physics:stiffness").Set(0.0)
-                    revolute_joint.GetAttribute("drive:angular:physics:targetPosition").Set(0.0)
-                    revolute_joint.GetAttribute("drive:angular:physics:targetVelocity").Set(0.0)
+                    _set_if_changed(revolute_joint, "drive:angular:physics:type", "acceleration")
+                    _set_if_changed(revolute_joint, "drive:angular:physics:damping", DEFAULT_REVOLUTE_JOINT_DAMPING)
+                    _set_if_changed(revolute_joint, "drive:angular:physics:stiffness", 0.0)
+                    _set_if_changed(revolute_joint, "drive:angular:physics:targetPosition", 0.0)
+                    _set_if_changed(revolute_joint, "drive:angular:physics:targetVelocity", 0.0)
 
         elif self._prim_type == PrimType.CLOTH:
             if category_mass is not None:

@@ -453,7 +453,11 @@ class JointPrim(BasePrim):
         Args:
             friction (float): friction to set
         """
-        self.set_attribute("physxJoint:jointFriction", friction)
+        # Skip the USD write if the asset already has this value: authoring it anyway resyncs the joint, which makes
+        # the Newton backend rebuild its whole model
+        current = self.get_attribute("physxJoint:jointFriction")
+        if current is None or abs(current - friction) > 1e-6 * max(abs(friction), 1.0):
+            self.set_attribute("physxJoint:jointFriction", friction)
         if og.sim.is_playing():
             self._articulation_view.set_friction_coefficients(th.tensor([[friction]]), joint_indices=self.dof_indices)
 
