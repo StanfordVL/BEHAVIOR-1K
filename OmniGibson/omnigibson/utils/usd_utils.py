@@ -3354,6 +3354,17 @@ def get_mesh_volume_and_com(mesh_prim, world_frame=False):
     Returns:
         Tuple[float, th.tensor]: Tuple containing the (volume, center_of_mass) in the mesh frame or the world frame
     """
+    # Use the values baked into the asset (mesh-local frame) when present, instead of rebuilding the trimesh.
+    # The world frame follows from the world transform M: volume scales by |det(M)| and the CoM maps through M.
+    volume_attr = mesh_prim.GetAttribute("ig:meshVolume")
+    if volume_attr and volume_attr.HasAuthoredValue():
+        volume = volume_attr.Get()
+        com = th.tensor(mesh_prim.GetAttribute("ig:meshCenterOfMass").Get(), dtype=th.float64)
+        if world_frame:
+            tf = get_world_pose_with_scale(mesh_prim.GetPath().pathString).cpu().to(th.float64)
+            volume = volume * abs(th.linalg.det(tf[:3, :3]).item())
+            com = tf[:3, :3] @ com + tf[:3, 3]
+        return volume, com.to(dtype=th.float32)
 
     trimesh_mesh = mesh_prim_to_trimesh_mesh(
         mesh_prim, include_normals=False, include_texcoord=False, world_frame=world_frame

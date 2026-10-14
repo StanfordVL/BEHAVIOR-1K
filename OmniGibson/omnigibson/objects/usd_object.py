@@ -143,6 +143,8 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         self._usd_path = usd_path
         self._encrypted = encrypted
         self._expected_file_hash = expected_file_hash
+        # Prepared (decrypted / articulation-root-preapplied) USD, set by prebuild() or load()
+        self._prepared_usd_path = None
         # Generate default prim path if none is specified
         relative_prim_path = f"/{name}" if relative_prim_path is None else relative_prim_path
 
@@ -378,6 +380,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         """
         # The /World in the scene USD will be mapped to /World/scene_i in Isaac Sim.
         usd_path = self._prepare_to_load()
+        self._prepared_usd_path = usd_path
         prim_path = "/World" + self._relative_prim_path
         prim = stage.GetPrimAtPath(prim_path)
         assert not prim.IsValid(), f"Prim path {prim_path} already exists in the stage!"
@@ -388,10 +391,12 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         return add_asset_to_stage(asset_path=self._prepared_usd_path, prim_path=self.prim_path)
 
     def load(self, scene):
-        # Always run _prepare_to_load (which calls _preapply_articulation_root) so that
+        # _prepare_to_load (which calls _preapply_articulation_root) must have run so that
         # _load_config["kinematic_only"] and _load_config["scale"] are set correctly before
         # _post_load runs, even when the prim already exists in the stage (e.g. from prebuild).
-        self._prepared_usd_path = self._prepare_to_load()
+        # prebuild() already ran it on this same object, so reuse its result instead of redoing it.
+        if self._prepared_usd_path is None or not os.path.exists(self._prepared_usd_path):
+            self._prepared_usd_path = self._prepare_to_load()
         prim = super().load(scene)
         log.info(f"Loaded {self.name} at {self.prim_path}")
         return prim

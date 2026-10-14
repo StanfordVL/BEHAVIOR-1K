@@ -247,9 +247,8 @@ class DatasetObject(USDObject):
         load_config = dict() if load_config is None else load_config
         load_config["bounding_box"] = bounding_box
         load_config["dataset_name"] = dataset_name
-        # All DatasetObjects should have xform properties pre-loaded
-        # TODO: enable this after next dataset release
-        load_config["xform_props_pre_loaded"] = False
+        # All DatasetObjects have xform properties pre-loaded (canonical translate/orient/scale ops as of dataset 3.9.0)
+        load_config["xform_props_pre_loaded"] = True
 
         # Infer the correct usd path to use
         if model is None:

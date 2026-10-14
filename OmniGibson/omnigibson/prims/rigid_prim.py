@@ -223,8 +223,13 @@ class RigidPrim(XFormPrim):
                 # mesh.scale now track og.sim.device -- match that here.
                 coms.append(T.quat2mat(local_orn) @ (com.to(local_orn.device) * mesh.scale) + local_pos)
                 # If the ratio between the max extent and min radius is too large (i.e. shape too oblong), use
-                # boundingCube approximation for the underlying collision approximation for GPU compatibility
-                if prim.HasAPI(lazy.pxr.UsdPhysics.MeshCollisionAPI) and not check_extent_radius_ratio(mesh, com):
+                # boundingCube approximation for the underlying collision approximation for GPU compatibility.
+                # This is a PhysX GPU limit; Newton imports with skip_mesh_approximation=True and ignores it.
+                if (
+                    gm.PHYSICS_BACKEND != "newton"
+                    and prim.HasAPI(lazy.pxr.UsdPhysics.MeshCollisionAPI)
+                    and not check_extent_radius_ratio(mesh, com)
+                ):
                     log.warning(f"Got overly oblong collision mesh: {mesh.name}; use boundingCube approximation")
                     apply_collision_approximation(prim, lazy.pxr.UsdPhysics.MeshCollisionAPI(prim), "boundingCube")
             else:
