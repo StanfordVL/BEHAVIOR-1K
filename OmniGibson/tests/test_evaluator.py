@@ -205,6 +205,27 @@ def test_all_ports_can_fail_without_advancing_simulation():
     assert results[202]["connection_failure"] == "lost"
 
 
+def test_wss_scheme_is_preserved_when_updating_host_and_in_multiport():
+    from omnigibson.eval.policies import WebsocketPolicy
+
+    scheme = "wss"
+    policy = WebsocketPolicy(host="example.org", port=443, scheme=scheme)
+    assert policy.policy._uri == f"{scheme}://example.org:443"
+    policy.update_host("other.example.org", 8443)
+    assert policy.policy._uri == f"{scheme}://other.example.org:8443"
+
+    multi = MultiWebsocketPolicy(
+        [{"host": "a.example.org", "port": 443}, {"host": "b.example.org", "port": 443}], scheme=scheme
+    )
+    try:
+        assert [client._uri for client in multi.clients] == [
+            f"{scheme}://a.example.org:443",
+            f"{scheme}://b.example.org:443",
+        ]
+    finally:
+        multi.close()
+
+
 def test_multiport_policy_queries_concurrently_and_preserves_environment_order(monkeypatch):
     barrier = threading.Barrier(2, timeout=2)
     received = {}

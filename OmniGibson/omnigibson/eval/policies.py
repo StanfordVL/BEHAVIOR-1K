@@ -75,6 +75,7 @@ class WebsocketPolicy:
         *args,
         host: Optional[str] = None,
         port: Optional[int] = None,
+        scheme: str = "ws",
         allow_reconnect: bool = False,
         action_chunk_size: int = 0,
         **kwargs,
@@ -82,6 +83,7 @@ class WebsocketPolicy:
         logging.info(f"Creating websocket client policy with host: {host}, port: {port}")
         self.last_action = None
         self.policy = None
+        self._scheme = scheme
         self._allow_reconnect = allow_reconnect
         self._action_chunk_size = action_chunk_size
         self._deadline = None
@@ -89,6 +91,7 @@ class WebsocketPolicy:
             self.policy = WebsocketClientPolicy(
                 host=host,
                 port=port,
+                scheme=scheme,
                 allow_reconnect=allow_reconnect,
                 action_chunk_size=action_chunk_size,
             )
@@ -97,6 +100,7 @@ class WebsocketPolicy:
         self.policy = WebsocketClientPolicy(
             host=host,
             port=port,
+            scheme=self._scheme,
             allow_reconnect=self._allow_reconnect,
             action_chunk_size=self._action_chunk_size,
         )
@@ -122,11 +126,14 @@ class WebsocketPolicy:
 class MultiWebsocketPolicy:
     """Query one policy server per logical environment while OmniGibson steps them together."""
 
-    def __init__(self, endpoints: list[dict], allow_reconnect: bool = True, action_chunk_size: int = 0) -> None:
+    def __init__(
+        self, endpoints: list[dict], allow_reconnect: bool = True, action_chunk_size: int = 0, scheme: str = "ws"
+    ) -> None:
         self.clients = [
             WebsocketClientPolicy(
                 host=endpoint["host"],
                 port=endpoint["port"],
+                scheme=scheme,
                 allow_reconnect=allow_reconnect,
                 action_chunk_size=action_chunk_size,
             )
