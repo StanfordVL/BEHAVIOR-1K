@@ -417,10 +417,10 @@ class BatchedEvaluator:
         # Heavier base so contact with the (heavy) world does not shove the robot around during eval.
         # base mass writes require the sim stopped; do all robots inside a single stop/play (global op).
         robots = [instance_eval_state.env_accessor.robot for instance_eval_state in self.instance_eval_states]
-        if any(robot.model in ("r1", "r1pro") for robot in robots):
+        if any(robot.model in ("r1", "r1pro", "r1pro_surround") for robot in robots):
             og.sim.stop()
             for robot in robots:
-                if robot.model in ("r1", "r1pro"):
+                if robot.model in ("r1", "r1pro", "r1pro_surround"):
                     robot.base_footprint_link.mass = EVAL_BASE_LINK_MASS
             og.sim.play()
 
