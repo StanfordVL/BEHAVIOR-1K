@@ -20,6 +20,8 @@ a bare quad with a real texture image renders uniform gray, not the image, via `
 the former (this module's approach, matching feat/newton) renders correctly.
 """
 
+import functools
+import inspect
 from dataclasses import dataclass
 
 import numpy as np
@@ -154,7 +156,13 @@ def _load_render_meshes(newton, prim, scale):
 
     faces, corner_indices = _fan_triangulate_faces(counts, indices, flip_winding)
     render_mesh = _make_render_mesh(
-        newton, points, indices, faces, corner_indices, uvs, usd_utils.resolve_material_properties_for_prim(prim)
+        newton,
+        points,
+        indices,
+        faces,
+        corner_indices,
+        uvs,
+        _with_glass_opacity(usd_utils.resolve_material_properties_for_prim(prim), prim),
     )
     return (("", render_mesh),) if render_mesh is not None else ()
 
@@ -166,6 +174,14 @@ def _make_render_mesh(newton, points, indices, faces, corner_indices, uvs, mater
     points, faces, uvs = _compact_mesh(points, indices, faces, corner_indices, uvs)
     texture = material_props.get("texture") if uvs is not None else None
     color = None if texture is not None else material_props.get("color")
+    extra = {}
+    # newton gained per-mesh opacity (and a transparent render pass) in 1.6.0; before that a glass
+    # link renders as an opaque solid -- e.g. the balustrade under a staircase shows up as a large
+    # white block. Forward it only where the installed newton accepts it.
+    if _mesh_supports_opacity(newton):
+        opacity = material_props.get("opacity")
+        if opacity is not None:
+            extra["opacity"] = opacity
     return newton.Mesh(
         points,
         faces.reshape(-1),
@@ -176,7 +192,13 @@ def _make_render_mesh(newton, points, indices, faces, corner_indices, uvs, mater
         roughness=material_props.get("roughness"),
         metallic=material_props.get("metallic"),
         texture=texture,
+        **extra,
     )
+
+
+@functools.lru_cache(maxsize=1)
+def _mesh_supports_opacity(newton):
+    return "opacity" in inspect.signature(newton.Mesh.__init__).parameters
 
 
 @dataclass(frozen=True)
@@ -204,10 +226,45 @@ def _material_subsets(usd_utils, prim, face_count):
             _MaterialSubset(
                 name=child.GetName(),
                 face_indices=face_indices,
-                material_props=usd_utils.resolve_material_properties_for_prim(child),
+                material_props=_with_glass_opacity(usd_utils.resolve_material_properties_for_prim(child), child),
             )
         )
     return tuple(subsets)
+
+
+# OmniGibson's dataset assets express glass with Omniverse's MDL ``OmniGlass`` shader rather than a
+# USD Preview Surface ``opacity`` input, so neither newton's material resolver nor anything reading
+# UsdPreviewSurface ever sees a transparency value -- the mesh then renders as an opaque solid (the
+# balustrade under a staircase becomes a large white block). Map the shader itself to an opacity.
+_OMNI_GLASS_OPACITY = 0.25
+
+
+def _bound_material_is_omni_glass(prim):
+    """True when ``prim``'s bound material is an MDL OmniGlass shader."""
+    try:
+        material, _ = UsdShade.MaterialBindingAPI(prim).ComputeBoundMaterial()
+        if not material:
+            return False
+        for child in Usd.PrimRange(material.GetPrim()):
+            if not child.IsA(UsdShade.Shader):
+                continue
+            shader = UsdShade.Shader(child)
+            sub = shader.GetSourceAssetSubIdentifier("mdl")
+            if sub and "omniglass" in str(sub).lower():
+                return True
+            asset = shader.GetSourceAsset("mdl")
+            if asset and "omniglass" in str(asset.path).lower():
+                return True
+    except Exception:
+        return False
+    return False
+
+
+def _with_glass_opacity(props, prim):
+    if props is not None and props.get("opacity") is None and _bound_material_is_omni_glass(prim):
+        props = dict(props)
+        props["opacity"] = _OMNI_GLASS_OPACITY
+    return props
 
 
 def _direct_material_properties(usd_utils, prim):
@@ -215,7 +272,7 @@ def _direct_material_properties(usd_utils, prim):
     if resolver is not None:
         props = resolver(prim)
         if props is not None:
-            return props
+            return _with_glass_opacity(props, prim)
     empty = getattr(usd_utils, "_empty_material_properties", None)
     if empty is not None:
         return empty()
