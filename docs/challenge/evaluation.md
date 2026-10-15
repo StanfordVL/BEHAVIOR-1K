@@ -113,25 +113,29 @@ In multi-port evaluation, each rollout has an accounted time budget of max_steps
 ### Optional action-chunk replay protocol
 
 Action-chunk replay is disabled by default. Setting <code>--replay-action-chunk-size K</code> with
-<code>K &gt; 1</code> asks a compatible policy server for <code>K</code> actions by adding the reserved
+<code>K &gt; 1</code> asks a compatible policy server for up to <code>K</code> actions by adding the reserved
 <code>__action_chunk_size__</code> field to the observation request. The server response must contain:
 
 ```python
 {
     "action": ...,        # shape: (..., action_dim)
-    "action_chunk": ...,  # shape: (..., K, action_dim)
+    "action_chunk": ...,  # shape: (..., L, action_dim), where 1 <= L <= K
 }
 ```
 
 The first action in <code>action_chunk</code> must exactly equal <code>action</code>. The client returns that first
-action immediately, then executes the remaining <code>K - 1</code> actions without another websocket request.
+action immediately, then executes the remaining <code>L - 1</code> actions without another websocket request.
+The server may choose a different length on each inference. Once the returned chunk is exhausted, the client
+queries the policy with a new observation. In multi-port evaluation, each port independently caches and replays
+its own chunk; simulator stepping remains synchronized. Each replayed action still counts as one simulation step,
+and rollout termination and time-budget checks remain in effect.
 The cached chunk is cleared on episode reset. If a server omits <code>action_chunk</code>, the client logs a warning
 and falls back to one request per simulator step. The generic <code>WebsocketPolicyServer</code> implements this
 fallback protocol; a chunk-capable policy server must implement the optional response field itself.
 
 Only enable replay when the server returns an action sequence intended to be executed open-loop from the current
-observation, such as one receding-horizon policy chunk, and choose <code>K</code> so replay never crosses the policy's
-replanning boundary. Do not enable it for temporal ensembling or for a server that repeatedly re-runs or blends the
+observation, such as one receding-horizon policy chunk. Return a length <code>L</code> that never crosses the policy's
+replanning boundary, up to the configured maximum <code>K</code>. Do not enable it for temporal ensembling or for a server that repeatedly re-runs or blends the
 policy on the same stale observation; those actions are not equivalent to normal closed-loop evaluation.
 
 Each successful rollout produces a JSON result containing `q_score`, `time`, `agent_distance`, and normalized efficiency metrics. For challenge submissions, run evaluation with `--write-video`; this records the head and wrist camera videos that must be submitted with the rollout metrics.

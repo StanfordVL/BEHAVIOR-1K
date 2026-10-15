@@ -66,7 +66,7 @@ class WebsocketClientPolicy:
             allow_reconnect (bool): Whether to allow automatic reconnection if the websocket connection is lost.
                 If False, the client will raise an error if the connection is lost.
                 If True, the client will attempt to reconnect up to three times per rollout.
-            action_chunk_size (int): Number of server-returned actions to execute before requesting a new
+            action_chunk_size (int): Maximum number of server-returned actions to execute before requesting a new
                 observation-conditioned action. Values <= 1 disable chunk requests. Only enable this when the
                 server returns an exact open-loop action sequence produced from the current observation.
         """
@@ -225,10 +225,17 @@ class WebsocketClientPolicy:
             if self._chunk_requests_supported:
                 if "action_chunk" in action_dict:
                     chunk = th.from_numpy(deepcopy(action_dict["action_chunk"])).to(th.float32)
-                    expected_shape = (*action.shape[:-1], self._action_chunk_size, action.shape[-1])
-                    if chunk.shape != expected_shape:
+                    valid_shape = (
+                        chunk.ndim == action.ndim + 1
+                        and chunk.shape[:-2] == action.shape[:-1]
+                        and chunk.shape[-1] == action.shape[-1]
+                        and 1 <= chunk.shape[-2] <= self._action_chunk_size
+                    )
+                    if not valid_shape:
                         raise RuntimeError(
-                            f"Server returned action_chunk shape {tuple(chunk.shape)}, expected {expected_shape}."
+                            f"Server returned action_chunk shape {tuple(chunk.shape)}; expected batch shape "
+                            f"{tuple(action.shape[:-1])}, 1 to {self._action_chunk_size} actions, "
+                            f"and action dimension {action.shape[-1]}."
                         )
                     if not th.equal(chunk[..., 0, :], action):
                         raise RuntimeError("Server action must exactly equal action_chunk[..., 0, :].")
