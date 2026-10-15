@@ -420,8 +420,9 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         if "visible" in self._load_config and self._load_config["visible"] is not None:
             self.visible = self._load_config["visible"]
 
-        # Set position / velocity solver iterations if we're not cloth and not kinematic only
-        if self._prim_type != PrimType.CLOTH and not self.kinematic_only:
+        # Set position / velocity solver iterations if we're not cloth and not kinematic only. These are PhysX
+        # (physxArticulation / physxRigidBody) attributes, which the Newton backend never reads
+        if self._prim_type != PrimType.CLOTH and not self.kinematic_only and gm.PHYSICS_BACKEND != "newton":
             self.solver_position_iteration_count = m.DEFAULT_SOLVER_POSITION_ITERATIONS
             self.solver_velocity_iteration_count = m.DEFAULT_SOLVER_VELOCITY_ITERATIONS
 

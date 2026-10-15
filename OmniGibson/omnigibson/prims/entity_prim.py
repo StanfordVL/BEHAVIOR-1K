@@ -83,8 +83,8 @@ class EntityPrim(XFormPrim):
         # Run super method
         super()._initialize()
 
-        if not self.kinematic_only:
-            # Set the default sleep threshold
+        if not self.kinematic_only and gm.PHYSICS_BACKEND != "newton":
+            # Set the default sleep threshold (a PhysX attribute, which the Newton backend never reads)
             self.sleep_threshold = m.DEFAULT_SLEEP_THRESHOLD
 
         # Initialize all the links

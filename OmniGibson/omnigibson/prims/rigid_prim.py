@@ -266,17 +266,22 @@ class RigidPrim(XFormPrim):
         """
         Enable collisions for all collision meshes owned by this RigidPrim
         """
-        with og.sim.editing_usd():
-            for collision_api in self._collision_apis:
-                collision_api.GetCollisionEnabledAttr().Set(True)
+        self._set_collisions_enabled(True)
 
     def disable_collisions(self):
         """
         Disable collisions for all collision meshes owned by this RigidPrim
         """
+        self._set_collisions_enabled(False)
+
+    def _set_collisions_enabled(self, enabled):
+        # Only author the attribute where it changes (unauthored resolves to the schema default, True), so loading an
+        # object doesn't write a no-op opinion onto every collision mesh
         with og.sim.editing_usd():
             for collision_api in self._collision_apis:
-                collision_api.GetCollisionEnabledAttr().Set(False)
+                attr = collision_api.GetCollisionEnabledAttr()
+                if attr.Get() != enabled:
+                    attr.Set(enabled)
 
     def set_contact_offset(self, offset):
         """
