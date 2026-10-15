@@ -394,6 +394,8 @@ def test_multiport_rollout_budget_adds_own_query_and_shared_simulator_time(monke
         failures = policy.charge_simulation(0.5, [0])
         assert isinstance(failures[0], PolicyTimeoutError)
         assert policy.elapsed[0] == pytest.approx(1.1)
+        assert policy.policy_time[0] == pytest.approx(0.6)
+        assert policy.sim_time[0] == pytest.approx(0.5)
     finally:
         policy.close()
 

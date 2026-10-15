@@ -814,7 +814,10 @@ class BatchedEvaluator:
             if isinstance(self.policy, MultiWebsocketPolicy):
                 # Wall-clock seconds charged to this rollout, distinct from simulated time.
                 evaluation_time = self.policy.elapsed[env_idx]
-                result.setdefault("time", {})["evaluation_time"] = evaluation_time
+                # Breakdown: this environment's policy queries plus its 1/num_envs share of shared simulator stepping.
+                result.setdefault("time", {})["policy_time"] = self.policy.policy_time[env_idx]
+                result["time"]["sim_time"] = self.policy.sim_time[env_idx]
+                result["time"]["evaluation_time"] = evaluation_time
                 result["time"]["evaluation_fps"] = step / evaluation_time if evaluation_time > 0 else None
             if metrics_dir is not None:
                 with open(os.path.join(metrics_dir, f"{task_name}_{instance}_{rollout_id}.json"), "w") as f:
