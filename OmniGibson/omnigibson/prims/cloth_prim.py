@@ -17,6 +17,7 @@ import uuid
 
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.python_utils import multi_dim_linspace
+import numpy as np
 import torch as th
 from omnigibson.utils.ui_utils import create_module_logger
 import trimesh
@@ -117,11 +118,12 @@ class ClothPrim(GeomPrim):
             "remesh", True
         ) and self.get_available_configurations() == ["default"]
         if should_remesh_because_of_scale or should_remesh_because_legacy or force_remesh:
-            # Remesh the object if necessary
-            log.warning(
-                f"Remeshing cloth {self.name}. This happens when cloth is loaded with non-unit scale or forced using the forced_remesh argument. It invalidates precached info for settled, folded, and crumpled configurations."
-            )
-            self._remesh()
+            # A unit-scale load can use the remeshed mesh baked into the asset instead of remeshing at load time
+            if should_remesh_because_of_scale or force_remesh or not self._apply_baked_remesh():
+                log.warning(
+                    f"Remeshing cloth {self.name}. This happens when cloth is loaded with non-unit scale or forced using the forced_remesh argument. It invalidates precached info for settled, folded, and crumpled configurations."
+                )
+                self._remesh()
 
         # Set the mesh to use the desired configuration
         points_configuration = self._load_config.get("default_point_configuration", "default")
@@ -265,17 +267,54 @@ class ClothPrim(GeomPrim):
             vertex_normals=new_normals,
         )
         # Apply the inverse of the world transform to get the mesh back into its local frame
-        tm.apply_transform(th.linalg.inv_ex(scaled_world_transform).inverse)
+        # trimesh is numpy-only, so the transform must be on the CPU regardless of og.sim.device
+        tm.apply_transform(th.linalg.inv_ex(scaled_world_transform).inverse.cpu())
+        self._set_remeshed_mesh(tm.vertices, tm.faces, tm.vertex_normals, texcoord)
+
+    def _apply_baked_remesh(self):
+        """
+        Uses the unit-scale remeshed mesh baked into the asset (ig:clothRemesh:* attributes, mesh-local frame), if any,
+        in place of remeshing at load time.
+
+        Returns:
+            bool: Whether a baked remeshed mesh was found and applied
+        """
+        points_attr = self.prim.GetAttribute("ig:clothRemesh:points")
+        if not points_attr or not points_attr.HasAuthoredValue():
+            return False
+        texcoord_attr = self.prim.GetAttribute("ig:clothRemesh:st")
+        self._set_remeshed_mesh(
+            vertices=points_attr.Get(),
+            faces=self.prim.GetAttribute("ig:clothRemesh:faceVertexIndices").Get(),
+            normals=self.prim.GetAttribute("ig:clothRemesh:normals").Get(),
+            texcoord=texcoord_attr.Get() if texcoord_attr and texcoord_attr.HasAuthoredValue() else None,
+        )
+        return True
+
+    def _set_remeshed_mesh(self, vertices, faces, normals, texcoord):
+        """
+        Writes a remeshed triangle mesh (mesh-local frame) to this prim and makes it the default configuration.
+
+        Args:
+            vertices ((N, 3)-array): vertex positions
+            faces ((M, 3)-array or flat (3M,)-array): triangle vertex indices
+            normals ((N, 3)-array): per-vertex normals
+            texcoord (None or (3M, 2)-array): per-face-corner texture coordinates, if the mesh has a UV mapping
+        """
+        vertices = np.asarray(vertices, dtype=np.float32).reshape(-1, 3)
+        faces = np.asarray(faces, dtype=np.int32).reshape(-1, 3)
+        normals = np.asarray(normals, dtype=np.float32).reshape(-1, 3)
 
         # Update the mesh prim to store the new information. First update the non-configuration-
         # dependent fields
         with og.sim.editing_usd():
-            face_vertex_counts = th.tensor([len(face) for face in tm.faces], dtype=int).cpu().numpy()
-            self.prim.GetAttribute("faceVertexCounts").Set(face_vertex_counts)
-            self.prim.GetAttribute("faceVertexIndices").Set(tm.faces.flatten())
-            self.prim.GetAttribute("normals").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm.vertex_normals))
-            if has_uv_mapping:
-                self.prim.GetAttribute("primvars:st").Set(lazy.pxr.Vt.Vec2fArray.FromNumpy(texcoord))
+            self.prim.GetAttribute("faceVertexCounts").Set(np.full(len(faces), 3, dtype=np.int32))
+            self.prim.GetAttribute("faceVertexIndices").Set(faces.flatten())
+            self.prim.GetAttribute("normals").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(normals))
+            if texcoord is not None:
+                self.prim.GetAttribute("primvars:st").Set(
+                    lazy.pxr.Vt.Vec2fArray.FromNumpy(np.asarray(texcoord, dtype=np.float32).reshape(-1, 2))
+                )
 
             # Remove the properties for all configurations
             for config in CLOTH_CONFIGURATIONS:
@@ -284,7 +323,7 @@ class ClothPrim(GeomPrim):
                     self.prim.RemoveProperty(attr_name)
 
         # Then update the configuration-dependent fields
-        self.save_configuration("default", th.tensor(tm.vertices, dtype=th.float32))
+        self.save_configuration("default", th.tensor(vertices, dtype=th.float32))
 
         # Then update the points to the default configuration
         self.reset_points_to_configuration("default")
