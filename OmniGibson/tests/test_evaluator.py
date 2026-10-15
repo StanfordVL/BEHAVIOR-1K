@@ -104,9 +104,12 @@ def test_group_deadline_starts_after_load_and_preserves_completed_rollouts(monke
     def load_fn(instances):
         clock[0] += 1000  # Scene startup is excluded.
 
+    def initialize_fn():
+        clock[0] += 50  # Initial policy connection/reset is also excluded.
+
     def step_fn(active_env_indices):
         clock[0] += 1
-        if clock[0] == 1101:
+        if clock[0] == 1151:
             return [True, False], [False, False]
         clock[0] += 3
         return [False, False], [False, False]
@@ -119,9 +122,10 @@ def test_group_deadline_starts_after_load_and_preserves_completed_rollouts(monke
         record_fn=lambda **record: record,
         time_limit_seconds=4,
         start_fn=lambda deadline: observed_deadlines.append(deadline),
+        initialize_fn=initialize_fn,
     )
 
-    assert observed_deadlines == [1104]
+    assert observed_deadlines == [1154]
     assert results[101]["terminated"] is True
     assert results[101]["truncated"] is False
     assert "timeout_failure" not in results[101]

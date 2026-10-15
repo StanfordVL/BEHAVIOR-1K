@@ -55,6 +55,7 @@ if TORCH_NUM_INTEROP_THREADS is not None:
 LIGHT_EVAL_TASKS = {"turning_out_all_lights_before_sleep"}
 EVAL_BASE_LINK_MASS = 250.0
 EVAL_HEAD_HORIZONTAL_APERTURE = 40.0
+POLICY_INITIALIZATION_TIMEOUT = 600.0
 DEFAULT_ROBOT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "r1pro.yaml")
 EVAL_MODES = ("train", "public_test", "hidden_test")
 
@@ -108,6 +109,7 @@ def evaluate_instances_batched(
     max_steps: Optional[int] = None,
     time_limit_seconds: Optional[float] = None,
     start_fn: Optional[Callable[[Optional[float]], None]] = None,
+    initialize_fn: Optional[Callable[[], None]] = None,
 ) -> "Dict[object, object]":
     """
     Drive one parallel evaluation batch with exactly one instance per logical environment. Pure
@@ -143,6 +145,14 @@ def evaluate_instances_batched(
         return results
 
     load_fn(dict(env_idx_to_instance))
+
+    try:
+        if initialize_fn is not None:
+            initialize_fn()
+    except PolicyConnectionError as e:
+        return fail_unfinished("connection_failure", str(e))
+    except PolicyTimeoutError as e:
+        return fail_unfinished("timeout_failure", str(e))
 
     deadline = time.monotonic() + time_limit_seconds if time_limit_seconds is not None else None
     try:
@@ -749,13 +759,27 @@ class BatchedEvaluator:
                 video_fps=video_fps,
             )
 
+        def initialize_fn():
+            # Bound initial connection/reset separately, without consuming the rollout budget.
+            if isinstance(self.policy, MultiWebsocketPolicy):
+                self.policy.set_time_budget(POLICY_INITIALIZATION_TIMEOUT)
+            elif isinstance(self.policy, WebsocketPolicy):
+                self.policy.set_deadline(time.monotonic() + POLICY_INITIALIZATION_TIMEOUT)
+            try:
+                self.policy.reset()
+            finally:
+                if isinstance(self.policy, MultiWebsocketPolicy):
+                    # Preserve per-port initialization failures, but discard startup timing.
+                    self.policy.set_time_budget(None)
+                elif hasattr(self.policy, "set_deadline"):
+                    self.policy.set_deadline(None)
+
         def start_fn(deadline):
-            # Scene loading is outside the budget; policy reset and any reconnect are inside it.
+            # Begin scoring immediately before the first action query, after initialization.
             if isinstance(self.policy, MultiWebsocketPolicy):
                 self.policy.set_time_budget(self.max_steps)
             elif hasattr(self.policy, "set_deadline"):
                 self.policy.set_deadline(deadline)
-            self.policy.reset()
 
         def step_fn(active_env_indices):
             step_result = self._step_fn(active_env_indices)
@@ -838,6 +862,7 @@ class BatchedEvaluator:
             record_fn=record_fn,
             time_limit_seconds=self.max_steps if isinstance(self.policy, WebsocketPolicy) else None,
             start_fn=start_fn,
+            initialize_fn=initialize_fn,
         )
 
     def __enter__(self):
