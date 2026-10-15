@@ -24,6 +24,10 @@ setup(
         "huggingface-hub[cli]>=0.34.4",
         "gymnasium>=0.28.1",
         "numpy<2.0.0,>=1.23.5",
+        # pyarrow 26 dropped numpy 1.x support, but isaacsim-kernel pins numpy==1.26.0.
+        # Without this bound, lerobot[dataset] -> datasets pulls pyarrow>=26 and every
+        # `import omnigibson` fails in omnigibson/envs/lerobot_data_wrapper.py.
+        "pyarrow<26",
         "scipy>=1.10.1",
         "GitPython>=3.1.40",
         "transforms3d>=0.4.1",
