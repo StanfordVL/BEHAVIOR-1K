@@ -502,19 +502,21 @@ class BatchedEvaluator:
             for key in keys
         }
 
-    def _step_fn(self, active_env_indices: List[int]):
+    def _step_fn(self, active_env_indices: List[int], policy_result=None):
         """
         Query active policies, then step the shared simulator once. Finished or failed environments
-        get zero actions and are not scored further.
+        get zero actions and are not scored further. A prefetched first-query result is executed
+        without querying again; its simulation step is charged normally.
         """
         action_dim = self.instance_eval_states[0].env_accessor.robot.action_dim
         if isinstance(self.policy, MultiWebsocketPolicy):
-            policy_result = self.policy.forward(
-                obs=[state.obs for state in self.instance_eval_states], active_env_indices=active_env_indices
-            )
+            if policy_result is None:
+                policy_result = self.policy.forward(
+                    obs=[state.obs for state in self.instance_eval_states], active_env_indices=active_env_indices
+                )
             batched_action, failures = policy_result.actions, policy_result.failures
         else:
-            batched_action = self.policy.forward(obs=self._batch_obs())
+            batched_action = self.policy.forward(obs=self._batch_obs()) if policy_result is None else policy_result
             failures = {}
         if batched_action.ndim == 1:
             batched_action = batched_action.unsqueeze(0)
@@ -750,6 +752,8 @@ class BatchedEvaluator:
         """
         task_name = self.cfg.task.name
 
+        first_policy_result = None
+
         def load_fn(env_idx_to_instance):
             self.load_batch(
                 env_idx_to_instance,
@@ -760,6 +764,7 @@ class BatchedEvaluator:
             )
 
         def initialize_fn():
+            nonlocal first_policy_result
             # Bound initial connection/reset separately, without consuming the rollout budget.
             if isinstance(self.policy, MultiWebsocketPolicy):
                 self.policy.set_time_budget(POLICY_INITIALIZATION_TIMEOUT)
@@ -774,15 +779,30 @@ class BatchedEvaluator:
                 elif hasattr(self.policy, "set_deadline"):
                     self.policy.set_deadline(None)
 
+            # One uncharged query per rollout, still bounded by the client's 600-second limit.
+            # Reconnects stay inside that query's deadline and do not grant another allowance.
+            if isinstance(self.policy, MultiWebsocketPolicy):
+                first_policy_result = self.policy.forward(
+                    obs=[state.obs for state in self.instance_eval_states],
+                    active_env_indices=list(range(self.num_envs)),
+                )
+            elif isinstance(self.policy, WebsocketPolicy):
+                first_policy_result = self.policy.forward(obs=self._batch_obs())
+
         def start_fn(deadline):
-            # Begin scoring immediately before the first action query, after initialization.
+            # Begin scoring after the first query, before executing its first action.
             if isinstance(self.policy, MultiWebsocketPolicy):
                 self.policy.set_time_budget(self.max_steps)
             elif hasattr(self.policy, "set_deadline"):
                 self.policy.set_deadline(deadline)
 
         def step_fn(active_env_indices):
-            step_result = self._step_fn(active_env_indices)
+            nonlocal first_policy_result
+            if first_policy_result is None:
+                step_result = self._step_fn(active_env_indices)
+            else:
+                policy_result, first_policy_result = first_policy_result, None
+                step_result = self._step_fn(active_env_indices, policy_result=policy_result)
             if write_video:
                 for env_idx in active_env_indices:
                     if env_idx in step_result.failures or not step_result.advanced:
