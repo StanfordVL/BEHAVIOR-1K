@@ -159,7 +159,7 @@ class SuppressLogsUntilError:
 class _StandaloneApp:
     """
     Lightweight stand-in for Isaac Sim's `SimulationApp`, used when the selected physics backend
-    reports `runs_inside_kit = False`. Only implements what `og.app` is touched for elsewhere
+    is not `"physx"`. Only implements what `og.app` is touched for elsewhere
     (truthiness, `.shutdown()`, and `.close()` -- `og.shutdown()` calls the latter specifically).
     """
 

@@ -48,13 +48,16 @@ EXAMPLES_TO_SKIP = [
     "object_states.object_state_texture_demo",  # disable temporarily due to contact API bug
     "object_states.overlaid_demo",  # cloth (Overlaid state) broken, see #2042 and test_object_states.py skips
     # WIP examples: currently broken, to be supported again in the future
+    "wip.claude_plan_and_execute",  # needs a cached plan or an Anthropic API key
     "wip.curobo_example",
     "wip.folded_unfolded_state_demo",
     "wip.heat_source_or_sink_demo",
     "wip.particle_source_sink_demo",
     "wip.rs_int_primitives_example",
     "wip.solve_behavior_task",
+    "wip.solve_picking_up_trash",  # long multi-object rollout, needs the 2026 challenge task instances
     "wip.solve_simple_task",
+    "wip.solve_turning_on_radio",  # long task rollout, needs the 2026 challenge task instances
     "wip.view_cloth_configurations",
 ]
 

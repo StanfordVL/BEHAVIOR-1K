@@ -9,8 +9,13 @@ import omnigibson.utils.transform_utils_np as NT
 def _to_numpy_compatible(x):
     # og.sim.device can now be a non-CPU (e.g. CUDA) device under the Newton backend. np.array() on a
     # CUDA torch.Tensor raises "can't convert cuda:0 device type tensor to numpy", so any torch tensor
-    # handed to the numpy compute backend must be explicitly moved to CPU first.
-    return x.detach().cpu().numpy() if isinstance(x, th.Tensor) else x
+    # handed to the numpy compute backend must be explicitly moved to CPU first -- including tensors
+    # nested inside a list/tuple (e.g. DifferentialDriveController's (lin, ang) limits of 0-dim tensors).
+    if isinstance(x, th.Tensor):
+        return x.detach().cpu().numpy()
+    if isinstance(x, (list, tuple)):
+        return type(x)(_to_numpy_compatible(v) for v in x)
+    return x
 
 
 # Global function for adding custom compute functions

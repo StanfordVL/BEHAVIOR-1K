@@ -414,7 +414,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             else:
                 new_scene_edge = last_scene_edge + scene_margin + (aabb_max[0] - aabb_min[0])
         else:
-            scene_position = th.zeros(3)
+            scene_position = th.zeros(3, device=og.sim.device)
             aabb_min, aabb_max = og.sim.render_backend.compute_world_aabb(scene_absolute_path)
             new_scene_edge = 0.0 if len(self._init_objs) == 0 else aabb_max[0]
 

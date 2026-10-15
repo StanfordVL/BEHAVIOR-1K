@@ -72,6 +72,16 @@ FULL_SCENE = False
 VIEWING_MODE = ViewingMode.MULTI_VIEW_1
 SIMPLIFIED_TRUNK_CONTROL = True
 APPLY_EXTRA_GRIP = False
+# Grasping mode the teleoperated robot loads with, one of "assisted" (default), "sticky" or
+# "physical". og_launch's --grasping-mode overrides this per run.
+#
+# "physical" is the escape hatch for frame rate: it is the only mode Robot.post_step() skips its
+# assisted-grasping handling in, and under the Newton backend that handling dominates the teleop
+# tick -- measured on r1pro at 103 ms of a 186 ms tick (5.4 fps), because it casts 32 single rays per
+# env.step() and each one pays newton.intersect_ray's per-call kernel rebuild. Dropping it takes the
+# tick to ~84 ms (~12 fps). The cost is real grasping behavior: nothing holds an object but friction,
+# and is_grasping() falls back to inferring from the gripper controller.
+GRASPING_MODE = "assisted"
 
 
 # ─── Robot-specific teleop configuration ────────────────────────────────────
@@ -316,6 +326,20 @@ FLASHLIGHT_INTENSITY = 2000.0
 
 # Visualization settings
 RESOLUTION = [1080, 1080]  # [H, W]
+# Newton GL viewer only (see OGRobotServer._setup_newton_viewer_panels): resolution of the docked
+# secondary camera panels that stand in for Kit's docked viewports, and how many viewer ticks pass
+# between panel refreshes. PANEL_RESOLUTION mirrors the 256x256 texture resolution setup_cameras()
+# gives those Kit viewports. Each refresh renders ONE panel (round-robin), so with the default 6
+# panels (4 secondary cameras + the 2 EXTRA_VIEWPOINT_CAMERA_CONFIGS gripper views) and a 30 fps
+# viewer the stride below means every panel updates at 30 / (6 * 1) = 5 fps for ~3 ms of extra work
+# per tick; raise it to spend less, at the cost of staler panels.
+PANEL_RESOLUTION = (256, 256)  # (W, H)
+PANEL_EVERY_N_FRAMES = 1
+# Name of the single viewer window all panels are logged into. Newton's image logger shows exactly
+# ONE logged name at a time (picked from its sidebar dropdown, auto-selecting whichever name was
+# logged first), but a batched log under one name renders as a tile grid -- so all the panels go out
+# together under this name to be visible at once. Renaming it renames that window.
+PANEL_WINDOW_NAME = "robot cameras"
 USE_VISUAL_SPHERES = False
 USE_VERTICAL_VISUALIZERS = False
 GHOST_APPEAR_THRESHOLD = 0.1
@@ -398,6 +422,50 @@ EXTERNAL_CAMERA_CONFIGS = {
         "orientation": [0.4164, -0.1929, -0.3737, 0.8060],
     },
 }
+
+# Extra viewpoint cameras docked as panels inside the Newton GL viewer (see
+# OGRobotServer._setup_newton_viewer_panels). Unlike the shoulder/wrist panels -- which reuse camera
+# prims the robot asset and the env's external sensors already provide -- these are plain USD camera
+# prims that setup_cameras_standalone() creates on the fly, so any robot link can be given a
+# viewpoint without adding a VisionSensor for it (which would also add it to the robot's observation
+# space, and therefore to recorded data, as a side effect). Newton-viewer only: the Kit path has its
+# own docked viewports and ignores these.
+#
+# Keys are the panel labels (tiles of the PANEL_WINDOW_NAME window). Every entry names what the
+# camera is mounted on and where it sits:
+#   - "arm": mount on that arm's gripper body (the link its fingers hang off -- see
+#     _gripper_mount_link), with the pose below authored in the GRASP frame: +z points out
+#     through the fingertips, +/-y is the finger-opening axis, so +/-x is the side a camera can watch
+#     the jaws from without a finger in the way. Robot-agnostic, so no per-robot link names needed.
+#     Mutually exclusive with "link", which names a link on the robot directly and takes the pose in
+#     that link's own frame.
+#   - "position" / "look_at": the camera sits at "position" and aims at "look_at", with "up"
+#     (default +z) breaking the roll tie. Note that the Newton viewer re-derives its camera from
+#     position + view direction only, keeping image-up aligned with WORLD up, so the roll "up"
+#     implies is authored on the prim but not honored there (it only matters to consumers that use
+#     the prim's full orientation) -- a gripper view therefore rotates with the wrist.
+#   - "focal_length" / "horizontal_aperture": optional USD camera intrinsics; the defaults below give
+#     a ~83 deg horizontal fov, wide enough to keep both fingers in frame from this close.
+# The gripper defaults below sit on the +x face of the gripper body, just behind the jaws, and look
+# out along the approach direction past the fingertips -- so the jaws frame the near field and
+# whatever is about to be grasped sits ahead of them. Verified by capture against r1pro.
+# Each entry costs one more off-screen render in the viewer's round-robin, so adding cameras here
+# lowers every panel's refresh rate proportionally (see PANEL_EVERY_N_FRAMES).
+EXTRA_VIEWPOINT_CAMERA_CONFIGS = {
+    "left_gripper": {
+        "arm": "left",
+        "position": [0.08, 0.0, -0.12],
+        "look_at": [0.0, 0.0, 0.2],
+    },
+    "right_gripper": {
+        "arm": "right",
+        "position": [0.08, 0.0, -0.12],
+        "look_at": [0.0, 0.0, 0.2],
+    },
+}
+VIEWPOINT_CAMERA_UP = [0.0, 0.0, 1.0]
+VIEWPOINT_CAMERA_FOCAL_LENGTH = 17.0
+VIEWPOINT_CAMERA_HORIZONTAL_APERTURE = 30.0
 
 # UI visual settings
 UI_SETTINGS = {

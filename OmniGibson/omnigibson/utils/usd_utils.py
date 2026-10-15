@@ -1245,6 +1245,12 @@ class RigidContactAPIImpl:
         """
         assert og.sim.is_playing(), "Cannot create rigid contact view while sim is not playing!"
 
+        if not og.sim.physics_backend.supports_contact_reporting:
+            # No engine-level contact reporting exists on this backend; leave the cache empty rather
+            # than attempting to build a view the backend can't provide.
+            self.clear()
+            return
+
         # Snapshot the old contact matrices and path mappings so we can carry over
         # cached contact state for pairs of bodies that already existed.
         prev_contact_matrix = dict(self._CONTACT_MATRIX)
@@ -2151,6 +2157,18 @@ def _get_world_transform_with_scale(prim_path):
     return og.sim.physics_backend.get_world_transform_with_scale(prim_path)
 
 
+def _live_matrix_from_pose(raw_matrix, live_pose):
+    """raw_matrix (a Gf.Matrix4d) with its translation/rotation replaced by live_pose = (position,
+    orientation xyzw), keeping raw_matrix's own scale component (physics never changes scale)."""
+    position, orientation = live_pose
+    transform = lazy.pxr.Gf.Transform(raw_matrix)
+    transform.SetRotation(
+        lazy.pxr.Gf.Rotation(lazy.pxr.Gf.Quatd(orientation[3].item(), lazy.pxr.Gf.Vec3d(*orientation[:3].tolist())))
+    )
+    transform.SetTranslation(lazy.pxr.Gf.Vec3d(*position.tolist()))
+    return transform.GetMatrix()
+
+
 def get_world_pose_with_scale(prim_path):
     """
     This is used when information about the prim's global scale is needed,
@@ -2267,6 +2285,49 @@ class BatchControlViewAPIImpl:
             self._read_cache["root_transforms"] = cb.from_torch(self._view.get_root_transforms())
             self._read_cache["link_transforms"] = cb.from_torch(self._view.get_link_transforms())
             self._read_cache["dof_positions"] = cb.from_torch(self._view.get_dof_positions())
+
+    def _set_dof_position_targets(self, data, indices, cast=True):
+        if gm.PHYSICS_BACKEND != "physx":
+            # No Isaac tensor-view frontend/backend split exists for a non-Kit backend.
+            self._view.set_dof_position_targets_fast(data, indices)
+            return
+        # No casting results in better efficiency
+        if cast:
+            data = self._view._frontend.as_contiguous_float32(data)
+            indices = self._view._frontend.as_contiguous_uint32(indices)
+        data_desc = self._view._frontend.get_tensor_desc(data)
+        indices_desc = self._view._frontend.get_tensor_desc(indices)
+
+        if not self._view._backend.set_dof_position_targets(data_desc, indices_desc):
+            raise Exception("Failed to set DOF positions in backend")
+
+    def _set_dof_velocity_targets(self, data, indices, cast=True):
+        if gm.PHYSICS_BACKEND != "physx":
+            self._view.set_dof_velocity_targets_fast(data, indices)
+            return
+        # No casting results in better efficiency
+        if cast:
+            data = self._view._frontend.as_contiguous_float32(data)
+            indices = self._view._frontend.as_contiguous_uint32(indices)
+        data_desc = self._view._frontend.get_tensor_desc(data)
+        indices_desc = self._view._frontend.get_tensor_desc(indices)
+
+        if not self._view._backend.set_dof_velocity_targets(data_desc, indices_desc):
+            raise Exception("Failed to set DOF velocities in backend")
+
+    def _set_dof_actuation_forces(self, data, indices, cast=True):
+        if gm.PHYSICS_BACKEND != "physx":
+            self._view.set_dof_actuation_forces_fast(data, indices)
+            return
+        # No casting results in better efficiency
+        if cast:
+            data = self._view._frontend.as_contiguous_float32(data)
+            indices = self._view._frontend.as_contiguous_uint32(indices)
+        data_desc = self._view._frontend.get_tensor_desc(data)
+        indices_desc = self._view._frontend.get_tensor_desc(indices)
+
+        if not self._view._backend.set_dof_actuation_forces(data_desc, indices_desc):
+            raise Exception("Failed to set DOF actuation forces in backend")
 
     def flush_control(self):
         if "dof_position_targets" in self._write_idx_cache:
@@ -3096,42 +3157,44 @@ def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=Non
     """
     assert primitive_type in PRIMITIVE_MESH_TYPES, "Invalid primitive mesh type: {primitive_type}"
 
+    og.sim.render_backend.create_primitive_mesh(
+        primitive_type, prim_path, u_patches=u_patches, v_patches=v_patches, stage=stage
+    )
+
+
+def _create_mesh_prim_standalone(primitive_type, prim_path, u_patches=None, v_patches=None, stage=None):
+    """
+    Kit-free equivalent of `KitRenderBackend.create_primitive_mesh()`, using trimesh to
+    generate the raw topology. Matches Kit's own convention of generating a 2cm-wide (extents
+    [-0.01, 0.01]) default primitive, since `create_primitive_mesh()` rescales by extents * 50.0
+    afterward assuming that convention, regardless of which path generated the raw mesh.
+    """
+    sections = max(u_patches, v_patches) if (u_patches is not None and v_patches is not None) else 32
+    if primitive_type == "Sphere":
+        tm = trimesh.creation.uv_sphere(radius=0.5, count=(sections, sections))
+    elif primitive_type == "Cube":
+        tm = trimesh.creation.box(extents=(1.0, 1.0, 1.0))
+    elif primitive_type == "Cylinder":
+        tm = trimesh.creation.cylinder(radius=0.5, height=1.0, sections=sections)
+    elif primitive_type == "Cone":
+        tm = trimesh.creation.cone(radius=0.5, height=1.0, sections=sections)
+    elif primitive_type == "Torus":
+        tm = trimesh.creation.torus(major_radius=0.375, minor_radius=0.125, major_sections=sections)
+    elif primitive_type == "Disk":
+        tm = trimesh.creation.cylinder(radius=0.5, height=1e-4, sections=sections)
+    else:  # "Plane"
+        tm = trimesh.creation.box(extents=(1.0, 1.0, 1e-4))
+
+    tm.vertices *= 0.02
+
+    stage = og.sim.stage if stage is None else stage
     with og.sim.editing_usd(stage=stage):
-        MESH_PRIM_TYPE_TO_EVALUATOR_MAPPING = {
-            "Sphere": lazy.omni.kit.primitive.mesh.evaluators.sphere.SphereEvaluator,
-            "Disk": lazy.omni.kit.primitive.mesh.evaluators.disk.DiskEvaluator,
-            "Plane": lazy.omni.kit.primitive.mesh.evaluators.plane.PlaneEvaluator,
-            "Cylinder": lazy.omni.kit.primitive.mesh.evaluators.cylinder.CylinderEvaluator,
-            "Torus": lazy.omni.kit.primitive.mesh.evaluators.torus.TorusEvaluator,
-            "Cone": lazy.omni.kit.primitive.mesh.evaluators.cone.ConeEvaluator,
-            "Cube": lazy.omni.kit.primitive.mesh.evaluators.cube.CubeEvaluator,
-        }
-
-        evaluator = MESH_PRIM_TYPE_TO_EVALUATOR_MAPPING[primitive_type]
-        u_backup = lazy.carb.settings.get_settings().get(evaluator.SETTING_U_SCALE)
-        v_backup = lazy.carb.settings.get_settings().get(evaluator.SETTING_V_SCALE)
-        hs_backup = lazy.carb.settings.get_settings().get(evaluator.SETTING_OBJECT_HALF_SCALE)
-        lazy.carb.settings.get_settings().set(evaluator.SETTING_U_SCALE, 1)
-        lazy.carb.settings.get_settings().set(evaluator.SETTING_V_SCALE, 1)
-        stage = og.sim.stage if stage is None else stage
-
-        # Default half_scale (i.e. half-extent, half_height, radius) is 1.
-        # TODO (eric): change it to 0.5 once the mesh generator API accepts floating-number HALF_SCALE
-        #  (currently it only accepts integer-number and floors 0.5 into 0).
-        lazy.carb.settings.get_settings().set(evaluator.SETTING_OBJECT_HALF_SCALE, 1)
-        kwargs = dict(prim_type=primitive_type, prim_path=prim_path, stage=stage)
-        if u_patches is not None and v_patches is not None:
-            kwargs["u_patches"] = u_patches
-            kwargs["v_patches"] = v_patches
-
-        # Import now to avoid too-eager load of Omni classes due to inheritance
-        from omnigibson.utils.deprecated_utils import CreateMeshPrimWithDefaultXformCommand
-
-        CreateMeshPrimWithDefaultXformCommand(**kwargs).do()
-
-        lazy.carb.settings.get_settings().set(evaluator.SETTING_U_SCALE, u_backup)
-        lazy.carb.settings.get_settings().set(evaluator.SETTING_V_SCALE, v_backup)
-        lazy.carb.settings.get_settings().set(evaluator.SETTING_OBJECT_HALF_SCALE, hs_backup)
+        mesh = lazy.pxr.UsdGeom.Mesh.Define(stage, prim_path)
+        mesh.GetPointsAttr().Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v) for v in tm.vertices.tolist()]))
+        mesh.GetNormalsAttr().Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*n) for n in tm.vertex_normals.tolist()]))
+        mesh.SetNormalsInterpolation("vertex")
+        mesh.GetFaceVertexCountsAttr().Set(lazy.pxr.Vt.IntArray([3] * len(tm.faces)))
+        mesh.GetFaceVertexIndicesAttr().Set(lazy.pxr.Vt.IntArray(tm.faces.flatten().tolist()))
 
 
 def mesh_prim_mesh_to_trimesh_mesh(mesh_prim, include_normals=True, include_texcoord=True):
@@ -3499,13 +3562,27 @@ def create_tensor_from_list(data, dtype, device=None):
     return wp.array(data, device=device, dtype=_WARP_DTYPE_FROM_STRING[dtype])
 
 
+def compute_path_world_aabb(prim_path):
+    """
+    Pure-pxr replacement for ``omni.usd.get_context().compute_path_world_bounding_box``, used when no
+    Kit application is running (``gm.PHYSICS_BACKEND != "physx"``).
+
+    Returns:
+        2-tuple: (aabb_min, aabb_max), each a 3-tuple of floats.
+    """
+    prim = og.sim.stage.GetPrimAtPath(prim_path)
+    bbox_cache = lazy.pxr.UsdGeom.BBoxCache(
+        lazy.pxr.Usd.TimeCode.Default(), [lazy.pxr.UsdGeom.Tokens.default_, lazy.pxr.UsdGeom.Tokens.render]
+    )
+    aabb_range = bbox_cache.ComputeWorldBound(prim).ComputeAlignedRange()
+    return tuple(aabb_range.GetMin()), tuple(aabb_range.GetMax())
+
+
 def get_world_prim():
     """
     Returns:
         Usd.Prim: Active world prim in the current stage
     """
-    # get_prim_at_path() is a pure-pxr equivalent of the Isaac Core convenience function (see its
-    # own docstring), so this needs no per-backend dispatch.
     return get_prim_at_path("/World")
 
 
@@ -3642,6 +3719,78 @@ def delete_or_deactivate_prim(prim_path):
             og.sim.render_backend.delete_prim(prim_path, destructive=False)
 
     return True
+
+
+def copy_mesh_prim_to_path(source_prim_path, dest_prim_path):
+    """
+    Pure-pxr replacement for ``omni.kit.commands.execute("CopyPrim", ...)``, used when no Kit
+    application is running (``gm.PHYSICS_BACKEND != "physx"``). Scoped to a single, childless Mesh
+    prim (the only case this is needed for -- cloth entity loading's mesh-promotion step in
+    entity_prim.py) rather than a general-purpose recursive prim copy: copies the prim's type and every
+    authored attribute value (geometry, transform ops, etc.), but not children or relationships.
+
+    Args:
+        source_prim_path (str): Path to the (possibly ancestral, hence uncopyable-by-move) source prim.
+        dest_prim_path (str): Path to define the copy at. Must not already exist.
+    """
+    source = og.sim.stage.GetPrimAtPath(source_prim_path)
+    dest = og.sim.stage.DefinePrim(dest_prim_path, source.GetTypeName())
+    for attr in source.GetAttributes():
+        if not attr.HasAuthoredValue():
+            continue
+        dest_attr = dest.CreateAttribute(attr.GetName(), attr.GetTypeName())
+        dest_attr.Set(attr.Get())
+    return dest
+
+
+def copy_prim_tree_to_path(source_prim_path, dest_prim_path):
+    """
+    Pure-pxr replacement for ``omni.kit.commands.execute("CopyPrim", ...)``, used when no Kit
+    application is running (``gm.PHYSICS_BACKEND != "physx"``). Unlike ``copy_mesh_prim_to_path()``
+    (scoped to a single childless Mesh prim), this recursively copies an entire prim subtree -- every
+    descendant's type, authored attribute values, and applied API schemas, plus relationship targets
+    (rewritten to point at the corresponding copied descendant when the target itself falls inside the
+    copied subtree, left as-is otherwise -- e.g. a material binding pointing at a prim outside the
+    copied subtree stays pointed at the original). Used for copying a whole particle-template object
+    (visual/collision meshes, RigidBodyAPI, MassAPI, material bindings, etc.), where the single-mesh
+    helper doesn't apply.
+
+    Args:
+        source_prim_path (str): Path to the (possibly ancestral, hence uncopyable-by-move) root of the
+            subtree to copy.
+        dest_prim_path (str): Path to define the copied root at. Must not already exist.
+
+    Returns:
+        Usd.Prim: The newly defined root of the copied subtree.
+    """
+    stage = og.sim.stage
+    source_root_path = lazy.pxr.Sdf.Path(str(source_prim_path))
+    dest_root_path = lazy.pxr.Sdf.Path(str(dest_prim_path))
+
+    for source_prim in lazy.pxr.Usd.PrimRange(stage.GetPrimAtPath(source_prim_path)):
+        rel_path = str(source_prim.GetPath().MakeRelativePath(source_root_path))
+        dest_path = dest_root_path if rel_path == "." else dest_root_path.AppendPath(rel_path)
+        dest_prim = stage.DefinePrim(dest_path, source_prim.GetTypeName())
+        for schema in source_prim.GetAppliedSchemas():
+            dest_prim.AddAppliedSchema(schema)
+        for attr in source_prim.GetAttributes():
+            if not attr.HasAuthoredValue():
+                continue
+            dest_attr = dest_prim.CreateAttribute(attr.GetName(), attr.GetTypeName())
+            dest_attr.Set(attr.Get())
+        for rel in source_prim.GetRelationships():
+            targets = rel.GetTargets()
+            if not targets:
+                continue
+            new_targets = [
+                dest_root_path.AppendPath(str(target.MakeRelativePath(source_root_path)))
+                if target.HasPrefix(source_root_path)
+                else target
+                for target in targets
+            ]
+            dest_prim.CreateRelationship(rel.GetName()).SetTargets(new_targets)
+
+    return stage.GetPrimAtPath(dest_prim_path)
 
 
 class PhysicsMaterial:
