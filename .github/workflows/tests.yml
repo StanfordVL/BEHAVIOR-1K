@@ -87,6 +87,7 @@ jobs:
           - test_symbolic_primitives
           - test_systems
           - test_transform_utils
+          - test_usd_utils
           - test_snapshots
           - test_transition_rules
         include:
