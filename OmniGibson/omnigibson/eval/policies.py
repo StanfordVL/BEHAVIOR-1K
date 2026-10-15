@@ -143,7 +143,10 @@ class MultiWebsocketPolicy:
         self.action_dim = None
         self.failures = {}
         self.time_budget = None
+        # Charged wall-clock seconds per environment: elapsed = policy_time + sim_time.
         self.elapsed = [0.0] * len(self.clients)
+        self.policy_time = [0.0] * len(self.clients)
+        self.sim_time = [0.0] * len(self.clients)
 
     def set_action_dim(self, action_dim: int) -> None:
         self.action_dim = action_dim
@@ -151,6 +154,8 @@ class MultiWebsocketPolicy:
     def set_time_budget(self, seconds: Optional[float]) -> None:
         self.time_budget = seconds
         self.elapsed = [0.0] * len(self.clients)
+        self.policy_time = [0.0] * len(self.clients)
+        self.sim_time = [0.0] * len(self.clients)
         for client in self.clients:
             client.set_deadline(None)
 
@@ -164,7 +169,9 @@ class MultiWebsocketPolicy:
         try:
             result = method(*args)
         finally:
-            self.elapsed[env_idx] += time.monotonic() - start
+            duration = time.monotonic() - start
+            self.elapsed[env_idx] += duration
+            self.policy_time[env_idx] += duration
         if self.time_budget is not None and self.elapsed[env_idx] >= self.time_budget:
             raise PolicyTimeoutError("Rollout time budget expired")
         return result
@@ -214,6 +221,7 @@ class MultiWebsocketPolicy:
         failures = {}
         for env_idx in active_env_indices:
             self.elapsed[env_idx] += share
+            self.sim_time[env_idx] += share
             if self.time_budget is not None and self.elapsed[env_idx] >= self.time_budget:
                 error = PolicyTimeoutError("Rollout time budget expired")
                 self.failures[env_idx] = failures[env_idx] = error
