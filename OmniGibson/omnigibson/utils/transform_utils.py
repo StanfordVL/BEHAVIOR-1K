@@ -1292,8 +1292,10 @@ def vecs2axisangle(vec0, vec1):
     vec0 = normalize(vec0, dim=-1, eps=1e-10)
     vec1 = normalize(vec1, dim=-1, eps=1e-10)
 
-    # Get cross product for direction of angle, and multiply by arcos of the dot product which is the angle
-    return torch.linalg.cross(vec0, vec1) * torch.arccos((vec0 * vec1).sum(-1, keepdim=True))
+    # Get the normalized axis of rotation, and multiply by arccos of the dot product which is the angle
+    axis = normalize(torch.linalg.cross(vec0, vec1), dim=-1, eps=1e-10)
+    angle = torch.arccos((vec0 * vec1).sum(-1, keepdim=True))
+    return axis * angle
 
 
 @torch_compile
