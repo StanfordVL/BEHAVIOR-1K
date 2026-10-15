@@ -102,7 +102,8 @@ def parse_args() -> argparse.Namespace:
         default=0,
         help=(
             "Opt in to exact client-side replay of a complete server-returned action chunk. "
-            "Use the receding-horizon length (for example 16); 0 keeps one websocket request per step."
+            "Set the maximum chunk length (for example 16); servers may return 1 to this many actions. "
+            "0 keeps one websocket request per step."
         ),
     )
     parser.add_argument(
