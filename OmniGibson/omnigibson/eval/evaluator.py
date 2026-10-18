@@ -375,6 +375,7 @@ class BatchedEvaluator:
         # Run num_envs instances of the same scene model + task in parallel environments.
         cfg.setdefault("env", {})
         cfg["env"]["num_envs"] = self.num_envs
+        cfg["env"]["num_rerenders_on_reset"] = 10
 
         env = og.Environment(configs=cfg)
         env._eval_robot_config = self.robot_eval_config
