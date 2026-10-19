@@ -279,8 +279,6 @@ def raytest_batch(
     if only_closest and ignore_bodies is None and ignore_collisions is None:
         if len(start_points) == 0:
             return []
-        if not og.sim.physics_backend.supports_scene_queries:
-            return [{"hit": False} for _ in start_points]
         starts = _stack_points(start_points)
         diffs = _stack_points(end_points) - starts
         distances = th.norm(diffs, dim=-1)
@@ -357,10 +355,6 @@ def raytest(
 
             Note that only "hit" = False exists in the dict if no hit was found
     """
-    if not og.sim.physics_backend.supports_scene_queries:
-        # No scene-query interface on this backend; report no hits rather than crashing.
-        return {"hit": False} if only_closest else []
-
     # Make sure start point, end point are torch tensors, and share a device if only one of the two
     # was already a tensor (a caller-supplied plain list must match the other point's device, since
     # they're differenced together below).
