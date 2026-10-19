@@ -33,6 +33,8 @@ BEHAVIOR_1K_ASSET_VERSION = "3.9.0"
 OMNIGIBSON_ROBOT_ASSETS_VERSION = "3.8.2"
 # The minimum compatible version of the dataset that should be used.
 MINIMUM_ROBOT_ASSETS_VERSION = "3.8.2"
+# Marks a partial behavior-1k-assets install from download_behavior_1k_task_assets()
+PARTIAL_DOWNLOAD_MARKER = ".partial_download"
 
 
 def is_dot_file(p):
@@ -581,10 +583,109 @@ def download_behavior_1k_assets(accept_license=False):
 
         download_key()
 
-    if os.path.exists(get_dataset_path("behavior-1k-assets")):
+    dataset_path = get_dataset_path("behavior-1k-assets")
+    partial_marker = os.path.join(dataset_path, PARTIAL_DOWNLOAD_MARKER)
+    if os.path.exists(dataset_path) and not os.path.exists(partial_marker):
         print("BEHAVIOR-1K dataset already installed.")
     else:
         download_and_unpack_zipped_dataset("behavior-1k-assets")
+        if os.path.exists(partial_marker):
+            os.remove(partial_marker)
+
+
+def _get_scene_json_model_dirs(json_path):
+    """Returns the "objects/<category>/<model>/" archive prefixes used by a scene or task instance json"""
+    with open(json_path, "r") as f:
+        init_info = json.load(f)["objects_info"]["init_info"]
+    # Robots have no category and live in omnigibson-robot-assets
+    return {
+        f"objects/{info['args']['category']}/{info['args']['model']}/"
+        for info in init_info.values()
+        if "category" in info["args"] and "model" in info["args"]
+    }
+
+
+def download_behavior_1k_task_assets(scenes_or_jsons, accept_license=False, num_workers=8):
+    """
+    Download only the BEHAVIOR-1K assets needed by the given scenes / task instances, reading individual files out
+    of the remote dataset zip. Can be called repeatedly to add more; existing files are skipped.
+
+    Only the object models listed in each json are fetched, so online task sampling or transition rules that spawn
+    other objects may still need the full dataset from download_behavior_1k_assets().
+
+    Args:
+        scenes_or_jsons (list of str): Scene names (resolved to their _best.json) and / or scene or task instance
+            json paths
+        accept_license (bool): Whether to pre-accept the BEHAVIOR-1K dataset license
+        num_workers (int): Number of parallel download threads
+    """
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    from huggingface_hub import HfFileSystem
+
+    if not os.path.exists(get_key_path()):
+        if not accept_license:
+            print("\n")
+            print_user_agreement()
+            while input("Do you agree to the above terms for using BEHAVIOR-1K dataset? [y/n]") != "y":
+                print("You need to agree to the terms for using BEHAVIOR-1K dataset.")
+        download_key()
+
+    dataset_path = get_dataset_path("behavior-1k-assets")
+    if os.path.exists(dataset_path) and not os.path.exists(os.path.join(dataset_path, PARTIAL_DOWNLOAD_MARKER)):
+        print("Full BEHAVIOR-1K dataset already installed, nothing to download.")
+        return
+    os.makedirs(dataset_path, exist_ok=True)
+    pathlib.Path(dataset_path, PARTIAL_DOWNLOAD_MARKER).touch()
+
+    fs = HfFileSystem()
+    remote_path = f"datasets/behavior-1k/zipped-datasets/behavior-1k-assets-{BEHAVIOR_1K_ASSET_VERSION}.zip"
+    # One file handle per thread; the readahead block lets a model's files share range requests
+    local = threading.local()
+
+    def get_zip():
+        if not hasattr(local, "zip"):
+            local.zip = zipfile.ZipFile(fs.open(remote_path, "rb", block_size=16 * 2**20))
+        return local.zip
+
+    def extract(infos):
+        z = get_zip()
+        n_bytes = 0
+        for info in sorted(infos, key=lambda i: i.header_offset):
+            target = os.path.join(dataset_path, info.filename)
+            if info.is_dir() or (os.path.exists(target) and os.path.getsize(target) == info.file_size):
+                continue
+            z.extract(info, dataset_path)
+            n_bytes += info.file_size
+        return n_bytes
+
+    print(f"Reading index of {remote_path}...")
+    infos = get_zip().infolist()
+
+    model_dirs = set()
+    for scene_or_json in scenes_or_jsons:
+        json_path = scene_or_json
+        if not scene_or_json.endswith(".json"):
+            json_path = os.path.join(dataset_path, "scenes", scene_or_json, "json", f"{scene_or_json}_best.json")
+        assert os.path.exists(json_path), f"Could not find scene or task instance json {json_path}"
+        model_dirs |= _get_scene_json_model_dirs(json_path)
+
+    # Metadata, scenes (~35MB) and systems (~850MB) are always fetched in full; objects only if used
+    groups = defaultdict(list)
+    for info in infos:
+        parts = info.filename.split("/")
+        if parts[0] != "objects":
+            groups["/".join(parts[:2])].append(info)
+        elif len(parts) > 3 and "/".join(parts[:3]) + "/" in model_dirs:
+            groups["/".join(parts[:3])].append(info)
+    missing = model_dirs - {g + "/" for g in groups}
+    assert not missing, f"Models not found in the dataset archive: {sorted(missing)}"
+
+    print(f"Downloading {len(model_dirs)} object models and all systems...")
+    with ThreadPoolExecutor(max_workers=num_workers) as executor:
+        n_bytes = sum(executor.map(extract, groups.values()))
+    print(f"Downloaded {n_bytes / 1e9:.2f}GB of BEHAVIOR-1K assets to {dataset_path}.")
 
 
 def download_2026_challenge_task_instances():
@@ -657,6 +758,12 @@ if __name__ == "__main__":
         action="store_true",
         help="download 2026 BEHAVIOR Challenge Tasks dataset",
     )
+    parser.add_argument(
+        "--download_task_assets",
+        nargs="+",
+        metavar="SCENE_OR_JSON",
+        help="download only the BEHAVIOR-1K assets needed by these scene names or scene / task instance json files",
+    )
     parser.add_argument("--accept_license", action="store_true", help="pre-accept the BEHAVIOR-1K dataset license")
     args = parser.parse_args()
 
@@ -666,6 +773,8 @@ if __name__ == "__main__":
         download_omnigibson_robot_assets(upgrade=True)
     if args.download_behavior_1k_assets:
         download_behavior_1k_assets(accept_license=args.accept_license)
+    if args.download_task_assets:
+        download_behavior_1k_task_assets(args.download_task_assets, accept_license=args.accept_license)
     if args.download_2025_challenge_task_instances:
         download_2025_challenge_task_instances()
     if args.download_2026_challenge_task_instances:
