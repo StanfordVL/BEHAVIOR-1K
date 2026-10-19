@@ -32,6 +32,34 @@ from omnigibson.utils.ui_utils import create_module_logger
 log = create_module_logger(module_name=__name__)
 
 
+def get_presampled_robot_poses(presampled_poses, robot_model, pose_key=None):
+    """
+    Selects the list of presampled robot poses to use from a task's "robot_poses" metadata
+
+    Args:
+        presampled_poses (dict): Maps pose key (generic "robot" or a robot model name) to list of poses
+        robot_model (str): Model of the robot being placed
+        pose_key (None or str): If specified, pose key to use when no generic "robot" poses exist, e.g. so a
+            custom robot can reuse another model's poses. Otherwise, falls back to @robot_model
+
+    Returns:
+        list of dict: Presampled poses, each with "position" and "orientation" keys
+    """
+    # make all lowercase
+    presampled_poses = {k.lower(): v for k, v in presampled_poses.items()}
+    # use generic "robot" key if it exists, otherwise look for the requested or model-specific key
+    if "robot" in presampled_poses:
+        return presampled_poses["robot"]
+    key = (pose_key or robot_model).lower()
+    if key not in presampled_poses:
+        raise KeyError(
+            f"No generic or {key!r} presampled robot pose found for {robot_model}! "
+            f"Available keys: {sorted(presampled_poses.keys())}"
+        )
+    log.info(f"No generic presampled robot pose found, using {key!r} pose.")
+    return presampled_poses[key]
+
+
 class BehaviorTask(BaseTask):
     """
     Task for BEHAVIOR
@@ -47,6 +75,8 @@ class BehaviorTask(BaseTask):
         use_presampled_robot_pose (bool): Whether to use presampled robot poses from scene metadata
         randomize_presampled_pose (bool): If True, randomly selects from available presampled poses. If False, always
             uses the first pose. Only applies when use_presampled_robot_pose is True. Default is False.
+        presampled_pose_key (None or str): If specified, presampled pose key (robot model name, e.g. "r1pro") to use
+            when the scene has no generic "robot" poses. Default is None, which uses the agent's own model name
         sampling_whitelist (None or dict): If specified, should map synset name (e.g.: "table.n.01" to a dictionary
             mapping category name (e.g.: "breakfast_table") to a list of valid models to be sampled from
             that category. During sampling, if a given synset is found in this whitelist, only the specified
@@ -75,6 +105,7 @@ class BehaviorTask(BaseTask):
         online_object_sampling=False,
         use_presampled_robot_pose=True,
         randomize_presampled_pose=False,
+        presampled_pose_key=None,
         sampling_whitelist=None,
         sampling_blacklist=None,
         highlight_task_relevant_objects=False,
@@ -111,6 +142,7 @@ class BehaviorTask(BaseTask):
         self.online_object_sampling = online_object_sampling  # bool
         self.use_presampled_robot_pose = use_presampled_robot_pose
         self.randomize_presampled_pose = randomize_presampled_pose
+        self.presampled_pose_key = presampled_pose_key
         self.sampling_whitelist = sampling_whitelist  # Maps str to str to list
         self.sampling_blacklist = sampling_blacklist  # Maps str to str to list
         self.highlight_task_relevant_objs = highlight_task_relevant_objects  # bool
@@ -274,17 +306,11 @@ class BehaviorTask(BaseTask):
         if self.use_presampled_robot_pose:
             for env_idx in env_indices:
                 robot = self.get_agent(env, env_idx)
-                presampled_poses = env.scenes[env_idx].get_task_metadata(key="robot_poses")
-                # make all lowercase
-                presampled_poses = {k.lower(): v for k, v in presampled_poses.items()}
-                # use generic "robot" key if it exists, otherwise look for model-specific key
-                if "robot" in presampled_poses:
-                    available_poses = presampled_poses["robot"]
-                elif robot.model.lower() in presampled_poses:
-                    print("No generic presampled robot pose found, using robot-specific pose.")
-                    available_poses = presampled_poses[robot.model.lower()]
-                else:
-                    raise KeyError(f"No generic or model-specific presampled robot pose found for {robot.model}!")
+                available_poses = get_presampled_robot_poses(
+                    env.scenes[env_idx].get_task_metadata(key="robot_poses"),
+                    robot_model=robot.model,
+                    pose_key=self.presampled_pose_key,
+                )
                 if self.randomize_presampled_pose:
                     robot_pose = random.choice(available_poses)
                 else:

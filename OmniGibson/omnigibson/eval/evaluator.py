@@ -35,6 +35,7 @@ from omnigibson.eval.utils.score_utils import load_human_stats
 from omnigibson.macros import gm
 from omnigibson.metrics import AgentMetric, MetricBase, TaskMetric
 from omnigibson.robots import Robot
+from omnigibson.tasks.behavior_task import get_presampled_robot_poses
 from omnigibson.utils.asset_utils import get_task_instance_path
 from omnigibson.utils.bddl_utils import is_system_bddl_inst
 from omnigibson.utils.python_utils import recursively_convert_to_torch
@@ -255,6 +256,8 @@ class BatchedEvaluator:
         robot_cfg = self._build_robot_config(task_name=task_name, task_cfg=task_cfg)
         self.robot_name = robot_cfg["name"]
         cfg["robots"] = [robot_cfg]
+        # Lets a custom robot reuse another model's presampled poses on tasks that only store model-specific ones.
+        cfg["task"]["presampled_pose_key"] = self.robot_eval_config.get("use_presampled_pose_key")
 
         # Camera resolution + modalities are decided by the chosen eval wrapper and baked into the
         # robot config HERE, before env creation. This is required (not just cleaner) whenever
@@ -481,14 +484,11 @@ class BatchedEvaluator:
             tro_state = recursively_convert_to_torch(json.load(f))
         for tro_key, tro_state in tro_state.items():
             if tro_key == "robot_poses":
-                presampled_robot_poses = {key.lower(): value for key, value in tro_state.items()}
-                if "robot" in presampled_robot_poses:
-                    available_poses = presampled_robot_poses["robot"]
-                elif robot.model in presampled_robot_poses:
-                    logger.info("No generic presampled robot pose found, using robot-specific pose.")
-                    available_poses = presampled_robot_poses[robot.model]
-                else:
-                    raise KeyError(f"No generic or model-specific presampled robot pose found for {robot.model}!")
+                available_poses = get_presampled_robot_poses(
+                    tro_state,
+                    robot_model=robot.model,
+                    pose_key=self.robot_eval_config.get("use_presampled_pose_key"),
+                )
                 # Presampled poses are scene-relative; frame="scene" puts environment N's robot in its own
                 # scene rather than env 0's geometry (cf. #2257).
                 robot.set_position_orientation(
