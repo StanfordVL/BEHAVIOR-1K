@@ -215,6 +215,8 @@ controller_config:
 
 The optional `eval.camera_sensor_names` block maps evaluation camera roles to robot sensor names. It is used by the provided wrappers and video writer to identify the head and wrist cameras. `--write-video` requires the `head`, `left_wrist`, and `right_wrist` roles. The official `RGBDFullResWrapper` uses these roles to set the head camera to `720 x 720` and wrist cameras to `480 x 480`; all other vision sensors are treated as wrist-resolution sensors.
 
+The optional `eval.use_presampled_pose_key` field names the presampled robot start pose to use when a task instance has no generic `robot` pose. The tasks carried over from the 2025 challenge store poses only per robot model (`fetch`, `r1`, `r1pro`, `stretch`, `tiago`). A robot whose `model` is not one of these must set this field, for example `use_presampled_pose_key: r1pro`, or environment creation fails on those tasks. By default the robot's own `model` is used.
+
 For controller syntax and supported controller types, see the [OmniGibson controller documentation](https://behavior.stanford.edu/omnigibson/controllers.html). For the recommended R1Pro baseline config, start from the bundled `OmniGibson/omnigibson/eval/r1pro.yaml` and modify `controller_config` or other robot fields as needed.
 
 
