@@ -266,10 +266,6 @@ python -m pip install torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0 torchco
 
 echo "✓ PyTorch installation completed"
 
-# Install numpy <2 to avoid conflicts
-echo "Installing numpy..."
-python -m pip install "numpy<2"
-
 # Install BDDL
 if [ "$BDDL" = true ]; then
     echo "Installing BDDL..."
