@@ -1426,8 +1426,16 @@ def _launch_simulator(*args, **kwargs):
 
                 # Possibly run transition rule step
                 if gm.ENABLE_TRANSITION_RULES:
-                    for scene in self.scenes:
-                        scene.transition_rule_api.step()
+                    transitions = [
+                        (scene.transition_rule_api, scene.transition_rule_api.get_transition_results())
+                        for scene in self.scenes
+                    ]
+                    # Remove across all scenes before adding objects, whose initialization is deferred.
+                    removed_objs = [obj for _, result in transitions for obj in result.remove]
+                    if removed_objs:
+                        self.batch_remove_objects(removed_objs)
+                    for api, result in transitions:
+                        api.execute_transition(added_obj_attrs=result.add, removed_objs=[])
 
         def play(self):
             if not self.is_playing():
