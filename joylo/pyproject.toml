@@ -20,7 +20,7 @@ dependencies = [
   "dynamixel-sdk",
   "hid",
   "joycon-python",
-  "numpy<2",
+  "numpy>=2",
   "numpy-quaternion",
   "Pillow",
   "pyglm",
