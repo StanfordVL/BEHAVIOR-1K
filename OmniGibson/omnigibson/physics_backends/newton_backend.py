@@ -3156,6 +3156,10 @@ class NewtonBackend(PhysicsBackend):
     # Adaptive remeshing still leaves some edges shorter than 2 * radius, so a few neighbors can start out overlapping.
     _CLOTH_PARTICLE_RADIUS_EDGE_RATIO = 0.25
     _CLOTH_DEFAULT_DENSITY = 200.0
+    # Minimum cloth particle mass as a fraction of the cloth's median particle mass. add_cloth_mesh() gives each
+    # particle density * area / 3 of its triangles, so a particle on sliver triangles is nearly massless (1e-7 kg vs a
+    # 15 g median on rubber_glove/leuiso), and XPBD blows the cloth apart.
+    _CLOTH_MIN_PARTICLE_MASS_RATIO = 0.01
     # Number of XPBD sub-steps per OmniGibson physics step (see step_physics_once()) -- matches
     # newton's own example_mujoco_xpbd_coupled_solver.py's substep count.
     _PARTICLE_SUBSTEPS = 32
@@ -3251,6 +3255,10 @@ class NewtonBackend(PhysicsBackend):
             particle_radius=particle_radius,
         )
         particle_end = builder.particle_count
+        masses = th.tensor(builder.particle_mass[particle_start:particle_end], dtype=th.float64)
+        if len(masses) > 0:
+            min_mass = self._CLOTH_MIN_PARTICLE_MASS_RATIO * masses.median().item()
+            builder.particle_mass[particle_start:particle_end] = masses.clamp(min=min_mass).tolist()
         path_cloth_particle_map[obj.root_link.prim_path] = (particle_start, particle_end)
 
     def _cloth_particle_radius(self, vertices, indices):
