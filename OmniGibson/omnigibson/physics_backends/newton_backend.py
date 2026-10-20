@@ -3148,7 +3148,13 @@ class NewtonBackend(PhysicsBackend):
     _CLOTH_DEFAULT_EDGE_KD = 1.0e-2
     _CLOTH_DEFAULT_SPRING_KE = 1.0
     _CLOTH_DEFAULT_SPRING_KD = 1.0e-2
+    # Upper bound for the cloth particle radius; the actual radius is derived per cloth mesh from its edge lengths
+    # (see _add_cloth_object). A fixed 0.01 equals ClothPrim._remesh's 1 cm target edge length, so neighboring
+    # particles started out overlapping and XPBD's particle-particle contacts blew the cloth apart on the first step.
     _CLOTH_DEFAULT_PARTICLE_RADIUS = 0.01
+    # Cloth particle radius as a fraction of the mesh's median edge length (~1.6-2.6 mm for most remeshed cloth).
+    # Adaptive remeshing still leaves some edges shorter than 2 * radius, so a few neighbors can start out overlapping.
+    _CLOTH_PARTICLE_RADIUS_EDGE_RATIO = 0.25
     _CLOTH_DEFAULT_DENSITY = 200.0
     # Number of XPBD sub-steps per OmniGibson physics step (see step_physics_once()) -- matches
     # newton's own example_mujoco_xpbd_coupled_solver.py's substep count.
@@ -3223,6 +3229,7 @@ class NewtonBackend(PhysicsBackend):
         # object scale directly into the vertices instead, and pass scale=1.0 below.
         scale = transform.GetScale()
         vertices = [(p[0] * scale[0], p[1] * scale[1], p[2] * scale[2]) for p in points]
+        particle_radius = self._cloth_particle_radius(vertices, indices)
 
         particle_start = builder.particle_count
         builder.add_cloth_mesh(
@@ -3241,10 +3248,26 @@ class NewtonBackend(PhysicsBackend):
             add_springs=True,
             spring_ke=self._CLOTH_DEFAULT_SPRING_KE,
             spring_kd=self._CLOTH_DEFAULT_SPRING_KD,
-            particle_radius=self._CLOTH_DEFAULT_PARTICLE_RADIUS,
+            particle_radius=particle_radius,
         )
         particle_end = builder.particle_count
         path_cloth_particle_map[obj.root_link.prim_path] = (particle_start, particle_end)
+
+    def _cloth_particle_radius(self, vertices, indices):
+        """
+        Particle radius for one cloth mesh: a fraction of its median (scaled) edge length, capped at
+        _CLOTH_DEFAULT_PARTICLE_RADIUS, so that neighboring particles don't start out overlapping.
+        """
+        tris = th.tensor(indices, dtype=th.int64).reshape(-1, 3)
+        verts = th.tensor(vertices, dtype=th.float64)
+        edges = th.cat([tris[:, [0, 1]], tris[:, [1, 2]], tris[:, [2, 0]]])
+        lengths = th.linalg.norm(verts[edges[:, 0]] - verts[edges[:, 1]], dim=1)
+        lengths = lengths[lengths > 0]
+        if len(lengths) == 0:
+            return self._CLOTH_DEFAULT_PARTICLE_RADIUS
+        return min(
+            self._CLOTH_DEFAULT_PARTICLE_RADIUS, self._CLOTH_PARTICLE_RADIUS_EDGE_RATIO * lengths.median().item()
+        )
 
     def _capture_state(self):
         """
