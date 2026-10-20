@@ -180,11 +180,19 @@ class ClothPrim(GeomPrim):
 
         # We will remesh in pymeshlab, but it doesn't allow programmatic construction of a mesh with texcoords so
         # we convert our mesh into a trimesh mesh, then export it to a temp file, then load it into pymeshlab
-        scaled_world_transform = self.scaled_transform
-        # Convert to trimesh mesh (in world frame)
+        # Remesh in a pose-independent frame: the mesh's own local transform with the object's scale applied, i.e. its
+        # world transform without the object's position and orientation. pymeshlab's result is sensitive to tiny
+        # floating-point differences in its input, so remeshing in the world frame made the mesh depend on where the
+        # object happened to be placed. The frame is built directly from the USD xform ops so it's exact, and at unit
+        # scale it is the frame the bake step remeshes in (see _apply_baked_remesh).
+        parent_scale_attr = self.prim.GetParent().GetAttribute("xformOp:scale")
+        parent_scale = np.asarray(parent_scale_attr.Get() if parent_scale_attr else (1.0, 1.0, 1.0), dtype=np.float64)
+        local = np.array(lazy.pxr.UsdGeom.Xformable(self.prim).GetLocalTransformation(), dtype=np.float64).T
+        remesh_frame = np.diag([*parent_scale, 1.0]) @ local
         tm = mesh_prim_to_trimesh_mesh(
-            mesh_prim=self.prim, include_normals=True, include_texcoord=True, world_frame=True
+            mesh_prim=self.prim, include_normals=True, include_texcoord=True, world_frame=False
         )
+        tm.apply_transform(remesh_frame)
         # Tmp file written to: {tmp_dir}/{tmp_fname}/{tmp_fname}.obj
         tmp_name = str(uuid.uuid4())
         tmp_dir = os.path.join(tempfile.gettempdir(), tmp_name)
@@ -266,9 +274,8 @@ class ClothPrim(GeomPrim):
             faces=new_faces,
             vertex_normals=new_normals,
         )
-        # Apply the inverse of the world transform to get the mesh back into its local frame
-        # trimesh is numpy-only, so the transform must be on the CPU regardless of og.sim.device
-        tm.apply_transform(th.linalg.inv_ex(scaled_world_transform).inverse.cpu())
+        # Map the mesh back into its local frame
+        tm.apply_transform(np.linalg.inv(remesh_frame))
         self._set_remeshed_mesh(tm.vertices, tm.faces, tm.vertex_normals, texcoord)
 
     def _apply_baked_remesh(self):
