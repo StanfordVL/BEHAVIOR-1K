@@ -2384,18 +2384,13 @@ class NewtonBackend(PhysicsBackend):
         self._already_broken_joints = set()
 
         builder = newton.ModelBuilder(gravity=[0.0, 0.0, -self._gravity])
-        # Newton's own ModelBuilder.ShapeConfig defaults (ke=2.5e3, kf=1e3) are tuned for sparse
-        # example scenes, not BEHAVIOR-1K's dense, cached-from-PhysX household layouts, where many
-        # objects carry small initial penetrations PhysX's softer contact model tolerated silently.
-        # At Newton's stock stiffness those penetrations resolve as one-shot impulses large enough
-        # to launch furniture across the room and/or leave it in a sustained, undamped oscillation
-        # (confirmed empirically: a breakfast table jittered with 177 direction reversals over 300
-        # steps, never settling; two chairs launched 2-5m). feat/newton (the mature reference
-        # implementation, docs/other/newton_migration.md "Physics Configuration") independently
-        # tuned these same softer values for the same reason, calling them "intentionally
-        # conservative for dense BEHAVIOR scenes" -- carry them over here too.
-        builder.default_shape_cfg.ke = 1.0e2
-        builder.default_shape_cfg.kd = 5.0e1
+        # Contact stiffness/damping: Newton's stock ke=2.5e3, kd=1e2, which SolverMuJoCo converts to
+        # MuJoCo's default solref (0.02, 1.0). The softer ke=1e2, kd=5e1 carried over from feat/newton
+        # map to (0.04, 2.5): a 1 m/s drop needed ~1.3 cm to stop, so the dough sank through a baking
+        # sheet's plate and was pushed out its bottom, and a body teleported into the floor crept out
+        # at ~0.1 m/s.
+        builder.default_shape_cfg.ke = 2.5e3
+        builder.default_shape_cfg.kd = 1.0e2
         builder.default_shape_cfg.kf = 1.0e2
         builder.default_shape_cfg.mu = 0.9
         # Keep the ground plane collidable but stop it rendering: every dataset scene brings its own
@@ -2762,6 +2757,10 @@ class NewtonBackend(PhysicsBackend):
                 qd_stop = (
                     builder.joint_qd_start[joint_idx + 1] if joint_idx + 1 < len(builder.joint_qd_start) else n_dofs
                 )
+                # A free joint's linear DOFs come first: armature there is added mass and dry friction a
+                # constant force against every translation, so a 50 g bowl fell at 7.99 m/s^2 instead of 9.81
+                if int(joint_type) == int(newton.JointType.FREE):
+                    qd_start += 3
                 for dof_idx in range(qd_start, qd_stop):
                     if dof_idx < len(builder.joint_armature):
                         builder.joint_armature[dof_idx] = max(
@@ -4015,7 +4014,8 @@ class NewtonBackend(PhysicsBackend):
         better bound than none, and splitting the limit between them would under-power the servo.
         """
         solver = self._get_mujoco_solver()
-        if solver is None or solver.mjw_model is None:
+        # A scene with no actuated joints (e.g. only free objects) compiles no actuator mapping at all
+        if solver is None or solver.mjw_model is None or solver.mjc_actuator_to_newton_idx is None:
             return
         effort = self._model.joint_effort_limit.numpy()
         actuator_to_dof = _wp_to_torch(solver.mjc_actuator_to_newton_idx)
