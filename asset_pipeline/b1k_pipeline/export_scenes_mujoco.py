@@ -80,7 +80,8 @@ def part_dir(scene, part):
 
 
 def compiler_xml(root):
-    return ET.SubElement(root, "compiler", {"angle": "radian", "autolimits": "true"})
+    g = mujoco_common.COLLISION_GROUP
+    return ET.SubElement(root, "compiler", {"angle": "radian", "autolimits": "true", "inertiagrouprange": f"{g} {g}"})
 
 
 def add_skybox(asset_xml, from_dir):

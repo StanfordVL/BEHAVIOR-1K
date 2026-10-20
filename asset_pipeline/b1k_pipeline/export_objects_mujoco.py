@@ -67,7 +67,7 @@ META_TYPE_REPRESENTATIONS = {
 
 DIMENSIONLESS_SITE_RADIUS = 0.005
 
-# Geom/site groups (see mujoco_common): 0 = collision, 2 = visual, 4 = meta
+# Geom/site groups (see mujoco_common): 2 = visual, 3 = collision, 4 = meta
 # volumes/sites. Groups above 2 are hidden by default in the MuJoCo visualizer.
 VISUAL_GROUP = str(mujoco_common.VISUAL_GROUP)
 COLLISION_GROUP = str(mujoco_common.COLLISION_GROUP)
@@ -208,6 +208,7 @@ def _add_meta_sites_from_metadata(body_xml, link_name, meta_links, meta_records)
                         "pos": _fmt(pos),
                         "dir": _fmt(orn.apply([0, 0, -1])),
                         "diffuse": _fmt(np.asarray(mesh_info["color"], dtype=np.float64) / 255.0),
+                        "castshadow": "false",
                     }
                     _record_meta_element(meta_records, meta_type, link_id, link_name, link_name, light_xml)
                     continue
@@ -494,7 +495,16 @@ def build_object_mjcf(in_obj_dir):
 
     # Assemble the MJCF
     root = ET.Element("mujoco", {"model": model_id})
-    ET.SubElement(root, "compiler", {"angle": "radian", "meshdir": ".", "texturedir": "."})
+    ET.SubElement(
+        root,
+        "compiler",
+        {
+            "angle": "radian",
+            "meshdir": ".",
+            "texturedir": ".",
+            "inertiagrouprange": f"{COLLISION_GROUP} {COLLISION_GROUP}",
+        },
+    )
     default_xml = ET.SubElement(root, "default")
     visual_default = ET.SubElement(default_xml, "default", {"class": "visual"})
     ET.SubElement(visual_default, "geom", {"group": VISUAL_GROUP, "contype": "0", "conaffinity": "0", "mass": "0"})

@@ -50,8 +50,8 @@ Geom groups:
 
 | Group | Contents |
 | --- | --- |
-| 0 | Collision |
 | 2 | Visual (`contype=conaffinity=0`, massless) |
+| 3 | Collision (with `<compiler inertiagrouprange="3 3"/>`) |
 | 4 | Meta volumes and meta sites |
 
 Masses are the category mass, split over the links by collision volume, as
@@ -110,7 +110,7 @@ The archive embeds a compact JSON object as `<custom><text name="b1k_metadata" d
 | `openable` | the raw `openable_joint_ids` and `openable_both_sides`, plus `joints: [{joint, direction}]` and `both_sides` as OmniGibson's Open state sees them: the annotated joints with direction 1, or every joint if none is annotated |
 | `meta_links` | `{type: {id: [{link, body, element, name, shape, pos, quat, size, mesh, dir}]}}`: every meta element written (fillable/openfillable volume geoms and their box sites, toggle buttons, heat sources, attachment points, lights, …), in the frame of `body` |
 | `link_tags`, `object_parts` | raw |
-| `groups` | `{collision: 0, visual: 2, meta: 4}` |
+| `groups` | `{collision: 3, visual: 2, meta: 4}` |
 
 ## Base scenes
 
@@ -137,7 +137,7 @@ namespaced by its part name in any composed scene:
 
 ```xml
 <mujoco model="house_single_floor_best">
-  <compiler angle="radian" autolimits="true"/>
+  <compiler angle="radian" autolimits="true" inertiagrouprange="3 3"/>
   <asset>
     <texture name="skybox" type="skybox" file="../../../skybox.png" gridsize="3 4" gridlayout=".U..LFRB.D.."/>
     <model name="part-shell" file="parts/shell/model.xml"/>

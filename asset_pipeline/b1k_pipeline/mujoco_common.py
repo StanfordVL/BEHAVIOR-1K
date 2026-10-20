@@ -15,10 +15,11 @@ import b1k_pipeline.utils
 
 DATASET_VERSION = (b1k_pipeline.utils.PIPELINE_ROOT / "VERSION").read_text().strip()
 
-# Geom and site groups. Collision geoms are in group 0, so that tools that
-# treat groups >= 3 as visual-only see them; visual meshes are in group 2 and
-# meta volumes and sites in group 4 (hidden by default in the MuJoCo viewer).
-COLLISION_GROUP = 0
+# Geom and site groups. Visual meshes are in group 2, collision geoms in
+# group 3 (with compiler inertiagrouprange="3 3" so inertia comes from the
+# collision meshes while keeping them hidden by default in the MuJoCo viewer),
+# and meta volumes and sites in group 4.
+COLLISION_GROUP = 3
 VISUAL_GROUP = 2
 META_GROUP = 4
 GROUPS = {"collision": COLLISION_GROUP, "visual": VISUAL_GROUP, "meta": META_GROUP}

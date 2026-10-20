@@ -547,7 +547,10 @@ class ActivityExporter:
         sidecar_modes = {}
         for mode_name, mode in modes.items():
             root = ET.Element("mujoco", {"model": f"{base_name}_{mode_name}"})
-            ET.SubElement(root, "compiler", {"angle": "radian", "autolimits": "true"})
+            g = mujoco_common.COLLISION_GROUP
+            ET.SubElement(
+                root, "compiler", {"angle": "radian", "autolimits": "true", "inertiagrouprange": f"{g} {g}"}
+            )
             asset_xml = ET.SubElement(root, "asset")
             ET.SubElement(
                 asset_xml,
