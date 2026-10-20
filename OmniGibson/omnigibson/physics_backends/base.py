@@ -514,8 +514,9 @@ class PhysicsBackend(ABC):
     # *system* is a named, dynamically-resizable set of particles -- generate/remove change how many
     # particles exist at runtime. Matches the existing "only one instancer per system" constraint
     # (MicroPhysicalParticleSystem.generate_particle_instancer's own assertion), so there is no
-    # per-instancer identity to track here, just a system name. All positions/velocities are
-    # world-frame.
+    # per-instancer identity to track here, just a system key. The key must be unique across scenes
+    # (callers pass the system's absolute prim path, since every scene has its own e.g. "water"). All
+    # positions/velocities are world-frame.
 
     @abstractmethod
     def create_particle_system(self, system_name):
