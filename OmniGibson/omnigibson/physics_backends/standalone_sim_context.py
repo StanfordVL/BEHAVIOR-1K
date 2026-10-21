@@ -40,6 +40,10 @@ class StandaloneSimulationContext:
             self._stage = lazy.isaacsim.core.utils.stage.get_current_stage()
         else:
             self._stage = lazy.pxr.Usd.Stage.CreateInMemory()
+        # OmniGibson works in meters (Isaac Sim's SimulationContext sets this on the PhysX path). Left unauthored,
+        # USD's 0.01 fallback makes USD physics parsing read the default density (1000 kg/m^3) per cm^3, so a body
+        # whose mass comes from density (e.g. a PrimitiveObject) got 1e-6 of its mass on Newton.
+        lazy.pxr.UsdGeom.SetStageMetersPerUnit(self._stage, 1.0)
 
         self._initial_physics_dt = physics_dt
         self._initial_rendering_dt = rendering_dt
