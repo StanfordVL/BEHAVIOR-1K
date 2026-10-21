@@ -1635,6 +1635,35 @@ class NewtonBackend(PhysicsBackend):
         self.ensure_model_current()
         self._sim_context.step(render=render)
 
+    @staticmethod
+    def _bake_nonuniform_mesh_scales(builder):
+        """
+        Bake every non-uniform mesh / convex-mesh shape scale into a scaled copy of its mesh, leaving the shape at
+        unit scale. BEHAVIOR collision hulls are near-unit meshes under a very non-uniform xform scale (e.g. a
+        tabletop slab at (0.51, 1.21, 0.03)), and newton's particle-shape contacts (create_soft_contacts) and
+        overlap_sphere() find the closest point in the unscaled mesh, which isn't the closest point after a
+        non-uniform scale: a cloth particle 5 mm into that tabletop, 5 cm from its edge, gets a sideways normal and
+        a 5 cm penetration, so cloth landing near an edge gets shoved off.
+        """
+        from newton import GeoType, Mesh
+
+        scaled_meshes = {}
+        for i, (geo_type, scale, src) in enumerate(zip(builder.shape_type, builder.shape_scale, builder.shape_source)):
+            if geo_type not in (GeoType.MESH, GeoType.CONVEX_MESH) or not isinstance(src, Mesh):
+                continue
+            magnitudes = [abs(x) for x in scale]
+            if max(magnitudes) - min(magnitudes) <= 1e-6 * max(magnitudes):
+                continue
+            key = (id(src), tuple(scale))
+            if key not in scaled_meshes:
+                indices = src.indices
+                if scale[0] * scale[1] * scale[2] < 0:
+                    # A mirroring scale flips the triangle winding, and with it the mesh's inside/outside sign
+                    indices = indices.reshape(-1, 3)[:, ::-1].reshape(-1)
+                scaled_meshes[key] = src.copy(vertices=src.vertices * scale, indices=indices)
+            builder.shape_source[i] = scaled_meshes[key]
+            builder.shape_scale[i] = (1.0, 1.0, 1.0)
+
     # Relative margin added on top of a body's triangle-inequality deficit by _balance_body_inertia().
     # MuJoCo has NO tolerance here (measured: it rejects a deficit of -1e-10 and accepts exactly 0), so
     # this only has to survive the model's own float32 rounding.
@@ -2695,6 +2724,7 @@ class NewtonBackend(PhysicsBackend):
         # plain numpy-convertible (i.e. CPU) tensors from controllers; default to CPU unless the caller
         # explicitly requested a device (e.g. gm.USE_NUMPY_CONTROLLER_BACKEND=False + an explicit cuda
         # device for a torch-backed controller pipeline).
+        self._bake_nonuniform_mesh_scales(builder)
         self._model = builder.finalize(device=self._sim_context.device or "cpu")
 
         self._balance_body_inertia()
