@@ -3144,7 +3144,11 @@ class NewtonBackend(PhysicsBackend):
     _CLOTH_DEFAULT_TRI_KE = 1.0e2
     _CLOTH_DEFAULT_TRI_KA = 1.0e2
     _CLOTH_DEFAULT_TRI_KD = 1.0e-1
-    _CLOTH_DEFAULT_EDGE_KE = 1.0
+    # SolverXPBD's bending constraint measures the dihedral angle with atan2, which wraps from +pi to -pi when a crease
+    # folds past flat, so the angle error jumps by ~2 pi and the constraint snaps the crease back open. At 1.0 that kept
+    # ~0.1% of the particles on folded cloth (curtain, sauna_suit) bouncing at 5-30 m/s after landing; 0.1 settles every
+    # tested asset. Only validated for stability (cloth dropped onto the ground), not for how stiff the cloth looks.
+    _CLOTH_DEFAULT_EDGE_KE = 0.1
     _CLOTH_DEFAULT_EDGE_KD = 1.0e-2
     _CLOTH_DEFAULT_SPRING_KE = 1.0
     _CLOTH_DEFAULT_SPRING_KD = 1.0e-2
