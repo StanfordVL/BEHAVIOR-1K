@@ -1364,6 +1364,8 @@ class NewtonBackend(PhysicsBackend):
     # abstract method in both of PhysicsBackend's cloth/particle sections is implemented here.
     supports_cloth = True
     supports_particles = True
+    # Cloth particles live in state.particle_q/qd (world frame), not in the mesh's USD points
+    cloth_particles_in_usd = False
     # Isaac/PhysX keeps settled scene articulations quiet via joint damping/friction baked into their
     # imported drive properties. Newton/MuJoCo imports many BEHAVIOR object joints (cabinets, doors,
     # drawers) as zero-gain effort DOFs instead, so without an explicit passive damper they can drift

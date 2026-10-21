@@ -32,6 +32,10 @@ class PhysicsBackend(ABC):
     supports_lidar = False
     supports_contact_reporting = False
     supports_scene_queries = False
+    # Whether a cloth's particle state IS its mesh's USD `points` (in the mesh's local frame), as on PhysX, so that
+    # writing those points or moving the mesh prim moves the cloth. If False, the particles live in the backend's own
+    # state and ClothPrim also writes them through set_cloth_particle_positions/velocities.
+    cloth_particles_in_usd = True
 
     def __init__(self, sim=None):
         self.sim = sim
