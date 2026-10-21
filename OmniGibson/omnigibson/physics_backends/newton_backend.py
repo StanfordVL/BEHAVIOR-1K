@@ -1198,6 +1198,8 @@ class NewtonBackend(PhysicsBackend):
     supports_contact_reporting = True
     supports_cloth = True
     supports_particles = True
+    # Cloth particles live in state.particle_q/qd (world frame), not in the mesh's USD points
+    cloth_particles_in_usd = False
 
     # Newton/MuJoCo imports many BEHAVIOR object joints (cabinets, doors, drawers) as zero-gain effort
     # DOFs instead, so without an explicit passive damper they can drift under contact/gravity even when

@@ -33,6 +33,7 @@ from omnigibson.utils.usd_utils import (
     mesh_prim_to_trimesh_mesh,
     sample_mesh_keypoints,
     delete_or_deactivate_prim,
+    get_world_pose_with_scale,
 )
 
 # Create module logger
@@ -577,6 +578,35 @@ class ClothPrim(GeomPrim):
         # Reset velocities to zero if velocities are present
         if self.prim.HasAttribute("velocities"):
             self.set_attribute(attr="velocities", val=lazy.pxr.Vt.Vec3fArray(th.zeros((len(points), 3)).tolist()))
+
+        if self._particles_outside_usd():
+            # The backend doesn't read the USD points while simulating, so write the configuration to it directly
+            transform = get_world_pose_with_scale(self.prim_path)
+            local = vtarray_to_torch(points, dtype=th.float32).to(transform.device)
+            self.set_particle_positions(local @ transform[:3, :3].T + transform[:3, 3])
+            self.particle_velocities = th.zeros((len(local), 3), dtype=th.float32)
+
+    def _particles_outside_usd(self):
+        """
+        Returns:
+            bool: Whether the physics backend is simulating this cloth from its own particle state rather than from
+                the mesh's USD points, so that USD points / pose writes alone don't move the cloth
+        """
+        return not og.sim.physics_backend.cloth_particles_in_usd and not og.sim.is_stopped()
+
+    def set_position_orientation(
+        self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"
+    ):
+        if not self._particles_outside_usd():
+            super().set_position_orientation(position=position, orientation=orientation, frame=frame)
+            return
+
+        # Move the particles along with the prim, as they do on PhysX (where they are the mesh's local-frame points)
+        positions = self.compute_particle_positions()
+        old_transform = get_world_pose_with_scale(self.prim_path)
+        super().set_position_orientation(position=position, orientation=orientation, frame=frame)
+        transform = (get_world_pose_with_scale(self.prim_path) @ th.linalg.inv(old_transform)).to(positions.device)
+        self.set_particle_positions(positions @ transform[:3, :3].T + transform[:3, 3])
 
     # For cloth, points should NOT be @cached_property because their local poses change over time
     @property
