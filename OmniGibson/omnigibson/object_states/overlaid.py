@@ -55,11 +55,13 @@ class Overlaid(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
             return False
 
         # Compute the convex hull of the particles of the cloth object.
-        points = self.obj.root_link.keypoint_particle_positions[:, :2]
+        # scipy needs CPU data; particle positions and poses live on the sim device (CUDA on the Newton backend)
+        points = self.obj.root_link.keypoint_particle_positions[:, :2].cpu()
         cloth_hull = ConvexHull(points)
 
         # Compute the base aligned bounding box of the rigid object.
         bbox_center, bbox_orn, bbox_extent, _ = other.get_base_aligned_bbox(xy_aligned=True)
+        bbox_center, bbox_orn, bbox_extent = bbox_center.cpu(), bbox_orn.cpu(), bbox_extent.cpu()
         vertices_local = th.tensor(list(itertools.product((1, -1), repeat=3))) * (bbox_extent / 2)
         vertices = T.transform_points(vertices_local, T.pose2mat((bbox_center, bbox_orn)))
         rigid_hull = ConvexHull(vertices[:, :2])
