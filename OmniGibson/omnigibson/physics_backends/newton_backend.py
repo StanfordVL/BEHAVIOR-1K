@@ -3153,7 +3153,8 @@ class NewtonBackend(PhysicsBackend):
     # particles started out overlapping and XPBD's particle-particle contacts blew the cloth apart on the first step.
     _CLOTH_DEFAULT_PARTICLE_RADIUS = 0.01
     # Cloth particle radius as a fraction of the mesh's median edge length (~1.6-2.6 mm for most remeshed cloth).
-    # Adaptive remeshing still leaves some edges shorter than 2 * radius, so a few neighbors can start out overlapping.
+    # Adaptive remeshing still leaves some edges shorter than 2 * radius, and separate layers of a garment can lie closer
+    # than 2 * radius, so _add_cloth_object also caps each particle's radius at half its nearest-particle distance.
     _CLOTH_PARTICLE_RADIUS_EDGE_RATIO = 0.25
     _CLOTH_DEFAULT_DENSITY = 200.0
     # Minimum cloth particle mass as a fraction of the cloth's median particle mass. add_cloth_mesh() gives each
@@ -3259,6 +3260,15 @@ class NewtonBackend(PhysicsBackend):
         if len(masses) > 0:
             min_mass = self._CLOTH_MIN_PARTICLE_MASS_RATIO * masses.median().item()
             builder.particle_mass[particle_start:particle_end] = masses.clamp(min=min_mass).tolist()
+            # XPBD's particle-particle contacts push apart any pair (mesh neighbors included) closer than r_i + r_j, at
+            # penetration / substep dt (meters per second for millimeters of overlap), so no pair may start overlapping
+            from scipy.spatial import cKDTree
+
+            q = [tuple(p) for p in builder.particle_q[particle_start:particle_end]]
+            if len(q) > 1:
+                nearest = th.tensor(cKDTree(q).query(q, k=2)[0][:, 1], dtype=th.float64)
+                radii = th.tensor(builder.particle_radius[particle_start:particle_end], dtype=th.float64)
+                builder.particle_radius[particle_start:particle_end] = th.minimum(radii, 0.5 * nearest).tolist()
         path_cloth_particle_map[obj.root_link.prim_path] = (particle_start, particle_end)
 
     def _cloth_particle_radius(self, vertices, indices):
