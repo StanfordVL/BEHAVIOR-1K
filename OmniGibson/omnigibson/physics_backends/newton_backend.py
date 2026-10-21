@@ -3192,6 +3192,11 @@ class NewtonBackend(PhysicsBackend):
     # Adaptive remeshing still leaves some edges shorter than 2 * radius, and separate layers of a garment can lie closer
     # than 2 * radius, so _add_cloth_object also caps each particle's radius at half its nearest-particle distance.
     _CLOTH_PARTICLE_RADIUS_EDGE_RATIO = 0.25
+    # Areal density (kg/m^2) the stiffness/damping defaults above were tuned at. _add_cloth_object gives each cloth the
+    # mass authored on its mesh instead, and scales those defaults by its areal density over this one: XPBD's cloth
+    # dynamics depend only on stiffness/damping relative to the particle masses (its contacts only on mass ratios), so
+    # the cloth moves as tuned while its momentum against rigid bodies matches the authored mass. Without the scaling, a
+    # real cloth (0.1-8 kg, 50-400x lighter than at this density) blew up from its spring damping on the first step.
     _CLOTH_DEFAULT_DENSITY = 200.0
     # Minimum cloth particle mass as a fraction of the cloth's median particle mass. add_cloth_mesh() gives each
     # particle density * area / 3 of its triangles, so a particle on sliver triangles is nearly massless (1e-7 kg vs a
@@ -3272,6 +3277,17 @@ class NewtonBackend(PhysicsBackend):
         vertices = [(p[0] * scale[0], p[1] * scale[1], p[2] * scale[2]) for p in points]
         particle_radius = self._cloth_particle_radius(vertices, indices)
 
+        # Use the mass authored on the mesh (what PhysX uses; DatasetObject sets it from the category's average specs)
+        density = self._CLOTH_DEFAULT_DENSITY
+        mass = obj.root_link.mass
+        tris = th.tensor(vertices, dtype=th.float64)[th.tensor(indices, dtype=th.int64).reshape(-1, 3)]
+        area = (
+            0.5 * th.linalg.norm(th.linalg.cross(tris[:, 1] - tris[:, 0], tris[:, 2] - tris[:, 0]), dim=1).sum().item()
+        )
+        if mass is not None and mass > 0 and area > 0:
+            density = mass / area
+        k = density / self._CLOTH_DEFAULT_DENSITY
+
         particle_start = builder.particle_count
         builder.add_cloth_mesh(
             pos=wp.vec3(pos[0], pos[1], pos[2]),
@@ -3280,15 +3296,15 @@ class NewtonBackend(PhysicsBackend):
             vel=wp.vec3(0.0, 0.0, 0.0),
             vertices=vertices,
             indices=indices,
-            density=self._CLOTH_DEFAULT_DENSITY,
-            tri_ke=self._CLOTH_DEFAULT_TRI_KE,
-            tri_ka=self._CLOTH_DEFAULT_TRI_KA,
-            tri_kd=self._CLOTH_DEFAULT_TRI_KD,
-            edge_ke=self._CLOTH_DEFAULT_EDGE_KE,
-            edge_kd=self._CLOTH_DEFAULT_EDGE_KD,
+            density=density,
+            tri_ke=self._CLOTH_DEFAULT_TRI_KE * k,
+            tri_ka=self._CLOTH_DEFAULT_TRI_KA * k,
+            tri_kd=self._CLOTH_DEFAULT_TRI_KD * k,
+            edge_ke=self._CLOTH_DEFAULT_EDGE_KE * k,
+            edge_kd=self._CLOTH_DEFAULT_EDGE_KD * k,
             add_springs=True,
-            spring_ke=self._CLOTH_DEFAULT_SPRING_KE,
-            spring_kd=self._CLOTH_DEFAULT_SPRING_KD,
+            spring_ke=self._CLOTH_DEFAULT_SPRING_KE * k,
+            spring_kd=self._CLOTH_DEFAULT_SPRING_KD * k,
             particle_radius=particle_radius,
         )
         particle_end = builder.particle_count
