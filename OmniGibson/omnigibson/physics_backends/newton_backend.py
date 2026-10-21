@@ -2771,6 +2771,9 @@ class NewtonBackend(PhysicsBackend):
     _CLOTH_MIN_PARTICLE_MASS_RATIO = 0.01
     # Number of XPBD sub-steps per OmniGibson physics step (see step_physics_once()) -- matches
     # newton's own example_mujoco_xpbd_coupled_solver.py's substep count.
+    # XPBD derives each particle's velocity from its float32 position change per sub-step, so motion from rest smaller
+    # than half a float32 ulp is lost: at 32 sub-steps gravity's first sub-step (g * dt^2 = 6.6e-7 m) rounds to zero
+    # at |z| >= 16 m, and a cloth starting at rest there never falls (e.g. while parked far away, where it is harmless).
     _PARTICLE_SUBSTEPS = 32
 
     # Fluid (SolverImplicitMPM) defaults: water as in newton's example_mpm_water_dam_break.py -- frictionless, with

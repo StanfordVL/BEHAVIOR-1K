@@ -619,6 +619,11 @@ class ClothPrim(GeomPrim):
         mesh = self.prim
         mesh_type = mesh.GetPrimTypeInfo().GetTypeName()
         assert mesh_type == "Mesh", f"Expected a mesh prim, got {mesh_type} instead!"
+        if self._particles_outside_usd():
+            # The USD points aren't updated while simulating, so map the particles back into the mesh's local frame
+            positions = self.compute_particle_positions()
+            transform = th.linalg.inv(get_world_pose_with_scale(self.prim_path)).to(positions.device)
+            return positions @ transform[:3, :3].T + transform[:3, 3]
         return vtarray_to_torch(mesh.GetAttribute("points").Get(), dtype=th.float32)
 
     @property
