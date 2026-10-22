@@ -3471,8 +3471,10 @@ class NewtonBackend(PhysicsBackend):
         if prim_path not in self._path_cloth_particle_map:
             return self._fallback_cloth_particle_positions(prim_path, idxs=idxs)
         start, end = self._path_cloth_particle_map[prim_path]
+        # A copy, as on PhysX: callers keep these as snapshots (e.g. ClothPrim.generate_folded_configuration pins the
+        # unfolded part to them every step), which a view into the live state would silently update while stepping
         particle_q = _wp_to_torch(self._state_0.particle_q)[start:end, :3]
-        return particle_q[th.as_tensor(idxs, device=particle_q.device)] if idxs is not None else particle_q
+        return particle_q[th.as_tensor(idxs, device=particle_q.device)] if idxs is not None else particle_q.clone()
 
     def set_cloth_particle_positions(self, prim_path, positions, idxs=None):
         if prim_path not in self._path_cloth_particle_map:
@@ -3504,7 +3506,7 @@ class NewtonBackend(PhysicsBackend):
         if prim_path not in self._path_cloth_particle_map:
             return th.zeros(len(self.sim.stage.GetPrimAtPath(prim_path).GetAttribute("points").Get()), 3)
         start, end = self._path_cloth_particle_map[prim_path]
-        return _wp_to_torch(self._state_0.particle_qd)[start:end, :3]
+        return _wp_to_torch(self._state_0.particle_qd)[start:end, :3].clone()
 
     def set_cloth_particle_velocities(self, prim_path, velocities):
         if prim_path not in self._path_cloth_particle_map:
