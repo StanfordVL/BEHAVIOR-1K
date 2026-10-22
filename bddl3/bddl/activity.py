@@ -14,7 +14,6 @@ object.  The functions here are the lower-level building blocks that ``Task``
 calls internally.
 """
 
-import os
 import re
 from bddl.condition_evaluation import (
     compile_state,
@@ -22,7 +21,7 @@ from bddl.condition_evaluation import (
     evaluate_state,
     get_ground_state_options,
 )
-from bddl.config import ACTIVITY_CONFIGS_PATH
+from bddl.config import ACTIVITY_CONFIGS_DIR
 from bddl.object_taxonomy import ObjectTaxonomy
 from bddl.parsing import (
     gen_natural_language_condition,
@@ -231,11 +230,7 @@ def get_all_activities():
     Returns:
         list<str>: list containing the name of each included activity
     """
-    return [
-        x
-        for x in os.listdir(ACTIVITY_CONFIGS_PATH)
-        if os.path.isdir(os.path.join(ACTIVITY_CONFIGS_PATH, x))
-    ]
+    return [p.name for p in ACTIVITY_CONFIGS_DIR.iterdir() if p.is_dir()]
 
 
 def get_instance_count(act):
@@ -248,8 +243,7 @@ def get_instance_count(act):
         int: number of instances of the given activity
     """
     problem_files = [
-        INSTANCE_EXPR.fullmatch(x)
-        for x in os.listdir(os.path.join(ACTIVITY_CONFIGS_PATH, act))
+        INSTANCE_EXPR.fullmatch(p.name) for p in (ACTIVITY_CONFIGS_DIR / act).iterdir()
     ]
     ids = set(int(x.group(1)) for x in problem_files if x is not None)
     assert ids == set(

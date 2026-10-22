@@ -16,14 +16,12 @@ query object properties.
 
 import copy
 import json
-import pathlib
 
 import networkx as nx
 import bddl
+from bddl.config import GENERATED_DATA_DIR
 
-DEFAULT_HIERARCHY_FILE = (
-    pathlib.Path(__file__).parent / "generated_data/output_hierarchy_properties.json"
-)
+DEFAULT_HIERARCHY_FILE = GENERATED_DATA_DIR / "output_hierarchy_properties.json"
 
 
 class ObjectTaxonomy(object):

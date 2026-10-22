@@ -17,16 +17,55 @@ This module handles the lowest layer of BDDL processing:
 """
 
 import itertools
+import os
 import re
 import sys
 import pprint
 
 from bddl.config import SUPPORTED_BDDL_REQUIREMENTS as supported_requirements
 from bddl.config import (
-    get_domain_filename,
-    get_definition_filename,
+    ACTIVITY_CONFIGS_DIR,
+    ACTIVITY_CONFIGS_PATH,
+    get_domain_resource,
+    get_definition_resource,
     READABLE_PREDICATE_NAMES,
 )
+
+
+def _read_bddl_file(filename):
+    """Read the contents of a BDDL file.
+
+    Supports, in order:
+
+    * :class:`importlib.resources.abc.Traversable` package resources (e.g. as
+      returned by :func:`~bddl.config.get_definition_resource`), which work
+      even when BDDL is imported from a zip archive.
+    * Legacy paths under ``ACTIVITY_CONFIGS_PATH`` (e.g. as returned by
+      :func:`~bddl.config.get_definition_filename`) that do not exist on the
+      filesystem because BDDL is imported from a zip archive.  These are
+      mapped back onto :data:`~bddl.config.ACTIVITY_CONFIGS_DIR`.
+    * Any other path, which is opened directly.
+
+    Args:
+        filename: Path to a ``.bddl`` file, or a Traversable.
+
+    Returns:
+        str: The file contents.
+    """
+    if not isinstance(filename, (str, bytes, os.PathLike)) and hasattr(
+        filename, "read_text"
+    ):
+        return filename.read_text()
+    fspath = os.fspath(filename)
+    if (
+        isinstance(fspath, str)
+        and fspath.startswith(ACTIVITY_CONFIGS_PATH + os.sep)
+        and not os.path.exists(fspath)
+    ):
+        rel_parts = os.path.relpath(fspath, ACTIVITY_CONFIGS_PATH).split(os.sep)
+        return ACTIVITY_CONFIGS_DIR.joinpath(*rel_parts).read_text()
+    with open(filename, "r") as f:
+        return f.read()
 
 
 def scan_tokens(filename=None, string=None):
@@ -36,7 +75,10 @@ def scan_tokens(filename=None, string=None):
     converts parenthesised expressions into nested Python lists.
 
     Args:
-        filename: Path to a ``.bddl`` file.  Mutually exclusive with *string*.
+        filename: Path to a ``.bddl`` file, or a
+            :class:`importlib.resources.abc.Traversable` (e.g. as returned by
+            :func:`~bddl.config.get_definition_resource`).  Mutually exclusive
+            with *string*.
         string: Raw BDDL string.  Mutually exclusive with *filename*.
 
     Returns:
@@ -48,9 +90,8 @@ def scan_tokens(filename=None, string=None):
         Exception: On mismatched parentheses or malformed expressions.
     """
     if filename is not None:
-        with open(filename, "r") as f:
-            # Remove single line comments
-            raw_str = f.read()
+        # Remove single line comments
+        raw_str = _read_bddl_file(filename)
     elif string is not None:
         raw_str = string
     else:
@@ -85,15 +126,15 @@ def parse_domain(domain):
     Args:
         domain: Domain name (e.g. ``"behavior-1k"``).  The file
             ``domain_<domain>.bddl`` is located via
-            :func:`~bddl.config.get_domain_filename`.
+            :func:`~bddl.config.get_domain_resource`.
 
     Returns:
         tuple: ``(domain_name, requirements, types, actions, predicates)``
         where *predicates* is a ``dict[str, dict[str, str]]`` mapping each
         predicate name to its typed parameter dict.
     """
-    domain_filename = get_domain_filename(domain)
-    tokens = scan_tokens(filename=domain_filename)
+    domain_resource = get_domain_resource(domain)
+    tokens = scan_tokens(filename=domain_resource)
     if type(tokens) is list and tokens.pop(0) == "define":
         domain_name = "unknown"
         requirements = []
@@ -241,10 +282,10 @@ def parse_problem(
     if predefined_problem is not None:
         tokens = scan_tokens(string=predefined_problem)
     else:
-        problem_filename = get_definition_filename(
+        problem_resource = get_definition_resource(
             behavior_activity, activity_definition
         )
-        tokens = scan_tokens(filename=problem_filename)
+        tokens = scan_tokens(filename=problem_resource)
     if isinstance(tokens, list) and tokens.pop(0) == "define":
         problem_name = "unknown"
         objects = {}
