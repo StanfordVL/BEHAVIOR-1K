@@ -233,6 +233,8 @@ class PrimitiveObject(USDObject):
             radius (float): radius to set
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_RADIUS_OBJECTS, name="primitive object with radius")
+        # See the size setter
+        radius = float(radius)
         # Update the extents variable
         original_extent = self._extents.clone()
         self._extents = (
@@ -292,6 +294,8 @@ class PrimitiveObject(USDObject):
             height (float): height to set
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_HEIGHT_OBJECTS, name="primitive object with height")
+        # See the size setter
+        height = float(height)
         # Update the extents variable
         original_extent = self._extents.clone()
         self._extents[2] = height
@@ -339,6 +343,8 @@ class PrimitiveObject(USDObject):
             size (float): size to set
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_SIZE_OBJECTS, name="primitive object with size")
+        # A deserialized state gives the size as a tensor on og.sim.device, while the extents and points are on the CPU
+        size = float(size)
 
         # Update the extents variable
         original_extent = self._extents.clone()
