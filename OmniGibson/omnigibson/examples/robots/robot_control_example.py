@@ -73,24 +73,15 @@ def main(
     Robot control demo with selection
     Queries the user to select a robot, the controllers, a scene and a type of input (random actions or teleop)
 
-    :param renderer: "kit" (default, interactive Omniverse viewport) or "rtx"/"gl" to run physics on
-        Newton (Kit-free) instead. Newton physics and a live Kit render must not share a process
-        (see docs/other/newton_migration.md's known-workarounds section), so "rtx"/"gl" force
-        PHYSICS_BACKEND="newton" and RENDER_BACKEND="none".
+    :param renderer: "kit" for Omniverse or "rtx"/"gl" to run on Newton
     :param output: for renderer "rtx"/"gl": if given, runs headless and writes a recorded video to
-        this path (works without a display). If omitted, opens a live on-screen window instead
-        (requires a real DISPLAY -- a local X server or an X11-forwarded SSH session) and does not
-        save anything.
+        this path. If omitted, opens a live on-screen window instead.
     :param num_steps: number of steps to run when renderer is "rtx" or "gl".
     """
     og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
     if renderer != "kit":
         if renderer == "gl" and output:
-            # pyglet.options["headless"] forces pyglet's EGL surfaceless backend globally, which is
-            # what lets the GL viewer init without a display -- but it also pre-empts ever opening a
-            # real window, so only set it for the headless-recording case. For a live window, leave
-            # this unset so pyglet falls back to its normal X11 backend against the caller's DISPLAY.
             import pyglet
 
             pyglet.options["headless"] = True
@@ -119,7 +110,6 @@ def main(
     # Add the robot we want to load
     robot0_cfg = dict()
     robot0_cfg["model"] = robot_name
-    # rgb capture requires Kit's Replicator renderer -- unavailable under RENDER_BACKEND="none"
     robot0_cfg["obs_modalities"] = ["rgb"] if gm.RENDER_BACKEND != "none" else []
     robot0_cfg["action_type"] = "continuous"
     robot0_cfg["action_normalize"] = True
@@ -159,9 +149,7 @@ def main(
     # is preserved
     env.scene.update_initial_file()
 
-    # Update the simulator's viewer camera's pose so it points towards the robot. Under the
-    # Newton-physics + Kit-render hybrid, viewer_camera creation is not yet implemented (deferred to a
-    # later phase of the RenderBackend abstraction) -- skip rather than crash.
+    # Update the simulator's viewer camera's pose so it points towards the robot.
     if og.sim.viewer_camera is not None:
         og.sim.viewer_camera.set_position_orientation(
             position=th.tensor([1.46949, -3.97358, 2.21529]),
@@ -171,23 +159,6 @@ def main(
     # Reset environment and robot
     env.reset()
     robot.reset()
-
-    if renderer != "kit":
-        # The stock KeyboardRobotController needs Kit's carb.input, unavailable under
-        # RENDER_BACKEND="none" -- but Newton's own viewers have their own (non-Kit) windows/input,
-        # so control_mode="teleop" drives KeyboardRobotController through that instead (see
-        # newton_viewer_recording.py's teleop helpers). control_mode="random" keeps recording through
-        # a fixed number of steps, same as before.
-        if control_mode == "teleop":
-            from omnigibson.utils.newton_viewer_recording import run_teleop_with_newton_viewer
-
-            run_teleop_with_newton_viewer(env, robot, renderer)
-        else:
-            from omnigibson.utils.newton_viewer_recording import record_with_newton_viewer
-
-            record_with_newton_viewer(env, robot, renderer, output, num_steps=num_steps)
-        og.shutdown()
-        return
 
     # Create teleop controller
     action_generator = KeyboardRobotController(robot=robot)
@@ -244,10 +215,8 @@ if __name__ == "__main__":
         default="kit",
         help=(
             "'kit' (default) is the interactive Omniverse Kit viewport. 'rtx' and 'gl' run physics "
-            "on Newton (Kit-free) through Newton's own ray-traced or OpenGL viewer instead, using "
-            "random actions. Pass --output to record a headless video (works without a display); "
-            "omit it to open a live on-screen window instead (requires a real DISPLAY -- a local X "
-            "server or an X11-forwarded SSH session)."
+            "on Newton through Newton's own ray-traced or OpenGL viewer instead, using "
+            "random actions."
         ),
     )
     parser.add_argument(
