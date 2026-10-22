@@ -25,7 +25,7 @@ import trimesh
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import create_module_macros
+from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.usd_utils import (
@@ -460,7 +460,32 @@ class ClothPrim(GeomPrim):
         )
         plane_prims = []
         plane_motions = []
-        for i, pc in enumerate(plane_centers):
+        # Distance from a wall's position to its cloth-facing side (0 for the planes, half the thickness for boxes)
+        wall_offset = 0.0
+        if gm.PHYSICS_BACKEND != "physx":
+            # Only PhysX simulates the bare (Kit-only) ground planes below: other backends simulate scene objects, so
+            # push the cloth with kinematic boxes instead, each one's cloth-facing side where the plane would be
+            from omnigibson.objects.primitive_object import PrimitiveObject
+
+            thickness = box_half_extent.max().item()
+            wall_offset = thickness / 2.0
+            span = 8.0 * box_half_extent.max().item()
+            for i, pc in enumerate(plane_centers):
+                horiz_dir = pc - th.tensor([0, 0, box_half_extent[2]], device=pc.device)
+                plane_z = -1 * horiz_dir / th.norm(horiz_dir)
+                size = [
+                    thickness if abs(plane_z[0]) > 0.5 else span,
+                    thickness if abs(plane_z[1]) > 0.5 else span,
+                    span,
+                ]
+                wall = PrimitiveObject(
+                    name=f"crumple_wall_{i}", primitive_type="Cube", scale=size, kinematic_only=True, visible=False
+                )
+                self.scene.add_object(wall)
+                wall.set_position_orientation(position=pc - plane_z * wall_offset)
+                plane_prims.append(wall)
+                plane_motions.append(plane_z)
+        for i, pc in enumerate(plane_centers if gm.PHYSICS_BACKEND == "physx" else []):
             plane = lazy.isaacsim.core.api.objects.ground_plane.GroundPlane(
                 prim_path=f"/World/plane_{i}",
                 name=f"plane_{i}",
@@ -517,7 +542,7 @@ class ClothPrim(GeomPrim):
             wall_dist_2 = th.linalg.norm(
                 plane_prims[1].get_position_orientation()[0] - plane_prims[3].get_position_orientation()[0]
             )
-            min_wall_dist = min(wall_dist_1, wall_dist_2)
+            min_wall_dist = min(wall_dist_1, wall_dist_2) - 2 * wall_offset
 
             # Stop if cloth height exceeds wall distance
             if max_height > min_wall_dist:
@@ -532,7 +557,10 @@ class ClothPrim(GeomPrim):
 
         # Remove the planes
         for plane_prim in plane_prims:
-            delete_or_deactivate_prim(plane_prim.prim_path)
+            if gm.PHYSICS_BACKEND == "physx":
+                delete_or_deactivate_prim(plane_prim.prim_path)
+            else:
+                self.scene.remove_object(plane_prim)
 
     def get_available_configurations(self):
         """
