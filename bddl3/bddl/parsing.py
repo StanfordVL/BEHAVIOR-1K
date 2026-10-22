@@ -166,7 +166,7 @@ def parse_domain(domain):
                 print("%s is not recognized in domain" % t)
         return domain_name, requirements, types, actions, predicates
     else:
-        raise Exception("File %s does not match domain pattern" % domain_filename)
+        raise Exception("File %s does not match domain pattern" % domain_resource)
 
 
 def parse_predicates(group):
