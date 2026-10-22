@@ -12,16 +12,10 @@ from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-# Set default isaac kp / kd for controllers. These were tuned against PhysX, which applies a
-# position actuator's kd as an explicit per-step velocity-error force.
+# Set default isaac kp / kd for controllers.
 m.DEFAULT_ISAAC_KP = 1e7
 m.DEFAULT_ISAAC_KD = 1e5
 
-# Newton's implicit integrator instead folds kd into the joint's effective mass matrix, so the
-# PhysX-tuned gains above don't transfer: they either barely move the joint (kp) or make a
-# gravity-loaded joint (e.g. a torso holding a deployed pose) diverge under closed-loop position
-# hold (kd). Use separately-tuned, Newton-native gains instead (matching feat/newton's own
-# empirically-tuned defaults, which write to the same underlying Newton joint_target_ke/kd fields).
 m.DEFAULT_NEWTON_KP = 3000.0
 m.DEFAULT_NEWTON_KD = 300.0
 
@@ -209,11 +203,6 @@ class BaseController(Serializable, Registerable, Recreatable):
             )
         )
 
-        # Set gains. Default kp/kd source depends on the active physics backend -- see the comment
-        # above DEFAULT_NEWTON_KP/KD for why these can't be shared with the PhysX-tuned defaults.
-        # Whether each gain came from that default (rather than from the config) is recorded so that
-        # group-aware refinements (see robots/robot.py's update_controller_mode()) can adjust a
-        # default without silently discarding a value the config explicitly asked for.
         self._isaac_kp_is_default = isaac_kp is None
         self._isaac_kd_is_default = isaac_kd is None
         default_kp = m.DEFAULT_NEWTON_KP if gm.PHYSICS_BACKEND == "newton" else m.DEFAULT_ISAAC_KP

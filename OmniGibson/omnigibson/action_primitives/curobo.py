@@ -93,9 +93,6 @@ class CuRoboMotionGenerator:
                 to the underlying sphere representation of the robot. Note that this does not affect self-collisions detection.
         """
         # Gives 1 - 5% better speedup, according to https://github.com/NVlabs/curobo/discussions/245#discussioncomment-9265692
-        # These are process-global, so they must only be applied once cuRobo is actually used: this module is
-        # imported by every robot (see robots/robot.py's curobo_path), and TF32's 10-bit mantissa silently corrupts
-        # world-frame geometry elsewhere in OmniGibson whenever it runs on CUDA (e.g. 0.125m error at 150m).
         th.backends.cudnn.benchmark = True
         th.backends.cuda.matmul.allow_tf32 = True
         th.backends.cudnn.allow_tf32 = True
@@ -120,8 +117,8 @@ class CuRoboMotionGenerator:
         print(
             """
             NOTE: Currently (v3.9.3), for cuda architecture 12.0 (e.g. RTX 50-series), using Default embodiment for Tiago or non-DEFAULT embodiment for R1Pro
-                will raise CUDA illegal memory access error during mg.warmup() due to cuRobo compatibility issues. 
-                Therefore, we automatically exclude these incompatible embodiments when we detect such GPU is being used. 
+                will raise CUDA illegal memory access error during mg.warmup() due to cuRobo compatibility issues.
+                Therefore, we automatically exclude these incompatible embodiments when we detect such GPU is being used.
             """
         )
         if th.cuda.get_device_capability(device) == (12, 0):
