@@ -1451,6 +1451,7 @@ class NewtonBackend(PhysicsBackend):
         self._rebuilding = False
         self._path_joint_map = {}
         self._path_cloth_particle_map = {}  # cloth entity prim_path -> (particle_start, particle_end)
+        self._cloth_stiffness_scale = {}  # cloth prim_path -> k its stiffness defaults were scaled by
         # Fluid/granular particle systems (MicroPhysicalParticleSystem, e.g. "water") -- unlike cloth,
         # particle count changes at runtime (generate_particles()/remove_particles()), so the
         # authoritative current state lives here (synced from the live model before each mutation),
@@ -3325,6 +3326,7 @@ class NewtonBackend(PhysicsBackend):
                 radii = th.tensor(builder.particle_radius[particle_start:particle_end], dtype=th.float64)
                 builder.particle_radius[particle_start:particle_end] = th.minimum(radii, 0.5 * nearest).tolist()
         path_cloth_particle_map[obj.root_link.prim_path] = (particle_start, particle_end)
+        self._cloth_stiffness_scale[obj.root_link.prim_path] = k
 
     def _cloth_particle_radius(self, vertices, indices):
         """
@@ -3518,22 +3520,25 @@ class NewtonBackend(PhysicsBackend):
         ).reshape(-1, 3)
 
     def get_cloth_stiffness(self, prim_path):
-        # No live per-object override tracked yet -- every cloth uses the same build-time defaults
-        # (see _add_cloth_object). Report those; set_cloth_stiffness below can still adjust the live
-        # model arrays even though this getter doesn't yet distinguish per-object customization.
+        # The values SolverXPBD actually uses for this cloth (it ignores tri_ke/ka/kd): stretch and shear both come from
+        # the springs along mesh edges, so there is no separate shear stiffness. These are XPBD stiffnesses, not PhysX's
+        # spring parameters, so they aren't comparable to what PhysX reports. Before the cloth's first build, k is
+        # unknown and this reports the defaults at _CLOTH_DEFAULT_DENSITY.
+        k = self._cloth_stiffness_scale.get(prim_path, 1.0)
         return {
-            "bend": self._CLOTH_DEFAULT_EDGE_KE,
-            "damping": self._CLOTH_DEFAULT_TRI_KD,
-            "shear": self._CLOTH_DEFAULT_TRI_KA,
-            "stretch": self._CLOTH_DEFAULT_TRI_KE,
+            "bend": self._CLOTH_DEFAULT_EDGE_KE * k,
+            "damping": self._CLOTH_DEFAULT_SPRING_KD * k,
+            "shear": None,
+            "stretch": self._CLOTH_DEFAULT_SPRING_KE * k,
         }
 
     def set_cloth_stiffness(self, prim_path, bend=None, damping=None, shear=None, stretch=None):
-        # Cloth stiffness lives on per-TRIANGLE/per-EDGE model arrays (tri_ke/ka/kd, edge_ke/kd), not a
-        # single per-object value -- finding the exact triangle/edge index range for one cloth object
-        # (analogous to _path_cloth_particle_map, but for tri_count/edge_count) isn't tracked yet.
-        # Deferred: not needed for the initial working end-to-end path (build-time defaults apply).
-        pass
+        # PhysX's values don't map onto XPBD's (different units and constraints, and XPBD has no shear term), and
+        # nothing in OmniGibson sets them, so raise rather than silently keep the build-time defaults
+        raise NotImplementedError(
+            "Setting cloth stiffness isn't supported on the Newton backend: every cloth uses the build-time defaults "
+            "(see NewtonBackend._add_cloth_object)."
+        )
 
     # ---- Fluid/granular particle-system state I/O ----
     # self._fluid_systems is the authoritative, always-current per-system particle state; the live
