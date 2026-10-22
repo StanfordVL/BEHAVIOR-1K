@@ -3633,8 +3633,9 @@ class NewtonBackend(PhysicsBackend):
             # which happens whenever every fluid system in the scene is currently empty.
             if end == start:
                 return th.zeros((0, 3), dtype=th.float32, device=self.sim.device)
-            return _wp_to_torch(self._state_0.particle_q)[start:end, :3]
-        return self._fluid_systems[system_name]["pos"]
+            # A copy, as on PhysX (see get_cloth_particle_positions)
+            return _wp_to_torch(self._state_0.particle_q)[start:end, :3].clone()
+        return self._fluid_systems[system_name]["pos"].clone()
 
     def set_particle_positions(self, system_name, positions, idxs=None):
         positions = th.as_tensor(positions, dtype=th.float32, device=self.sim.device).reshape(-1, 3)
@@ -3661,8 +3662,8 @@ class NewtonBackend(PhysicsBackend):
             start, end = self._path_fluid_particle_map[system_name]
             if end == start:
                 return th.zeros((0, 3), dtype=th.float32, device=self.sim.device)
-            return _wp_to_torch(self._state_0.particle_qd)[start:end, :3]
-        return self._fluid_systems[system_name]["vel"]
+            return _wp_to_torch(self._state_0.particle_qd)[start:end, :3].clone()
+        return self._fluid_systems[system_name]["vel"].clone()
 
     def set_particle_velocities(self, system_name, velocities, idxs=None):
         velocities = th.as_tensor(velocities, dtype=th.float32, device=self.sim.device).reshape(-1, 3)
