@@ -1449,6 +1449,8 @@ class NewtonBackend(PhysicsBackend):
         # Guards get_live_world_pose() -- see _rebuild()'s own comment on why it must return None
         # while a rebuild is in progress.
         self._rebuilding = False
+        # Set while stopped -- see _discard_live_state()
+        self._live_state_discarded = False
         self._path_joint_map = {}
         self._path_cloth_particle_map = {}  # cloth entity prim_path -> (particle_start, particle_end)
         self._cloth_stiffness_scale = {}  # cloth prim_path -> k its stiffness defaults were scaled by
@@ -1629,6 +1631,26 @@ class NewtonBackend(PhysicsBackend):
 
     def stop(self):
         self._sim_context.stop()
+        self._discard_live_state()
+
+    def _discard_live_state(self):
+        """
+        Detaches every rigid body, articulation and cloth from the live model while stopped, as on PhysX, where poses
+        are read from (and written to) USD while stopped and the next play() starts from USD. Otherwise reads kept
+        returning the live state while writes went to USD: moving an object that had moved while playing failed
+        EntityPrim's entity-vs-root-link pose check, and the next play() restored the live state over a moved cloth.
+        Cloth particles are written back to the USD points, as PhysX does while simulating (updateParticlesToUsd), so a
+        cloth keeps its shape across stop. Fluid and macro particles keep their live state across stop, as before.
+        """
+        if self._model is None:
+            return
+        self._live_state_discarded = True
+        for handle in list(self._articulation_handles.values()) + list(self._rigid_body_handles.values()):
+            handle._valid = False
+        cloth_positions = {path: self.get_cloth_particle_positions(path) for path in self._path_cloth_particle_map}
+        self._path_cloth_particle_map = {}
+        for path, positions in cloth_positions.items():
+            self.set_cloth_particle_positions(path, positions)
 
     def render(self):
         self._sim_context.render()
@@ -2089,7 +2111,7 @@ class NewtonBackend(PhysicsBackend):
         return lazy.pxr.UsdGeom.Xformable(prim).GetLocalTransformation(lazy.pxr.Usd.TimeCode.Default())
 
     def get_live_world_pose(self, prim_path):
-        if self._rebuilding or self._state_0 is None or self._state_0.body_q is None:
+        if self._rebuilding or self._live_state_discarded or self._state_0 is None or self._state_0.body_q is None:
             return None
         body_idx = self._path_body_map.get(prim_path)
         if body_idx is None or body_idx >= self._state_0.body_q.shape[0]:
@@ -2100,6 +2122,8 @@ class NewtonBackend(PhysicsBackend):
     # ---- Model build (before_play hook) ----
 
     def before_play(self, sim):
+        # Build from USD (_capture_state() skips the handles and cloth _discard_live_state() detached)
+        self._live_state_discarded = False
         self._rebuild()
 
     def _rebuild(self):
@@ -2146,6 +2170,9 @@ class NewtonBackend(PhysicsBackend):
         finally:
             self._rebuilding = False
             Work.SetConcurrencyLimit(prev_concurrency_limit)
+        # A rebuild while stopped (e.g. generate_particles()) rebinds everything to the fresh model
+        if self._live_state_discarded:
+            self._discard_live_state()
 
     def _ensure_joint_change_listener(self):
         """
