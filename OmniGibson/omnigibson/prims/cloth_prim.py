@@ -10,10 +10,8 @@
 import math
 from functools import cached_property
 import os
-from pathlib import Path
 import tempfile
 from typing import Literal
-import uuid
 
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.python_utils import multi_dim_linspace
@@ -194,11 +192,10 @@ class ClothPrim(GeomPrim):
             mesh_prim=self.prim, include_normals=True, include_texcoord=True, world_frame=False
         )
         tm.apply_transform(remesh_frame)
-        # Tmp file written to: {tmp_dir}/{tmp_fname}/{tmp_fname}.obj
-        tmp_name = str(uuid.uuid4())
-        tmp_dir = os.path.join(tempfile.gettempdir(), tmp_name)
-        tmp_fpath = os.path.join(tmp_dir, f"{tmp_name}.obj")
-        Path(tmp_dir).mkdir(parents=True, exist_ok=True)
+        # Exported to its own temporary directory (with any material files the export writes next to it), which is
+        # removed once remeshing is done, or by its finalizer if remeshing fails
+        tmp_dir = tempfile.TemporaryDirectory()
+        tmp_fpath = os.path.join(tmp_dir.name, "mesh.obj")
         tm.export(tmp_fpath)
 
         # Start with the default particle distance
@@ -264,6 +261,7 @@ class ClothPrim(GeomPrim):
                 break
         else:
             raise ValueError(f"Could not remesh with less than MAX_CLOTH_PARTICLES ({m.MAX_CLOTH_PARTICLES}) vertices!")
+        tmp_dir.cleanup()
 
         # Re-write data to @mesh_prim
         new_faces = cm.face_matrix()
