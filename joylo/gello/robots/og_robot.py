@@ -42,7 +42,6 @@ class OGRobotServer:
         attachment_joint_visuals: Optional[bool] = None,
         viewer_renderer: str = "gl",
         viewer_panels: bool = True,
-        grasping_mode: Optional[str] = None,
     ):
         if task_name is not None:
             available_tasks = utils.load_available_tasks()
@@ -108,7 +107,6 @@ class OGRobotServer:
             robot_name=robot_name,
             task_name=self.task_name,
             task_cfg=self.task_cfg,
-            grasping_mode=grasping_mode,
         )
         cfg["robots"] = [robot_config]
 

@@ -1442,8 +1442,9 @@ class NewtonBackend(PhysicsBackend):
     # approximate that by dropping their friction. Matches feat/newton's own
     # _apply_chassis_caster_friction() value and rationale.
     _FLOOR_CONTACT_FRICTION = 0.02
-    # Generalized armature / dry-friction floors applied to EVERY non-FIXED joint at build time,
-    # free-body root joints included. PhysX quiets a settled scene through per-body sleep plus solver
+    # Generalized armature / dry-friction floors applied to every articulated (non-FIXED, non-FREE) joint
+    # at build time. Free-body root joints are left out: on a light object the floors swamp its real mass
+    # and inertia. PhysX quiets a settled scene through per-body sleep plus solver
     # damping; MuJoCo-Warp keeps every imported free body fully active every substep, so a pile of
     # resting contacts (a coffee table on the floor carrying a laptop, a plant and a modem) can pump
     # velocity into the stack indefinitely from contact-solve residue alone. A small armature raises
@@ -1457,11 +1458,8 @@ class NewtonBackend(PhysicsBackend):
     # (5*ke*dt^2) on every joint rather than a flat floor, which at OmniGibson's default gains worked
     # out orders of magnitude larger and made the whole robot visibly sluggish -- keep the floor flat.
     #
-    # Auditing note: verify coverage against the solver's `mjw_model`, NOT its `mj_model`. On a 210-DOF
-    # Rs_int scene, mjw_model.dof_armature carries the floor on all 210 DOFs, while the CPU-side
-    # mj_model.dof_armature shows it on only the 72 articulated (35 SLIDE + 37 HINGE) ones and zero on
-    # all 23 FREE root joints. mjw_model is the one actually stepped, so the free bodies ARE covered --
-    # reading mj_model alone makes it look like this pass silently skipped every free body.
+    # Auditing note: verify coverage against the solver's `mjw_model` (the one actually stepped), NOT its
+    # CPU-side `mj_model`, which can disagree with it.
     _JOINT_ARMATURE_FLOOR = 1.0e-2
     _JOINT_FRICTION_FLOOR = 2.0e-1
     # Whether to override every robot joint's authored USD effort limit with inf -- see the use site in
@@ -2743,24 +2741,19 @@ class NewtonBackend(PhysicsBackend):
             ):
                 builder.joint_target_kd[qd_start] = self._PASSIVE_OBJECT_JOINT_KD
 
-        # Armature / dry-friction floors on every non-FIXED joint -- see _JOINT_ARMATURE_FLOOR. Driven
-        # off builder.joint_type directly rather than path_joint_map, because the joints that most need
-        # it are the FREE root joints add_usd() synthesizes for each free-floating rigid body, and those
-        # have no USD joint prim (hence no path) at all.
+        # Armature / dry-friction floors on every articulated joint -- see _JOINT_ARMATURE_FLOOR.
         if self._JOINT_ARMATURE_FLOOR or self._JOINT_FRICTION_FLOOR:
-            joint_fixed = int(newton.JointType.FIXED)
+            # Free joints are skipped: on a light body the floors swamp its real inertia (a 50 g spoon's is
+            # 1e-6..9e-5 kg*m^2), so it fell at 0.8 g and could not tip over a bowl's rim
+            skipped = (int(newton.JointType.FIXED), int(newton.JointType.FREE))
             n_dofs = len(builder.joint_qd)
             for joint_idx, joint_type in enumerate(builder.joint_type):
-                if int(joint_type) == joint_fixed:
+                if int(joint_type) in skipped:
                     continue
                 qd_start = builder.joint_qd_start[joint_idx]
                 qd_stop = (
                     builder.joint_qd_start[joint_idx + 1] if joint_idx + 1 < len(builder.joint_qd_start) else n_dofs
                 )
-                # A free joint's linear DOFs come first: armature there is added mass and dry friction a
-                # constant force against every translation, so a 50 g bowl fell at 7.99 m/s^2 instead of 9.81
-                if int(joint_type) == int(newton.JointType.FREE):
-                    qd_start += 3
                 for dof_idx in range(qd_start, qd_stop):
                     if dof_idx < len(builder.joint_armature):
                         builder.joint_armature[dof_idx] = max(
