@@ -40,6 +40,16 @@ pytest tests/test_object_states.py      # single test file
 pytest tests/test_envs.py -k "test_name" # single test by name
 ```
 
+Tests produce a LOT of log output which can flood the conversation. Run tests with output redirected to a temp file and then grep/inspect that file instead of piping through tail. For example:
+
+```bash
+OMNIGIBSON_HEADLESS=1 ~/miniconda3/envs/behavior/bin/python -m pytest tests/test_object_states.py -x > /tmp/test_object_states.log 2>&1
+# Then inspect the result
+grep -E "PASSED|FAILED|ERROR|====" /tmp/test_object_states.log | tail -40
+```
+
+Use the same log file across retries (re-redirect, don't append) so you are always inspecting the latest output.
+
 ### Linting
 Pre-commit hooks run Ruff on `OmniGibson/` only (not joylo, bddl3):
 ```bash
@@ -80,6 +90,14 @@ under the `isaacsim` package. Everything from isaacsim needs to be imported usin
 relevant extensions' names start with isaacsim.core.
 
 OmniGibson currently uses [Isaac Sim 5.1](https://docs.isaacsim.omniverse.nvidia.com/5.1.0/) and [Omniverse Kit 107.3.1](https://docs.omniverse.nvidia.com/kit/docs/kit-manual/107.3.1/). This [documentation for USDRT](https://docs.omniverse.nvidia.com/kit/docs/usdrt.scenegraph/7.6.1/index.html#usdrt-scenegraph-module) may also be especially useful for understanding Fabric and USD syncing. When following the links, make sure not to add an extra "docs/" to the href.
+
+Isaac Sim source code (e.g. `isaacsim.core.prims` wrappers `Articulation` and `RigidPrim`) can be read directly from the `behavior` conda env at:
+
+```
+~/miniconda3/envs/behavior/lib/python3.11/site-packages/isaacsim/exts/<extension-name>/...
+```
+
+For example, `isaacsim.core.prims` is at `.../isaacsim/exts/isaacsim.core.prims/isaacsim/core/prims/impl/`. These files can be inspected directly with Read/grep without booting the simulator. Note that `isaacsim.*` modules are only importable after `SimulationApp` has been instantiated, so reading the files directly is the practical way to understand their APIs offline.
 
 ### BDDL3 (`bddl3/bddl/`)
 - **`activity_definitions/`** — One file per activity with symbolic pre/post conditions.
