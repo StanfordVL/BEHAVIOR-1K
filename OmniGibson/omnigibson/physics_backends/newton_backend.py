@@ -1,18 +1,6 @@
 """
-Standalone (no Isaac Sim / Omniverse Kit) implementation of PhysicsBackend, driving the open-source
-`newton` physics package (MuJoCo-Warp solver) directly. Verified against ``newton==1.5.0.dev0`` /
-``warp-lang==1.17.0.dev...`` / ``mujoco-warp==3.10.0.3`` (the versions in the ``newton-b1k`` conda env).
-
-Implemented: joint-position/velocity/effort control, Jacobians (unblocking ``InverseKinematicsController``),
-dynamic object add/remove, cloth (``SolverXPBD``), fluid/granular particles (``SolverImplicitMPM``), and
-scene queries (raycast via ``newton.intersect_ray`` against the model's shape BVH; sphere/box overlap via
-an AABB-based approximation against tracked rigid-body shapes -- see the "Scene queries" section below for
-both the precision tradeoffs and a known performance caveat: BDDL's online object-placement sampling can
-issue tens of thousands of individual raycasts for object-dense activities, each cheap but paying Python/
-Warp per-call dispatch overhead PhysX's native call doesn't have, so very query-heavy activities (e.g.
-those placing many small objects, like ``laying_wood_floors``) can take substantially longer to sample on
-this backend). Contact reporting, sensors/rendering, and mass-matrix-dependent controllers (OSC) remain
-explicitly out of scope -- see ``PhysicsBackend.supports_*`` flags and the ``NotImplementedError``s below.
+Standalone implementation of PhysicsBackend using the open-source `newton` physics package (MuJoCo-Warp
+solver) directly.
 """
 
 import math
@@ -37,9 +25,6 @@ log = create_module_logger(module_name=__name__)
 def _wp_to_torch(array):
     import warp as wp
 
-    # wp.to_torch() raises on a zero-length CPU array: it falls back to numpy.asarray(), which
-    # cannot infer a dtype from an empty buffer. The CUDA path goes through dlpack and is fine.
-    # Hit on every first _rebuild(), which runs from play() before any object has been loaded.
     if array.size == 0:
         return th.from_numpy(array.numpy())
     return wp.to_torch(array)
@@ -50,10 +35,9 @@ _SPHERE_SHAPE_OVERLAP_KERNEL = None
 
 def _sphere_shape_overlap_kernel():
     """
-    Lazily-built warp kernel testing a sphere against each (already AABB-prefiltered) candidate shape's exact
-    geometry: overlap iff the shape's signed distance at the sphere center is <= the radius. Follows newton's own
-    particle-vs-shape contact kernel conventions (shape-local query point; meshes queried unscaled, distances
-    measured scaled). Built lazily since newton must not be imported before enable_extensions() runs.
+    Warp kernel testing a sphere against each candidate shape's exact geometry: overlap iff the shape's signed
+    distance at the sphere center is <= the radius. Follows newton's own particle-vs-shape contact kernel conventions.
+    Built lazily since newton must not be imported before enable_extensions() runs.
     """
     global _SPHERE_SHAPE_OVERLAP_KERNEL
     if _SPHERE_SHAPE_OVERLAP_KERNEL is not None:
@@ -114,8 +98,7 @@ def _sphere_shape_overlap_kernel():
 def _assign(wp_array, idx, value):
     """
     Write `value` into `wp_array[idx]`, converting `value` to a plain, flat torch tensor on the same
-    device/dtype as `wp_array` first -- Newton's model/state/control data may live on a CUDA device
-    regardless of what device the caller's tensor happens to be on.
+    device/dtype as `wp_array` first.
     """
     target = _wp_to_torch(wp_array)
     target[idx] = th.as_tensor(value).reshape(-1).to(device=target.device, dtype=target.dtype)
@@ -191,10 +174,7 @@ class _SceneQueryHit:
 
 
 class _NewtonJointBreakEvent:
-    """Synthetic stand-in for PhysX's SimulationEvent -- this backend detects joint breaks itself
-    (see NewtonBackend._check_joint_breaks()) rather than receiving them from an engine-native event
-    stream, so there's no real payload to decode; joint_path is all is_joint_break_event()/
-    decode_joint_break_event() need."""
+    """Synthetic stand-in for PhysX's SimulationEvent."""
 
     __slots__ = ("joint_path",)
 
@@ -213,11 +193,6 @@ class _AppliedActions:
 def _native_to_handle_dof_cols(handle, dof_start, dof_count):
     """
     Column order mapping a native-DOF-ordered articulation matrix onto a handle's own DOF order.
-
-    eval_jacobian()/eval_mass_matrix() lay their columns out in the model's native DOF order, but a
-    handle reports its joints in PhysX's order (see _breadth_first_joint_order). Columns with no
-    handle DOF -- a floating base's 6 virtual ones -- keep their native order at the front, matching
-    PhysX's [virtual_base(6), joints] convention. The identity when the two orders already agree.
     """
     handle_cols = [int(g) - dof_start for g in handle._global_qd_idx.tolist()]
     return sorted(set(range(dof_count)) - set(handle_cols)) + handle_cols
@@ -226,25 +201,12 @@ def _native_to_handle_dof_cols(handle, dof_start, dof_count):
 def _breadth_first_joint_order(model, global_joint_idx):
     """
     Reorders an articulation's joints into the order PhysX enumerates its DOFs.
-
-    PhysX walks an articulation breadth-first, so sibling chains interleave by tree depth: r1pro's
-    two arms come out left_arm_joint1, right_arm_joint1, left_arm_joint2, ... Newton builds its model
-    straight from a USD traversal, which is depth-first -- the whole left chain, then the whole right.
-    Both are internally consistent, but a serialized state is a flat vector read positionally, so a
-    recording made under one backend lands every value on the wrong joint when replayed under the
-    other (silently -- same joint count, same state size, no error). Matching PhysX here makes the
-    state format, dataset recordings and every control index backend-independent.
-
-    Ties within a parent body follow @global_joint_idx's own (ascending, i.e. model-build) order.
-    Any joint the walk cannot reach -- a loop closure, or a joint whose parent is outside this
-    articulation -- is appended in that same order, so the result is always a permutation of the input.
     """
     joint_parent = model.joint_parent.numpy()
     joint_child = model.joint_child.numpy()
     by_parent = {}
     for j in global_joint_idx:
         by_parent.setdefault(int(joint_parent[j]), []).append(j)
-    # An articulation's root bodies are the ones that drive a joint but are never driven by one.
     child_bodies = {int(joint_child[j]) for j in global_joint_idx}
     queue = deque(sorted(set(by_parent) - child_bodies))
     ordered, seen_joints, seen_bodies = [], set(), set(queue)
@@ -275,11 +237,6 @@ class NewtonArticulationHandle:
     def __init__(self, backend, prim_path):
         self._backend = backend
         self.prim_path = prim_path
-        # Stable, never mutated after construction -- initialize() may reassign self.prim_path (see
-        # below) to the entity-level path for a fixed-base object, and since initialize() can run
-        # multiple times against a rebuilt model (see before_play()'s proactive re-init of every
-        # registered handle), every call must look up path_body_map using this original root-link
-        # path, not whatever self.prim_path happened to be corrected to on a previous call.
         self._root_link_prim_path = prim_path
         self._valid = False
         # Local joint metadata, populated in initialize()
@@ -293,7 +250,7 @@ class NewtonArticulationHandle:
             None  # torch.long tensor: global q-space index per local dof (for revolute/prismatic, 1:1 with qd)
         )
         # q_start of this articulation's own root FREE joint (7-wide: pos(3)+quat(4)), or None for a
-        # fixed-base object with no such joint. Populated in initialize(), used by set_world_poses().
+        # fixed-base object with no such joint.
         self._root_free_joint_q_start = None
 
     def initialize(self, physics_sim_view):
@@ -305,12 +262,6 @@ class NewtonArticulationHandle:
             self._valid = False
             return
 
-        # Callers always request this view using the ROOT LINK's path (entity_prim.py hardcodes
-        # f"{prim_path}/{root_link_name}" regardless of fixed/floating base -- mirroring a PhysX
-        # ArticulationView quirk where searching by base_link still resolves to the true articulation
-        # root). This body IS a real body either way, so the lookup below always succeeds. Always use
-        # the stable, never-mutated root-link path here -- see __init__'s note on why self.prim_path
-        # itself isn't safe to key this lookup on across repeat initialize() calls.
         root_body_idx = path_body_map.get(self._root_link_prim_path)
         if root_body_idx is None:
             self._valid = False
@@ -3134,6 +3085,9 @@ class NewtonBackend(PhysicsBackend):
                     impratio=5.0,
                     njmax=32_768,
                     nconmax=self._RIGID_CONTACT_MAX,
+                    # Up to 4 contacts per convex pair instead of 1: with one, a flat 2-hull body (Rs_int's
+                    # laptop) rests on a pivot line, tips on landing and sinks through the table under it
+                    enable_multiccd=True,
                 )
             except ValueError as e:
                 # Every ValueError lands here, not just the expected "no joints in the model yet" one

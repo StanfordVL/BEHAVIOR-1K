@@ -1489,8 +1489,6 @@ class ParticleApplier(ParticleModifier):
         # We also combine start and end points for efficiency when doing the transform, then split them up again
         points = th.cat([start_points, end_points], dim=0)
         pos, quat = self.link.get_position_orientation()
-        # points was built from bare (CPU-default) sampling tensors above; match pos/quat/scale's device
-        # (og.sim.device, not always CPU under the Newton backend) before combining them.
         points = get_particle_positions_from_frame(
             pos=pos,
             quat=quat,
