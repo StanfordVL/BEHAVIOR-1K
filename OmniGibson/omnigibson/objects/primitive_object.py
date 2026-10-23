@@ -7,9 +7,7 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.objects.usd_object import USDObject
 from omnigibson.utils.constants import PRIMITIVE_MESH_TYPES, PrimType
-from omnigibson.utils.physx_utils import bind_material
 from omnigibson.utils.python_utils import assert_valid_key
-from omnigibson.utils.render_utils import create_pbr_material
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import create_primitive_mesh, create_usd_stage, ensure_usd_api
 
@@ -146,7 +144,7 @@ class PrimitiveObject(USDObject):
         )
         ensure_usd_api(col_geom.GetPrim(), lazy.pxr.UsdPhysics.CollisionAPI)
         ensure_usd_api(col_geom.GetPrim(), lazy.pxr.UsdPhysics.MeshCollisionAPI)
-        ensure_usd_api(col_geom.GetPrim(), lazy.pxr.PhysxSchema.PhysxCollisionAPI)
+        og.sim.physics_backend.apply_collision_schemas(col_geom.GetPrim())
 
         side_stage.Save()
         del side_stage
@@ -156,15 +154,15 @@ class PrimitiveObject(USDObject):
         self._vis_geom = lazy.pxr.UsdGeom.Mesh(og.sim.stage.GetPrimAtPath(f"{self.prim_path}/base_link/visuals"))
         self._col_geom = lazy.pxr.UsdGeom.Mesh(og.sim.stage.GetPrimAtPath(f"{self.prim_path}/base_link/collisions"))
 
-        # Create a material and bind it to the visual geom.
-        # This is done here rather than in _prepare_to_load() because create_pbr_material
-        # and bind_material both go through omni.kit.commands, which operates on the
-        # active stage.
-        with og.sim.editing_usd():
-            og.sim.stage.DefinePrim(f"{self.prim_path}/Looks", "Scope")
-        mat_path = f"{self.prim_path}/Looks/default"
-        create_pbr_material(prim_path=mat_path)
-        bind_material(prim_path=self._vis_geom.GetPrim().GetPrimPath().pathString, material_path=mat_path)
+        # Create a material and bind it to the visual geom. Purely visual, so only a render backend
+        # that actually draws does anything here (this is also the only reason the step is deferred
+        # to here rather than done in _prepare_to_load(): Kit's own create_pbr_material/bind_material
+        # go through omni.kit.commands, which operates on the active stage).
+        og.sim.render_backend.create_default_pbr_material(
+            scope_path=f"{self.prim_path}/Looks",
+            material_path=f"{self.prim_path}/Looks/default",
+            target_prim_path=self._vis_geom.GetPrim().GetPrimPath().pathString,
+        )
 
         # Possibly set scalings (only if the scale value is not set)
         if self._load_config["scale"] is not None:
