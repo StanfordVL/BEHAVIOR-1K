@@ -1,5 +1,6 @@
 import torch as th
 
+import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.reward_functions.reward_function_base import BaseRewardFunction
 
@@ -28,7 +29,7 @@ class ReachingGoalReward(BaseRewardFunction):
 
     def _step(self, task, env, action):
         # Sparse reward is received if distance between robot_idn robot's eef and goal is below the distance threshold
-        rewards = th.zeros(env.num_envs, dtype=th.float32)
+        rewards = th.zeros(env.num_envs, dtype=th.float32, device=og.sim.device)
         infos = [dict() for _ in range(env.num_envs)]
         for env_idx in range(env.num_envs):
             robot = env.scenes[env_idx].robots[self._robot_idn]

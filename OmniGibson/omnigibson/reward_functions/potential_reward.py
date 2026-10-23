@@ -1,5 +1,6 @@
 import torch as th
 
+import omnigibson as og
 from omnigibson.reward_functions.reward_function_base import BaseRewardFunction
 
 
@@ -43,13 +44,13 @@ class PotentialReward(BaseRewardFunction):
         super().reset(task, env, env_indices)
         # Reset potential
         if self._potential is None:
-            self._potential = th.zeros(env.num_envs, dtype=th.float32)
+            self._potential = th.zeros(env.num_envs, dtype=th.float32, device=og.sim.device)
         for idx in env_indices:
             self._potential[idx] = self._potential_fcn(env, idx)
 
     def _step(self, task, env, action):
         # Reward is proportional to the potential difference between the current and previous timestep
-        rewards = th.zeros(env.num_envs, dtype=th.float32)
+        rewards = th.zeros(env.num_envs, dtype=th.float32, device=og.sim.device)
         infos = [dict() for _ in range(env.num_envs)]
         for env_idx in range(env.num_envs):
             new_potential = self._potential_fcn(env, env_idx)

@@ -1,5 +1,6 @@
 import torch as th
 
+import omnigibson as og
 from omnigibson.utils.usd_utils import RigidContactAPI
 from omnigibson.termination_conditions.termination_condition_base import FailureCondition
 
@@ -33,7 +34,7 @@ class MaxCollision(FailureCondition):
 
         # Also reset collision counter
         if self._n_collisions is None:
-            self._n_collisions = th.zeros(env.num_envs, dtype=th.int64)
+            self._n_collisions = th.zeros(env.num_envs, dtype=th.int64, device=og.sim.device)
         self._n_collisions[env_indices] = 0
 
     def _step(self, task, env, action):
