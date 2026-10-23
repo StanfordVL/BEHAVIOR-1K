@@ -176,7 +176,9 @@ def test_arm_control():
                 "ori": lambda target, curr, init: check_ori_error(curr, init),
             },
             "up": {
-                "pos": lambda target, curr, init: check_up_error(curr, init),
+                "pos": lambda target, curr, init: check_up_error(
+                    curr, init, tol=0.015
+                ),  # Slightly bigger tolerance: mobile-base robots (e.g. r1) show a hairline xy recoil under Isaac 6.0's PhysX solver
                 "ori": lambda target, curr, init: check_ori_error(curr, init),
             },
             "rotate": {

@@ -272,7 +272,7 @@ class MaterialPrim(BasePrim):
         if non_default_inp is not None:
             return non_default_inp
 
-        return self._shader_node.GetInput(inp).GetDefaultValue()
+        return self._shader_node.GetShaderInput(inp).GetDefaultValue()
 
     def set_input(self, inp, val):
         """
@@ -314,7 +314,7 @@ class MaterialPrim(BasePrim):
         Returns:
             set: All the shader input names associated with this material that have default values
         """
-        return set(self._shader_node.GetInputNames())
+        return set(self._shader_node.GetShaderInputNames())
 
     def get_shader_input_names_by_type(self, input_type, include_default=False):
         """
@@ -332,7 +332,7 @@ class MaterialPrim(BasePrim):
         shader_default_input_names = {
             inp_name
             for inp_name in self.shader_default_input_names
-            if self._shader_node.GetInput(inp_name).GetType() == input_type
+            if self._shader_node.GetShaderInput(inp_name).GetType() == input_type
         }
         return shader_input_names | shader_default_input_names
 
