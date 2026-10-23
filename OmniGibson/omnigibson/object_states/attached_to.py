@@ -128,9 +128,7 @@ class AttachedTo(
 
         self.attachment_joint_visuals = defaultdict(list)
         if m.ENABLE_ATTACHMENT_JOINT_VISUALS:
-            # These are built out of Kit-only machinery (OmniPBRMaterialPrim -> omni.kit.commands). They
-            # are a debug visualization, so skip them with a note rather than taking the whole
-            # environment down -- attachment itself works fine without them.
+            # TODO: support attachment visuals in Newton
             if og.sim.render_backend.supports_materials:
                 self._create_attachment_joint_visuals()
             else:

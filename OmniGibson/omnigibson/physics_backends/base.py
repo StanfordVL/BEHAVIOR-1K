@@ -6,14 +6,8 @@ chosen via ``gm.PHYSICS_BACKEND``. All physics-engine-specific behavior is confi
 interface -- ``Simulator`` and the ``prims`` / ``utils`` layers above it talk only to
 ``og.sim.physics_backend``, never to a concrete engine module directly.
 
-Rendering (the Kit/RTX render loop, cameras, materials, lighting) is out of scope for this abstraction
-and lives instead in the sibling ``render_backends.RenderBackend`` interface (``og.sim.render_backend``,
-chosen via ``gm.RENDER_BACKEND``). The two are independent axes -- a given run picks a physics backend
-and a render backend separately, and ``Simulator._launch_app()`` launches whichever application a
-backend hands back from ``create_app()``. ``PhysicsBackend.sync_to_render_layer()`` below remains
-the one physics-side hook that
-crosses this boundary (pushing computed poses toward wherever the render backend reads them from), since
-that's fundamentally the physics engine's own responsibility, not the renderer's.
+Rendering lives instead in the sibling ``render_backends.RenderBackend`` interface (``og.sim.render_backend``,
+chosen via ``gm.RENDER_BACKEND``).
 """
 
 from abc import ABC, abstractmethod
@@ -25,8 +19,7 @@ class PhysicsBackend(ABC):
     """
 
     # Whether this backend supports PhysX-specific particle / cloth / lidar features, engine-level
-    # contact reporting, and scene queries (raycasts/overlaps). These have no engine-agnostic
-    # equivalent today, so callers should guard on these flags rather than assume support.
+    # contact reporting, and scene queries (raycasts/overlaps).
     supports_particles = False
     supports_cloth = False
     supports_lidar = False
@@ -376,10 +369,7 @@ class PhysicsBackend(ABC):
         prim path, read directly from this backend's own simulation state -- or None if untracked
         (e.g. sim not yet played) or not applicable. Only meaningful for a backend whose USD prim
         attributes don't automatically reflect live physics state (see sync_to_render_layer() above);
-        the main consumer is that backend's own get_world_transform_with_scale(). A
-        backend with a working Fabric/USD sync (e.g. PhysX) never needs this, so the default is a
-        no-op returning None, meaning "fall back to reading USD directly" (PhysX's existing, correct
-        behavior).
+        the main consumer is that backend's own get_world_transform_with_scale().
         """
         return None
 
@@ -509,14 +499,7 @@ class PhysicsBackend(ABC):
     def set_cloth_stiffness(self, prim_path, bend=None, damping=None, shear=None, stretch=None):
         """Set any subset of this cloth's bend/damping/shear/stretch stiffness values (None = unchanged)."""
 
-    # ---- Fluid/granular particle-system state I/O (backs MicroPhysicalParticleSystem; only meaningful
-    # when supports_particles). Unlike cloth (one mesh, particle count fixed at load), a particle
-    # *system* is a named, dynamically-resizable set of particles -- generate/remove change how many
-    # particles exist at runtime. Matches the existing "only one instancer per system" constraint
-    # (MicroPhysicalParticleSystem.generate_particle_instancer's own assertion), so there is no
-    # per-instancer identity to track here, just a system key. The key must be unique across scenes
-    # (callers pass the system's absolute prim path, since every scene has its own e.g. "water"). All
-    # positions/velocities are world-frame.
+    # ---- Fluid/granular particle-system state I/O ----
 
     @abstractmethod
     def create_particle_system(self, system_name):
