@@ -157,6 +157,11 @@ class TransitionRuleAPI:
         """
         Steps all active transition rules, checking if any are satisfied, and if so, executing their transition
         """
+        result = self.get_transition_results()
+        self.execute_transition(added_obj_attrs=result.add, removed_objs=result.remove)
+
+    def get_transition_results(self):
+        """Evaluate this scene's rules without adding or removing objects."""
         # First apply any transition object init states from before, and then clear the dictionary
         for obj, info in self.obj_init_info.items():
             if info["states"] is not None:
@@ -177,7 +182,7 @@ class TransitionRuleAPI:
                 added_obj_attrs += output.add
                 removed_objs += output.remove
 
-        self.execute_transition(added_obj_attrs=added_obj_attrs, removed_objs=removed_objs)
+        return TransitionResults(add=added_obj_attrs, remove=removed_objs)
 
     def execute_transition(self, added_obj_attrs, removed_objs):
         """
