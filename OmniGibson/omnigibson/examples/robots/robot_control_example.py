@@ -60,12 +60,33 @@ def choose_controllers(robot, random_selection=False):
     return controller_choices
 
 
-def main(random_selection=False, headless=False, short_exec=False, quickstart=False):
+def main(
+    random_selection=False,
+    headless=False,
+    short_exec=False,
+    quickstart=False,
+    renderer="kit",
+    output=None,
+    num_steps=100,
+):
     """
     Robot control demo with selection
     Queries the user to select a robot, the controllers, a scene and a type of input (random actions or teleop)
+
+    :param renderer: "kit" for Omniverse or "rtx"/"gl" to run on Newton
+    :param output: for renderer "rtx"/"gl": if given, runs headless and writes a recorded video to
+        this path. If omitted, opens a live on-screen window instead.
+    :param num_steps: number of steps to run when renderer is "rtx" or "gl".
     """
     og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
+
+    if renderer != "kit":
+        if renderer == "gl" and output:
+            import pyglet
+
+            pyglet.options["headless"] = True
+        gm.PHYSICS_BACKEND = "newton"
+        gm.RENDER_BACKEND = "none"
 
     # Choose scene to load
     scene_model = "Rs_int"
@@ -89,12 +110,14 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
     # Add the robot we want to load
     robot0_cfg = dict()
     robot0_cfg["model"] = robot_name
-    robot0_cfg["obs_modalities"] = ["rgb"]
+    robot0_cfg["obs_modalities"] = ["rgb"] if gm.RENDER_BACKEND != "none" else []
     robot0_cfg["action_type"] = "continuous"
     robot0_cfg["action_normalize"] = True
 
     # Compile config
     cfg = dict(scene=scene_cfg, robots=[robot0_cfg])
+    if renderer != "kit":
+        cfg["env"] = {"device": "cuda:0"}
 
     # Create the environment
     env = og.Environment(configs=cfg)
@@ -126,11 +149,12 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
     # is preserved
     env.scene.update_initial_file()
 
-    # Update the simulator's viewer camera's pose so it points towards the robot
-    og.sim.viewer_camera.set_position_orientation(
-        position=th.tensor([1.46949, -3.97358, 2.21529]),
-        orientation=th.tensor([0.56829048, 0.09569975, 0.13571846, 0.80589577]),
-    )
+    # Update the simulator's viewer camera's pose so it points towards the robot.
+    if og.sim.viewer_camera is not None:
+        og.sim.viewer_camera.set_position_orientation(
+            position=th.tensor([1.46949, -3.97358, 2.21529]),
+            orientation=th.tensor([0.56829048, 0.09569975, 0.13571846, 0.80589577]),
+        )
 
     # Reset environment and robot
     env.reset()
@@ -185,5 +209,22 @@ if __name__ == "__main__":
         action="store_true",
         help="Whether the example should be loaded with default settings for a quick start.",
     )
+    parser.add_argument(
+        "--renderer",
+        choices=["kit", "rtx", "gl"],
+        default="kit",
+        help=(
+            "'kit' (default) is the interactive Omniverse Kit viewport. 'rtx' and 'gl' run physics "
+            "on Newton through Newton's own ray-traced or OpenGL viewer instead, using "
+            "random actions."
+        ),
+    )
+    parser.add_argument(
+        "--output",
+        type=str,
+        default=None,
+        help="Video output path for --renderer rtx/gl (headless recording). Omit for a live window.",
+    )
+    parser.add_argument("--num-steps", type=int, default=100, help="Number of steps to run for --renderer rtx/gl.")
     args = parser.parse_args()
-    main(quickstart=args.quickstart)
+    main(quickstart=args.quickstart, renderer=args.renderer, output=args.output, num_steps=args.num_steps)

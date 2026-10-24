@@ -4,7 +4,7 @@ from enum import IntEnum
 
 import torch as th
 
-from omnigibson.macros import create_module_macros
+from omnigibson.macros import create_module_macros, gm
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.python_utils import Recreatable, Registerable, Serializable, assert_valid_key, classproperty
 from omnigibson.utils.usd_utils import ControllableObjectViewAPI
@@ -12,9 +12,12 @@ from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-# Set default isaac kp / kd for controllers
+# Set default isaac kp / kd for controllers.
 m.DEFAULT_ISAAC_KP = 1e7
 m.DEFAULT_ISAAC_KD = 1e5
+
+m.DEFAULT_NEWTON_KP = 3000.0
+m.DEFAULT_NEWTON_KD = 300.0
 
 # Global dicts that will contain mappings
 REGISTERED_CONTROLLERS = dict()
@@ -200,17 +203,20 @@ class BaseController(Serializable, Registerable, Recreatable):
             )
         )
 
-        # Set gains
+        self._isaac_kp_is_default = isaac_kp is None
+        self._isaac_kd_is_default = isaac_kd is None
+        default_kp = m.DEFAULT_NEWTON_KP if gm.PHYSICS_BACKEND == "newton" else m.DEFAULT_ISAAC_KP
+        default_kd = m.DEFAULT_NEWTON_KD if gm.PHYSICS_BACKEND == "newton" else m.DEFAULT_ISAAC_KD
         if self.control_type == ControlType.POSITION:
             # Set default kp / kd values if not specified
-            isaac_kp = m.DEFAULT_ISAAC_KP if isaac_kp is None else isaac_kp
-            isaac_kd = m.DEFAULT_ISAAC_KD if isaac_kd is None else isaac_kd
+            isaac_kp = default_kp if isaac_kp is None else isaac_kp
+            isaac_kd = default_kd if isaac_kd is None else isaac_kd
         elif self.control_type == ControlType.VELOCITY:
             # No kp should be specified, but kd should be
             assert (
                 isaac_kp is None
             ), f"Control type for controller {self.__class__.__name__} is VELOCITY, so no isaac_kp should be set!"
-            isaac_kd = m.DEFAULT_ISAAC_KP if isaac_kd is None else isaac_kd
+            isaac_kd = default_kp if isaac_kd is None else isaac_kd
         elif self.control_type == ControlType.EFFORT:
             # Neither kp nor kd should be specified
             assert (
@@ -736,6 +742,24 @@ class BaseController(Serializable, Registerable, Recreatable):
                 None if not specified.
         """
         return self._isaac_kd
+
+    @property
+    def isaac_kp_is_default(self):
+        """
+        Returns:
+            bool: Whether isaac_kp was filled in from the backend-wide default rather than explicitly
+                configured. See __init__'s own comment on why this distinction is tracked.
+        """
+        return self._isaac_kp_is_default
+
+    @property
+    def isaac_kd_is_default(self):
+        """
+        Returns:
+            bool: Whether isaac_kd was filled in from the backend-wide default rather than explicitly
+                configured. See __init__'s own comment on why this distinction is tracked.
+        """
+        return self._isaac_kd_is_default
 
     @property
     def command_input_limits(self):

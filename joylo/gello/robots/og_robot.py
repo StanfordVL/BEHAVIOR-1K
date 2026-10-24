@@ -7,7 +7,7 @@ import json
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.envs import HDF5CollectionWrapper
-from omnigibson.macros import macros
+from omnigibson.macros import gm, macros
 from omnigibson.robots import Robot, REGISTERED_ROBOTS
 from omnigibson.tasks import BehaviorTask
 from omnigibson.systems.system_base import BaseSystem
@@ -40,6 +40,8 @@ class OGRobotServer:
         instance_id: Optional[int] = None,
         ghosting: bool = True,
         attachment_joint_visuals: Optional[bool] = None,
+        viewer_renderer: str = "gl",
+        viewer_panels: bool = True,
     ):
         if task_name is not None:
             available_tasks = utils.load_available_tasks()
@@ -85,6 +87,10 @@ class OGRobotServer:
 
         self._robot_type = robot
 
+        assert viewer_renderer in ("gl", "rtx"), f"viewer_renderer must be 'gl' or 'rtx', got {viewer_renderer!r}"
+        self._viewer_renderer = viewer_renderer
+        self._viewer_panels_requested = viewer_panels
+
         if config is None:
             cfg = utils.generate_basic_environment_config(
                 robot_type=robot,
@@ -114,10 +120,20 @@ class OGRobotServer:
                 )
             cfg["scene"]["load_room_types"] = relevant_rooms
 
+        from omnigibson.macros import gm
+        # Force GPU use in Newton instead of falling back to CPU.
+        if gm.PHYSICS_BACKEND == "newton":
+            cfg.setdefault("env", {}).setdefault("device", "cuda:0")
+
         self.env = og.Environment(configs=cfg)
         # The vectorized Environment exposes robots as a per-scene list of lists
         # (env.robots[scene_idx] -> list of robots). JoyLo drives a single scene/robot.
         self.robot = self.env.robots[0][0]
+
+        # Whether Kit's UI stack (viewports, overlay windows, carb input, Kit materials) exists in
+        # this process. False under the Newton-standalone configuration (PHYSICS_BACKEND="newton" +
+        # RENDER_BACKEND uses newton "gl" or "rtx").
+        self._kit_ui = og.sim.render_backend.supports_viewport
 
         assert self.robot.is_manipulation, (
             f"Robot {robot} is not a manipulation robot! Cannot use GELLO"
@@ -130,6 +146,10 @@ class OGRobotServer:
 
         self._teleop_config = ROBOT_CONFIGS[robot]
 
+        if ghosting and not self._kit_ui:
+            # TODO: Support ghost visualization in newton renderer.
+            print("Ghost robot visualization requires Kit rendering; disabling ghosting.")
+            ghosting = False
         self.ghosting = ghosting
         if self.ghosting:
             self.ghost = utils.setup_ghost_robot(
@@ -154,9 +174,13 @@ class OGRobotServer:
         self._setup_teleop_support()
 
         # Set up status display
-        self.status_window, self.status_labels = utils.setup_status_display_ui(
-            og.sim.viewer_camera._viewport
-        )
+        if self._kit_ui:
+            # TODO: Add status display to newton renderer.
+            self.status_window, self.status_labels = utils.setup_status_display_ui(
+                og.sim.viewer_camera._viewport
+            )
+        else:
+            self.status_window, self.status_labels = None, None
         self.event_queue = []
 
         # Set variables that are set during reset call
@@ -182,7 +206,7 @@ class OGRobotServer:
             self.env = HDF5CollectionWrapper(
                 env=self.env,
                 output_path=self._recording_path,
-                viewport_camera_path=og.sim.viewer_camera.active_camera_path,
+                viewport_camera_path=og.sim.viewer_camera.active_camera_path if self._kit_ui else None,
                 only_successes=False,
                 flush_every_n_traj=1,
                 use_vr=VIEWING_MODE == ViewingMode.VR,
@@ -234,8 +258,9 @@ class OGRobotServer:
         # # Set lower position iteration count for faster sim speed
         # og.sim._physics_context._physx_scene_api.GetMaxPositionIterationCountAttr().Set(8)
         # og.sim._physics_context._physx_scene_api.GetMaxVelocityIterationCountAttr().Set(1)
-        isregistry = lazy.carb.settings.acquire_settings_interface()
-        isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_NUM_THREADS, 0)
+        if gm.PHYSICS_BACKEND == "physx":
+            isregistry = lazy.carb.settings.acquire_settings_interface()
+            isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_NUM_THREADS, 0)
         # isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_MIN_FRAME_RATE, int(1 / og.sim.get_physics_dt()))
         # isregistry.set_int(lazy.omni.physx.bindings._physx.SETTING_MIN_FRAME_RATE, 30)
 
@@ -263,8 +288,8 @@ class OGRobotServer:
 
         og.sim.play()
 
-        # Make sure robot fingers are extra grippy
-        if APPLY_EXTRA_GRIP:
+        # Make sure robot fingers are extra grippy (PhysX-only: isaacsim PhysicsMaterial API)
+        if APPLY_EXTRA_GRIP and gm.PHYSICS_BACKEND == "physx":
             gripper_mat = lazy.isaacsim.core.api.materials.PhysicsMaterial(
                 prim_path=f"{self.robot.prim_path}/Looks/gripper_mat",
                 name="gripper_material",
@@ -278,7 +303,17 @@ class OGRobotServer:
                         msh.apply_physics_material(gripper_mat)
 
         # Set optimized settings
-        utils.optimize_sim_settings(vr_mode=(VIEWING_MODE == ViewingMode.VR))
+        if self._kit_ui:
+            utils.optimize_sim_settings(vr_mode=(VIEWING_MODE == ViewingMode.VR))
+
+        # Keys currently held down for local (no separate ZMQ client) keyboard base driving.
+        # _setup_keyboard_handlers/_setup_newton_viewer (called further below, after the first
+        # get_action() call) populate _BASE_KEYS with the real backend-specific key constants and push
+        # into _held_keys on press/release; get_action() reads both. Both must already exist as empty
+        # containers before that first get_action() call.
+        self._held_keys = set()
+        self._BASE_KEYS = set()
+        self._local_base_active = False
 
         # Reset environment to initialize
         self._needs_initial_file_update = True
@@ -291,6 +326,15 @@ class OGRobotServer:
 
         # Set up keyboard handlers
         self._setup_keyboard_handlers()
+
+        # Set up the live Newton GL viewer window
+        self._newton_viewer = None
+        self._newton_frame_idx = 0
+        self._camera_fov_cache = {}
+        self._newton_viewer_panels = {}
+        self._newton_panel_images = {}
+        if not self._kit_ui:
+            self._setup_newton_viewer()
 
         # Set up VR system if needed
         self._setup_vr()
@@ -312,38 +356,69 @@ class OGRobotServer:
 
     def _setup_teleop_support(self):
         """Set up cameras, visualizations, UI elements"""
-        # Setup cameras
-        self.camera_paths, self.viewports = utils.setup_cameras(
-            self.robot, self.env.external_sensors[0], RESOLUTION, self._teleop_config
-        )
-        self.active_camera_id = 0
+        if self._kit_ui:
+            # Setup cameras
+            self.camera_paths, self.viewports = utils.setup_cameras(
+                self.robot, self.env.external_sensors[0], RESOLUTION, self._teleop_config
+            )
+            self.active_camera_id = 0
+            self._panel_camera_paths = {}
 
-        # Setup camera blinking visualizers
-        self.camera_blinking_visualizers = utils.setup_camera_blinking_visualizers(
-            self.camera_paths, self.env.scene
-        )
+            # Setup camera blinking visualizers
+            self.camera_blinking_visualizers = utils.setup_camera_blinking_visualizers(
+                self.camera_paths, self.env.scene
+            )
 
-        # Setup visualizers
-        self.vis_elements = utils.setup_robot_visualizers(self.robot, self.env.scene)
-        self.eef_cylinder_geoms = self.vis_elements["eef_cylinder_geoms"]
-        self.vis_mats = self.vis_elements["vis_mats"]
-        self.vertical_visualizers = self.vis_elements["vertical_visualizers"]
-        self.reachability_visualizers = self.vis_elements["reachability_visualizers"]
+            # Setup visualizers
+            self.vis_elements = utils.setup_robot_visualizers(self.robot, self.env.scene)
+            self.eef_cylinder_geoms = self.vis_elements["eef_cylinder_geoms"]
+            self.vis_mats = self.vis_elements["vis_mats"]
+            self.vertical_visualizers = self.vis_elements["vertical_visualizers"]
+            self.reachability_visualizers = self.vis_elements["reachability_visualizers"]
 
-        # Setup flashlights
-        self.flashlights = utils.setup_flashlights(self.robot)
+            # Setup flashlights
+            self.flashlights = utils.setup_flashlights(self.robot)
+        else:
+            # No Kit viewports/materials standalone. The camera prims themselves still exist in USD --
+            # their paths drive the Newton GL viewer's camera (see _tick_newton_viewer), and button B
+            # cycles through them exactly like the Kit viewport toggle.
+            self.camera_paths, self._panel_camera_paths = utils.setup_cameras_standalone(
+                self.robot, self.env.external_sensors[0], self._teleop_config
+            )
+            self.active_camera_id = 0
+            self.viewports = {}
+            self.camera_blinking_visualizers = {}
+            self.vis_elements = {
+                "eef_cylinder_geoms": {},
+                "vis_mats": {},
+                "vertical_visualizers": {},
+                "reachability_visualizers": {},
+            }
+            self.eef_cylinder_geoms = self.vis_elements["eef_cylinder_geoms"]
+            self.vis_mats = self.vis_elements["vis_mats"]
+            self.vertical_visualizers = self.vis_elements["vertical_visualizers"]
+            self.reachability_visualizers = self.vis_elements["reachability_visualizers"]
+            self.flashlights = {}
 
         # Setup task-related elements if task is specified
         if self.task_name is not None:
-            # Setup task instruction UI
-            (
-                self.overlay_window,
-                self.text_labels,
-                self.instance_id_label,
-                self.bddl_goal_conditions,
-            ) = utils.setup_task_instruction_ui(
-                self.task_name, self.env, self.instance_id
-            )
+            if self._kit_ui:
+                # Setup task instruction UI
+                (
+                    self.overlay_window,
+                    self.text_labels,
+                    self.instance_id_label,
+                    self.bddl_goal_conditions,
+                ) = utils.setup_task_instruction_ui(
+                    self.task_name, self.env, self.instance_id
+                )
+            else:
+                # No overlay UI standalone -- goal conditions are still tracked (and printed to the
+                # console on change, see _update_visualization_and_status)
+                self.overlay_window = None
+                self.text_labels = None
+                self.instance_id_label = None
+                self.bddl_goal_conditions = self.env.task.activity_natural_language_goal_conditions
 
             # Initialize goal status tracking
             self._prev_goal_status = {
@@ -362,9 +437,11 @@ class OGRobotServer:
                 and obj.category not in EXTRA_TASK_RELEVANT_CATEGORIES
             ]
 
-            # Setup object beacons
-            self.object_beacons = utils.setup_object_beacons(
-                self.task_relevant_objects, self.env.scene
+            # Setup object beacons (Kit-only: uses Replicator colors + Kit materials)
+            self.object_beacons = (
+                utils.setup_object_beacons(self.task_relevant_objects, self.env.scene)
+                if self._kit_ui
+                else {}
             )
 
             # Attachment guides are owned by the AttachedTo object state. Keep this as a placeholder for future
@@ -416,10 +493,188 @@ class OGRobotServer:
             keyboard, keyboard_event_handler
         )
 
+    def _setup_newton_viewer(self):
+        """Open a live Newton viewer window (Kit-free, ``self._viewer_renderer`` -- ``"gl"`` (default,
+        rasterizer) or ``"rtx"`` (real ray tracer, higher visual fidelity but see the caveat below)) and
+        wire the same R/P/X/ESC teleop keys the carb keyboard handler provides under Kit. The window's
+        camera tracks ``self.camera_paths[self.active_camera_id]``'s live prim pose every tick (see
+        _tick_newton_viewer), so button B camera switching works the same as the Kit viewport toggle.
+        """
+        import pyglet
+
+        from omnigibson.utils.newton_viewer_recording import build_viewer
+
+        viewer = build_viewer(
+            self._viewer_renderer,
+            og.sim.physics_backend._model,
+            cam_pos=(2.0, 2.0, 2.0),  # placeholder -- overwritten every tick from the camera prim
+            look_at=(0.0, 0.0, 1.0),
+            width=1280,
+            height=720,
+            headless=False,
+        )
+
+        key = pyglet.window.key
+
+        def _on_key_press(symbol, modifiers):
+            if symbol == key.R:
+                self.reset()
+            elif symbol == key.P:
+                self.pause()
+            elif symbol == key.X:
+                self.resume_control()
+            elif symbol == key.ESCAPE:
+                self.stop()
+
+        def _on_key_release(symbol, modifiers):
+            self._held_keys.discard(symbol)
+
+        if self._viewer_renderer == "gl":
+            viewer.renderer.register_key_press(_on_key_press)
+            viewer.renderer.register_key_release(_on_key_release)
+        else:
+            self._sync_newton_viewer_camera(viewer)
+            viewer.begin_frame(0.0)
+            viewer.log_state(og.sim.physics_backend._state_0)
+            viewer.end_frame()
+            viewer._window.push_handlers(on_key_press=_on_key_press, on_key_release=_on_key_release)
+        self._newton_viewer = viewer
+        self._setup_newton_viewer_panels()
+
+    def _setup_newton_viewer_panels(self):
+        """Add secondary-camera image panels inside the Newton viewer window -- the Kit-free
+        analogue of setup_cameras()'s docked viewports (left/right shoulder + wrist), plus the
+        EXTRA_VIEWPOINT_CAMERA_CONFIGS viewpoints (the gripper cams by default).
+
+        Each panel is an off-screen camera resource from the active RenderBackend (the same machinery
+        VisionSensor rgb capture uses), rendered on demand in _tick_newton_viewer and handed to
+        ViewerGL.log_image().
+        """
+        self._newton_viewer_panels = {}
+        if self._newton_viewer is None or not self._viewer_panels_requested:
+            return
+        if not self._panel_camera_paths:
+            return
+        if self._viewer_renderer != "gl":
+            print(
+                f"Viewer camera panels need the GL viewer (log_image is ViewerGL-only); "
+                f"--viewer-renderer {self._viewer_renderer} shows the main view only."
+            )
+            return
+        if not og.sim.render_backend.supports_camera_capture:
+            print(
+                f"Viewer camera panels need a render backend that can capture images; "
+                f"{type(og.sim.render_backend).__name__} cannot. Showing the main view only."
+            )
+            return
+
+        for label, cam_path in self._panel_camera_paths.items():
+            camera_resource = og.sim.render_backend.create_camera_resource(
+                cam_path, PANEL_RESOLUTION, force_new=True
+            )
+            annotator = og.sim.render_backend.create_annotator("rgb")
+            og.sim.render_backend.attach_modality(annotator, camera_resource)
+            self._newton_viewer_panels[label] = (camera_resource, annotator)
+
+        panel_width, panel_height = PANEL_RESOLUTION
+        self._newton_panel_images = {
+            label: np.zeros((panel_height, panel_width, 4), dtype=np.uint8) for label in self._newton_viewer_panels
+        }
+        print(
+            f"Newton viewer camera panels, in tile order of the '{PANEL_WINDOW_NAME}' window: "
+            f"{', '.join(sorted(self._newton_viewer_panels))}"
+        )
+
+    def _teardown_newton_viewer_panels(self):
+        """Release the panels' off-screen camera resources (each owns its own GL window)."""
+        for camera_resource, annotator in getattr(self, "_newton_viewer_panels", {}).values():
+            og.sim.render_backend.detach_modality(annotator, camera_resource)
+            og.sim.render_backend.destroy_camera_resource(camera_resource)
+        self._newton_viewer_panels = {}
+        self._newton_panel_images = {}
+
+    def _draw_newton_viewer_panels(self, viewer):
+        """Re-render ONE panel camera (round-robin) and log every panel as one tiled image window."""
+        labels = sorted(self._newton_viewer_panels)
+        label = labels[(self._newton_frame_idx // PANEL_EVERY_N_FRAMES) % len(labels)]
+        _camera_resource, annotator = self._newton_viewer_panels[label]
+        self._newton_panel_images[label] = np.asarray(og.sim.render_backend.get_modality_data(annotator))
+        viewer.log_image(PANEL_WINDOW_NAME, np.stack([self._newton_panel_images[name] for name in labels]))
+
+    def _camera_horizontal_fov(self, cam_path):
+        """Horizontal fov (radians) authored on a USD camera prim, or None if it has no usable
+        focal-length/aperture pair. Cached: these are static once setup_cameras_standalone ran."""
+        if cam_path not in self._camera_fov_cache:
+            usd_camera = lazy.pxr.UsdGeom.Camera(og.sim.stage.GetPrimAtPath(cam_path))
+            focal_length = usd_camera.GetFocalLengthAttr().Get()
+            horizontal_aperture = usd_camera.GetHorizontalApertureAttr().Get()
+            self._camera_fov_cache[cam_path] = (
+                2.0 * np.arctan(horizontal_aperture / (2.0 * focal_length))
+                if focal_length and horizontal_aperture
+                else None
+            )
+        return self._camera_fov_cache[cam_path]
+
+    def _sync_newton_viewer_camera(self, viewer):
+        """Point the viewer's camera at the active camera prim's live world pose, matching its fov."""
+        from pyglet.math import Vec3 as PyVec3
+
+        from omnigibson.utils.usd_utils import get_world_pose
+
+        cam_path = self.camera_paths[self.active_camera_id]
+        pos, quat = get_world_pose(cam_path)
+        # UsdGeom.Camera convention: looks down its own local -Z
+        forward = T.quat_apply(quat, th.tensor([0.0, 0.0, -1.0], device=quat.device))
+        viewer.camera.pos = PyVec3(*pos.tolist())
+        viewer.camera.look_at((pos + forward).tolist())
+
+        # Approximate the tracked prim's intrinsics. Newton's camera takes a single scalar
+        # VERTICAL fov but OmniGibson only authors horizontal aperature.
+        horizontal_fov = self._camera_horizontal_fov(cam_path)
+        if horizontal_fov is not None and viewer.camera.height:
+            aspect = viewer.camera.width / viewer.camera.height
+            viewer.camera.fov = np.degrees(2.0 * np.arctan(np.tan(horizontal_fov / 2.0) / aspect))
+
+        viewer._camera_dirty = True
+
+    def _tick_newton_viewer(self):
+        """Render one frame of the live Newton viewer (gl or rtx), tracking the active camera prim's pose."""
+        viewer = self._newton_viewer
+        if viewer is None:
+            return
+        if hasattr(viewer, "is_running") and not viewer.is_running():
+            self._teardown_newton_viewer_panels()
+            viewer.close()
+            self._newton_viewer = None
+            return
+
+        try:
+            self._sync_newton_viewer_camera(viewer)
+        except Exception:
+            pass  # keep last camera pose rather than dropping the frame
+
+        if self._newton_viewer_panels and self._newton_frame_idx % PANEL_EVERY_N_FRAMES == 0:
+            try:
+                self._draw_newton_viewer_panels(viewer)
+            except Exception as e:
+                print(f"Viewer camera panels failed ({e}); disabling them.")
+                self._teardown_newton_viewer_panels()
+
+        viewer.begin_frame(self._newton_frame_idx / 30.0)
+        viewer.log_state(og.sim.physics_backend._state_0)
+        viewer.end_frame()
+        self._newton_frame_idx += 1
+
     def _setup_vr(self):
         """Set up VR system if needed"""
         self.vr_system = None
         self.camera_prims = []
+
+        if VIEWING_MODE == ViewingMode.VR and not self._kit_ui:
+            raise RuntimeError(
+                "VR viewing mode requires Kit rendering (OVXRSystem); it is not available with the "
+                "Newton-standalone configuration."
+            )
 
         if VIEWING_MODE == ViewingMode.VR:
             for cam_path in self.camera_paths:
@@ -459,7 +714,7 @@ class OGRobotServer:
             joint_state: Target joint state
             component: Which component to control (optional)
         """
-        state = joint_state.clone()
+        state = joint_state.clone().to(og.sim.device)
         if self.is_bimanual_mobile:
             arm_dof = len(self.robot.arm_control_idx["left"])
             component_dims = (
@@ -493,7 +748,7 @@ class OGRobotServer:
             assert component in self._joint_cmd, (
                 f"Got invalid component joint cmd: {component}. Valid options: {self._joint_cmd.keys()}"
             )
-            self._joint_cmd[component] = joint_state.clone()
+            self._joint_cmd[component] = joint_state.clone().to(og.sim.device)
 
     def freedrive_enabled(self) -> bool:
         """Check if freedrive mode is enabled"""
@@ -606,6 +861,12 @@ class OGRobotServer:
         # Start the zmq server
         self._zmq_server_thread.start()
 
+        try:
+            self._serve_forever()
+        finally:
+            self.stop()
+
+    def _serve_forever(self) -> None:
         while True:
             self._update_observations()
 
@@ -613,9 +874,13 @@ class OGRobotServer:
             self._process_button_inputs()
 
             # Update status display
-            self.event_queue = utils.update_status_display(
-                self.status_window, self.status_labels, self.event_queue, time.time()
-            )
+            if self.status_window is not None:
+                self.event_queue = utils.update_status_display(
+                    self.status_window, self.status_labels, self.event_queue, time.time()
+                )
+            else:
+                now = time.time()
+                self.event_queue = [e for e in self.event_queue if now - e[2] < 5.0]
 
             # Only decrement cooldown if we're not waiting to resume
             if not self._waiting_to_resume:
@@ -628,6 +893,7 @@ class OGRobotServer:
             # If waiting to resume, simply step sim without updating action
             if self._waiting_to_resume:
                 og.sim.render()
+                self._tick_newton_viewer()
                 utils.print_color(
                     f"\rPress X (keyboard or JoyCon) to resume sim!{' ' * 30}",
                     end="",
@@ -647,6 +913,7 @@ class OGRobotServer:
                 _, _, _, _, info = self.env.step(action)
                 if isinstance(info, (list, tuple)):
                     info = info[0]
+                self._tick_newton_viewer()
 
                 # Update checkpoint if queued
                 if self._should_update_checkpoint:
@@ -687,9 +954,10 @@ class OGRobotServer:
                         self.env.rollback_to_checkpoint(
                             index=-self._rollback_checkpoint_idx
                         )
-                        utils.optimize_sim_settings(
-                            vr_mode=(VIEWING_MODE == ViewingMode.VR)
-                        )
+                        if self._kit_ui:
+                            utils.optimize_sim_settings(
+                                vr_mode=(VIEWING_MODE == ViewingMode.VR)
+                            )
 
                         # Extract trunk position values and calculate offsets
                         trunk_qpos = self.robot.get_joint_positions()[
@@ -750,18 +1018,21 @@ class OGRobotServer:
         button_b_state = self._joint_cmd["button_b"].item() != 0.0
         if button_b_state and not self._button_toggled_state["b"]:
             self.active_camera_id = 1 - self.active_camera_id
-            og.sim.viewer_camera.active_camera_path = self.camera_paths[
-                self.active_camera_id
-            ]
+            if self._kit_ui:
+                og.sim.viewer_camera.active_camera_path = self.camera_paths[
+                    self.active_camera_id
+                ]
+            # (standalone: _tick_newton_viewer reads active_camera_id directly, nothing else to do)
             if VIEWING_MODE == ViewingMode.VR:
                 self.vr_system.set_anchor_with_prim(
                     self.camera_prims[self.active_camera_id]
                 )
         self._button_toggled_state["b"] = button_b_state
 
-        # If A is toggled from OFF -> ON, toggle task-irrelevant object visibility
+        # If A is toggled from OFF -> ON, toggle task-irrelevant object visibility.
         button_a_state = self._joint_cmd["button_a"].item() != 0.0
-        if button_a_state and not self._button_toggled_state["a"]:
+        if button_a_state and not self._button_toggled_state["a"] and self._kit_ui:
+            # TODO: implement beacon support in Newton UI?
             for obj in self.task_irrelevant_objects:
                 obj.visible = not obj.visible
             task_objects = [obj for obj in self.env.task.object_scopes[0].values() if obj is not None]
@@ -783,7 +1054,8 @@ class OGRobotServer:
                     if entity in self.object_beacons:
                         beacon = self.object_beacons[entity]
                         beacon.set_position_orientation(
-                            position=entity.aabb_center + th.tensor([0, 0, BEACON_LENGTH / 2.0]),
+                            position=entity.aabb_center
+                            + th.tensor([0, 0, BEACON_LENGTH / 2.0], device=entity.aabb_center.device),
                             orientation=T.euler2quat(th.tensor([0, 0, 0])),
                             frame="world",
                         )
@@ -816,7 +1088,7 @@ class OGRobotServer:
 
         # If left arrow is toggled from OFF -> ON, toggle flashlight on left eef
         button_left_arrow_state = self._joint_cmd["button_left"].item() != 0.0
-        if button_left_arrow_state and not self._button_toggled_state["left"]:
+        if button_left_arrow_state and not self._button_toggled_state["left"] and self.flashlights:
             with og.sim.editing_usd():
                 if self.flashlights["left"].GetVisibilityAttr().Get() == "invisible":
                     self.flashlights["left"].MakeVisible()
@@ -826,7 +1098,7 @@ class OGRobotServer:
 
         # If right arrow is toggled from OFF -> ON, toggle flashlight on right eef
         button_right_arrow_state = self._joint_cmd["button_right"].item() != 0.0
-        if button_right_arrow_state and not self._button_toggled_state["right"]:
+        if button_right_arrow_state and not self._button_toggled_state["right"] and self.flashlights:
             with og.sim.editing_usd():
                 if self.flashlights["right"].GetVisibilityAttr().Get() == "invisible":
                     self.flashlights["right"].MakeVisible()
@@ -838,14 +1110,24 @@ class OGRobotServer:
         """Update visualization and status based on new information"""
         # Update task goal status if task is active
         if self.task_name is not None and "done" in info:
-            current_goal_status = utils.update_goal_status(
-                self.text_labels,
-                info["done"]["goal_status"],
-                self._prev_goal_status,
-                self.env,
-                self._recording_path,
-                self.event_queue,
-            )
+            if self._kit_ui:
+                current_goal_status = utils.update_goal_status(
+                    self.text_labels,
+                    info["done"]["goal_status"],
+                    self._prev_goal_status,
+                    self.env,
+                    self._recording_path,
+                    self.event_queue,
+                )
+            else:
+                # TODO: implement goal status tracking in newton?
+                current_goal_status = info["done"]["goal_status"]
+                if set(current_goal_status["satisfied"]) != set(self._prev_goal_status["satisfied"]):
+                    utils.print_color(
+                        f"\nGoal status: {len(current_goal_status['satisfied'])}/"
+                        f"{len(self.bddl_goal_conditions)} conditions satisfied",
+                        color="green",
+                    )
 
             # Update checkpoint if new goals are satisfied
             if AUTO_CHECKPOINTING and len(current_goal_status["satisfied"]) > len(
@@ -856,25 +1138,26 @@ class OGRobotServer:
 
             self._prev_goal_status = current_goal_status
 
-        # Update other visualization elements
-        self._prev_in_hand_status = utils.update_in_hand_status(
-            self.robot, self.vis_mats, self._prev_in_hand_status
-        )
+        # Update other visualization elements (all Kit-side visuals: materials, viewport spheres)
+        if self._kit_ui:
+            self._prev_in_hand_status = utils.update_in_hand_status(
+                self.robot, self.vis_mats, self._prev_in_hand_status
+            )
 
-        self._prev_grasp_status = utils.update_grasp_status(
-            self.robot, self.eef_cylinder_geoms, self._prev_grasp_status
-        )
+            self._prev_grasp_status = utils.update_grasp_status(
+                self.robot, self.eef_cylinder_geoms, self._prev_grasp_status
+            )
 
-        self._prev_base_motion = utils.update_reachability_visualizers(
-            self.reachability_visualizers, self._joint_cmd, self._prev_base_motion
-        )
+            self._prev_base_motion = utils.update_reachability_visualizers(
+                self.reachability_visualizers, self._joint_cmd, self._prev_base_motion
+            )
 
-        utils.update_camera_blinking_visualizers(
-            self.camera_blinking_visualizers,
-            self.camera_paths[self.active_camera_id],
-            self.obs,
-            self._blink_frequency,
-        )
+            utils.update_camera_blinking_visualizers(
+                self.camera_blinking_visualizers,
+                self.camera_paths[self.active_camera_id],
+                self.obs,
+                self._blink_frequency,
+            )
 
         # Update checkpoint if needed
         self._frame_counter = utils.update_checkpoint(
@@ -888,9 +1171,6 @@ class OGRobotServer:
         Returns:
             torch.Tensor: Action for the robot
         """
-        # Start an empty action
-        action = th.zeros(self.robot.action_dim)
-
         # Apply arm action + extra dimension from base
         if self.is_bimanual_mobile:
             # Apply arm action
@@ -936,7 +1216,7 @@ class OGRobotServer:
             action[self.robot.arm_action_idx["left"]] = left_act
             action[self.robot.arm_action_idx["right"]] = right_act
 
-            # Apply base action
+           # Apply base action
             action[self.robot.base_action_idx] = self._joint_cmd["base"].clone()
 
             # Apply gripper action
@@ -968,7 +1248,8 @@ class OGRobotServer:
                     self._current_trunk_translate, self._teleop_config
                 )
 
-                # Update trunk tilt offset
+                trunk_tilt_lower = (self._trunk_tilt_limits["lower"] - trunk_action[2]).item()
+                trunk_tilt_upper = (self._trunk_tilt_limits["upper"] - trunk_action[2]).item()
                 self._current_trunk_tilt_offset = float(
                     th.clamp(
                         th.tensor(self._current_trunk_tilt_offset, dtype=th.float)
@@ -977,13 +1258,13 @@ class OGRobotServer:
                             * og.sim.get_sim_step_dt(),
                             dtype=th.float,
                         ),
-                        self._trunk_tilt_limits["lower"] - trunk_action[2],
-                        self._trunk_tilt_limits["upper"] - trunk_action[2],
+                        trunk_tilt_lower,
+                        trunk_tilt_upper,
                     )
                 )
                 trunk_action[2] = trunk_action[2] + self._current_trunk_tilt_offset
 
-                action[self.robot.trunk_action_idx] = trunk_action
+                action[self.robot.trunk_action_idx] = trunk_action.to(action.device)
 
             # Update vertical visualizers
             if USE_VERTICAL_VISUALIZERS:
@@ -992,7 +1273,7 @@ class OGRobotServer:
                         frame="world"
                     )[0]
                     self.vertical_visualizers[arm].set_position_orientation(
-                        position=arm_position - th.tensor([0, 0, 1.0]),
+                        position=arm_position - th.tensor([0, 0, 1.0], device=arm_position.device),
                         orientation=th.tensor([0, 0, 0, 1.0]),
                         frame="world",
                     )
@@ -1056,7 +1337,7 @@ class OGRobotServer:
             self._joint_cmd[f"{arm}_gripper"] = th.ones(
                 len(self.robot.gripper_action_idx[arm])
             )
-        self._joint_cmd["base"] = self._joint_state[self.robot.base_control_idx]
+        self._joint_cmd["base"] = th.zeros(len(self.robot.base_control_idx), device=og.sim.device)
         self._joint_cmd["trunk"] = th.zeros(2)
         self._joint_cmd["button_-"] = th.zeros(1)
         self._joint_cmd["button_+"] = th.zeros(1)
@@ -1124,7 +1405,8 @@ class OGRobotServer:
             print(
                 f"\nLoading task {self.env.task.activity_name} instance id: {self.instance_id}\n"
             )
-            utils.update_instance_id_label(self.instance_id_label, self.instance_id)
+            if self.instance_id_label is not None:
+                utils.update_instance_id_label(self.instance_id_label, self.instance_id)
 
 
         if should_update_initial_file:
@@ -1160,6 +1442,10 @@ class OGRobotServer:
 
     def stop(self) -> None:
         """Stop the server and clean up resources"""
+        if getattr(self, "_stopped", False):
+            return
+        self._stopped = True
+
         self._zmq_server_thread.terminate()
         self._zmq_server_thread.join()
 
@@ -1172,6 +1458,11 @@ class OGRobotServer:
 
         if VIEWING_MODE == ViewingMode.VR:
             self.vr_system.stop()
+
+        if getattr(self, "_newton_viewer", None) is not None:
+            self._teardown_newton_viewer_panels()
+            self._newton_viewer.close()
+            self._newton_viewer = None
 
         og.shutdown()
 
