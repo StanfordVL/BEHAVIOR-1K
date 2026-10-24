@@ -767,11 +767,21 @@ class NewtonRigidBodyHandle:
         if self._valid:
             self._backend._mass_properties_dirty = True
 
+    # Gravity is switched per body through MuJoCo's gravity compensation (a body with gravcomp 1 gets an
+    # upward m*g at its COM), authored on USD so every _rebuild() imports it. OmniGibson disables gravity
+    # on each robot link not fixed to the base instead of compensating it in the controllers
+
+    def _set_gravcomp(self, value):
+        prim = self._backend.sim.stage.GetPrimAtPath(self.prim_path)
+        prim.CreateAttribute("mjc:gravcomp", lazy.pxr.Sdf.ValueTypeNames.Float).Set(value)
+        if self._valid:
+            self._backend._mass_properties_dirty = True
+
     def enable_gravities(self):
-        pass
+        self._set_gravcomp(0.0)
 
     def disable_gravities(self):
-        pass
+        self._set_gravcomp(1.0)
 
 
 class _NewtonBatchArticulationView:
@@ -1389,12 +1399,12 @@ class NewtonBackend(PhysicsBackend):
     # Contact friction for a holonomic robot's floor-touching base links (its "wheels"). Those links
     # are non-articulated pads, not driven joints -- a holonomic base is driven through its virtual
     # base_footprint_x/y/rz joints instead, so the wheels can never roll and instead sit on the floor
-    # at default_shape_cfg.mu (0.9), pinning the whole robot in place. Real casters roll freely;
+    # at default_shape_cfg.mu (1.0), pinning the whole robot in place. Real casters roll freely;
     # approximate that by dropping their friction. Matches feat/newton's own
     # _apply_chassis_caster_friction() value and rationale.
     _FLOOR_CONTACT_FRICTION = 0.02
-    # Generalized armature / dry-friction floors applied to every articulated (non-FIXED, non-FREE) joint
-    # at build time. Free-body root joints are left out: on a light object the floors swamp its real mass
+    # Generalized armature / dry-friction floors applied to every articulated robot joint at build time.
+    # Object joints, free-body roots included, are left out: on a light part the floors swamp its real mass
     # and inertia. PhysX quiets a settled scene through per-body sleep plus solver
     # damping; MuJoCo-Warp keeps every imported free body fully active every substep, so a pile of
     # resting contacts (a coffee table on the floor carrying a laptop, a plant and a modem) can pump
@@ -1403,7 +1413,7 @@ class NewtonBackend(PhysicsBackend):
     # friction gives it a threshold to overcome before moving at all. Matches feat/newton's own
     # _add_scaled_joint_stabilization() constants and rationale.
     #
-    # Scope note: this deliberately includes robot joints (feat/newton does the same). 1e-2 kg*m^2 of
+    # Scope note: robot joints keep both floors (feat/newton applies them to every joint). 1e-2 kg*m^2 of
     # rotor inertia and 0.2 N*m of stiction are negligible against r1pro's real link inertias and
     # actuator torques. A previous attempt at this pass used a *stiffness-derived* per-joint armature
     # (5*ke*dt^2) on every joint rather than a flat floor, which at OmniGibson's default gains worked
@@ -1434,6 +1444,8 @@ class NewtonBackend(PhysicsBackend):
         self._contacts = None
         self._solver = None
         self._collision_pipeline = None
+        # Newton collision pipeline feeding the plain (rigid-only) SolverMuJoCo path -- see _rebuild()
+        self._rigid_collision_pipeline = None
         self._mpm_in_place = False
         self._pre_step_cb = None
         self._post_step_cb = None
@@ -1652,6 +1664,30 @@ class NewtonBackend(PhysicsBackend):
     # this only has to survive the model's own float32 rounding.
     _INERTIA_BALANCE_MARGIN = 1e-6
 
+    @staticmethod
+    def _dof_effective_inertia(builder, joint_idx, qd_start, is_revolute):
+        """
+        Inertia (kg*m^2) or mass (kg) a single-DOF joint moves: its child body's, about the joint axis for a
+        revolute joint. Ignores bodies further down the chain, which BEHAVIOR's doors/drawers/lids don't have.
+        """
+        import numpy as np
+
+        child = builder.joint_child[joint_idx]
+        mass = float(builder.body_mass[child])
+        if not is_revolute:
+            return mass
+        x_c = builder.joint_X_c[joint_idx]
+        # Joint axis (authored in the joint frame) and anchor, in the child body's frame
+        q = np.array(x_c[3:7], dtype=np.float64)  # xyzw
+        v = np.array(builder.joint_axis[qd_start], dtype=np.float64)
+        t = 2.0 * np.cross(q[:3], v)
+        axis = v + q[3] * t + np.cross(q[:3], t)
+        axis /= np.linalg.norm(axis)
+        r = np.array(builder.body_com[child], dtype=np.float64) - np.array(x_c[0:3], dtype=np.float64)
+        r_perp = r - (r @ axis) * axis
+        inertia = np.array(builder.body_inertia[child], dtype=np.float64).reshape(3, 3)
+        return float(axis @ inertia @ axis + mass * (r_perp @ r_perp))
+
     def _balance_body_inertia(self):
         """
         Make every body's inertia satisfy MuJoCo's triangle inequality (principal moments A + B >= C),
@@ -1816,6 +1852,8 @@ class NewtonBackend(PhysicsBackend):
                 # rigid path is captured: the MPM and XPBD branches above interleave a collision
                 # pipeline and, for XPBD, several sub-substeps per call.
                 step_dt = self.get_physics_dt()
+                if self._rigid_collision_pipeline is not None:
+                    self._rigid_collision_pipeline.collide(self._state_0, self._contacts)
                 graph = self._step_graph(step_dt)
                 if graph is not None:
                     import warp as wp
@@ -2338,16 +2376,22 @@ class NewtonBackend(PhysicsBackend):
         # map to (0.04, 2.5): a 1 m/s drop needed ~1.3 cm to stop, so the dough sank through a baking
         # sheet's plate and was pushed out its bottom, and a body teleported into the floor crept out
         # at ~0.1 m/s.
+        # IsaacLab's NewtonShapeCfg defaults (isaaclab_newton/physics/newton_manager_cfg.py): mu 1.0 and a
+        # 1 cm contact gap instead of the builder's 10 cm
         builder.default_shape_cfg.ke = 2.5e3
         builder.default_shape_cfg.kd = 1.0e2
-        builder.default_shape_cfg.kf = 1.0e2
-        builder.default_shape_cfg.mu = 0.9
+        builder.default_shape_cfg.mu = 1.0
+        builder.default_shape_cfg.margin = 0.0
+        builder.default_shape_cfg.gap = 0.01
         # Keep the ground plane collidable but stop it rendering: every dataset scene brings its own
         # floor meshes whose top face sits at exactly z = 0, which is also where this infinite plane
         # lands, and two coplanar visible surfaces z-fight -- it shows up as bands of the plane's flat
         # grey flickering across the floor at grazing angles.
         ground_shape = builder.add_ground_plane()
         builder.shape_flags[ground_shape] = int(builder.shape_flags[ground_shape]) & ~int(newton.ShapeFlags.VISIBLE)
+
+        # Lets add_usd() import mjc:* body/joint/shape attributes (e.g. mjc:gravcomp), as IsaacLab does
+        newton.solvers.SolverMuJoCo.register_custom_attributes(builder)
 
         if self._fluid_systems:
             # Must be registered before any particles referencing "mpm:*" custom attributes are added.
@@ -2394,8 +2438,19 @@ class NewtonBackend(PhysicsBackend):
                 floating=not obj.fixed_base,
                 enable_self_collisions=False,
                 collapse_fixed_joints=False,
-                skip_mesh_approximation=True,
+                # Apply each collider's authored physics:approximation (convexHull on BEHAVIOR assets), as IsaacLab
+                # does when simulating. Skipped, colliders import as raw triangle meshes: MuJoCo's own collision
+                # hulled them anyway, but Newton's pipeline collides the triangles, and a 10 kg TV slid 35 cm
+                # across a cabinet top on the scattered edge normals. Scenes with fluid keep the raw meshes:
+                # SolverImplicitMPM cannot build a collider from a convex mesh ("Shape type 10 not supported")
+                skip_mesh_approximation=bool(self._fluid_systems),
                 load_visual_shapes=False,
+                # As IsaacLab imports: also read physx* and mjc:* authored attributes, not only newton:*
+                schema_resolvers=[
+                    newton.usd.SchemaResolverNewton(),
+                    newton.usd.SchemaResolverPhysx(),
+                    newton.usd.SchemaResolverMjc(),
+                ],
                 # We never load add_usd()'s own visual geometry (load_visual_shapes=False above) --
                 # omnigibson/utils/newton_viewer_recording.py registers real textured visual meshes
                 # separately, directly with the viewer. Collision shapes should stay non-rendered
@@ -2642,6 +2697,32 @@ class NewtonBackend(PhysicsBackend):
             damping = drive.GetDampingAttr().Get() if drive else 0.0
             builder.joint_target_ke[qd_start] = stiffness if stiffness is not None else 0.0
             builder.joint_target_kd[qd_start] = damping if damping is not None else 0.0
+            # DatasetObject authors its passive joint damping as an "acceleration" drive (per degree for
+            # revolute joints), which PhysX scales by the joint's effective inertia. MuJoCo applies kd as a
+            # plain torque, so convert: raw, a laptop lid (I ~3e-3 kg*m^2) decayed at 16/s instead of 2.9/s
+            if (
+                drive
+                and damping
+                and joint_path not in robot_joint_paths
+                and drive.GetTypeAttr().Get() == "acceleration"
+            ):
+                is_revolute = builder.joint_type[joint_idx] == int(newton.JointType.REVOLUTE)
+                builder.joint_target_kd[qd_start] = (
+                    damping
+                    * (180.0 / math.pi if is_revolute else 1.0)
+                    * self._dof_effective_inertia(builder, joint_idx, qd_start, is_revolute)
+                )
+            # Critically damp object joint limits. SolverMuJoCo maps limit (ke, kd) to a mass-normalized solref
+            # with damping ratio kd / (2 sqrt(ke)): the importer's uniform 1e4/10 gives 0.05, and a cabinet door
+            # starting 0.75 cm inside a neighbouring sink bounced between the sink and its closed stop, gaining
+            # energy until the whole scene went NaN
+            if joint_path not in robot_joint_paths and builder.joint_type[joint_idx] in (
+                int(newton.JointType.REVOLUTE),
+                int(newton.JointType.PRISMATIC),
+            ):
+                builder.joint_limit_kd[qd_start] = max(
+                    float(builder.joint_limit_kd[qd_start]), 2.0 * math.sqrt(float(builder.joint_limit_ke[qd_start]))
+                )
             # add_usd() infers joint_target_mode from the SAME authored (ke, kd) via
             # JointTargetMode.from_gains(): a drive present with both gains at 0 -> EFFORT, which the
             # SolverMuJoCo backend takes literally -- "No MuJoCo actuator is created for this DOF" (see
@@ -2692,14 +2773,16 @@ class NewtonBackend(PhysicsBackend):
             ):
                 builder.joint_target_kd[qd_start] = self._PASSIVE_OBJECT_JOINT_KD
 
-        # Armature / dry-friction floors on every articulated joint -- see _JOINT_ARMATURE_FLOOR.
+        # Armature / dry-friction floors -- see _JOINT_ARMATURE_FLOOR.
         if self._JOINT_ARMATURE_FLOOR or self._JOINT_FRICTION_FLOOR:
-            # Free joints are skipped: on a light body the floors swamp its real inertia (a 50 g spoon's is
-            # 1e-6..9e-5 kg*m^2), so it fell at 0.8 g and could not tip over a bowl's rim
+            # Robot joints only, as IsaacLab adds no such floors. On a light object part they swamp its real
+            # inertia: a 50 g spoon's free joint fell at 0.8 g and could not tip over a bowl's rim, and a laptop
+            # lid spun at 2 rad/s stopped within 0.1 rad (PhysX: 1.5 rad)
+            robot_joint_idxs = {path_joint_map[p] for p in robot_joint_paths if p in path_joint_map}
             skipped = (int(newton.JointType.FIXED), int(newton.JointType.FREE))
             n_dofs = len(builder.joint_qd)
             for joint_idx, joint_type in enumerate(builder.joint_type):
-                if int(joint_type) in skipped:
+                if int(joint_type) in skipped or joint_idx not in robot_joint_idxs:
                     continue
                 qd_start = builder.joint_qd_start[joint_idx]
                 qd_stop = (
@@ -2941,6 +3024,7 @@ class NewtonBackend(PhysicsBackend):
         # only count systems that actually contributed particles to the model.
         has_fluid = any(end > start for start, end in path_fluid_particle_map.values())
         has_rigid = self._model.joint_count > 0
+        self._rigid_collision_pipeline = None
         if has_cloth and has_fluid:
             # Not yet supported simultaneously (would need 3-way SolverCoupledProxy MuJoCo+XPBD+MPM
             # entries) -- fall through to the fluid path below, which will silently leave the cloth
@@ -3076,19 +3160,32 @@ class NewtonBackend(PhysicsBackend):
                 # "debug" (adds array bounds-checking), which turned the segfault into a clean
                 # `Assertion failed: 'i >= -arr.shape[0] && i < arr.shape[0]'` in warp/native/array.h
                 # right after a ccd_kernel_builder-specialized kernel load.
+                # IsaacLab's MJWarpSolverCfg defaults (isaaclab_newton/physics/mjwarp_manager_cfg.py), with the
+                # implicitfast integrator its tasks all select; njmax/nconmax stay sized for a whole house
                 self._solver = newton.solvers.SolverMuJoCo(
                     self._model,
-                    iterations=150,
-                    ls_iterations=80,
-                    ccd_iterations=120,
-                    cone="elliptic",
-                    impratio=5.0,
+                    solver="newton",
+                    integrator="implicitfast",
+                    iterations=100,
+                    ls_iterations=50,
+                    ccd_iterations=35,
+                    cone="pyramidal",
+                    impratio=1.0,
+                    tolerance=1e-6,
+                    enable_multiccd=False,
+                    use_mujoco_contacts=False,
                     njmax=32_768,
                     nconmax=self._RIGID_CONTACT_MAX,
-                    # Up to 4 contacts per convex pair instead of 1: with one, a flat 2-hull body (Rs_int's
-                    # laptop) rests on a pivot line, tips on landing and sinks through the table under it
-                    enable_multiccd=True,
                 )
+                # Contacts from Newton's own collision pipeline, as IsaacLab's manipulation tasks (lift,
+                # stack) run it, instead of MuJoCo's one-point-per-convex-pair collision
+                self._rigid_collision_pipeline = newton.CollisionPipeline(
+                    self._model,
+                    broad_phase="explicit",
+                    rigid_contact_max=max(self._RIGID_CONTACT_MAX, self._solver.get_max_contact_count()),
+                    soft_contact_max=0,
+                )
+                self._contacts = self._rigid_collision_pipeline.contacts()
             except ValueError as e:
                 # Every ValueError lands here, not just the expected "no joints in the model yet" one
                 # during early startup -- and the consequence is severe (no solver means the scene
