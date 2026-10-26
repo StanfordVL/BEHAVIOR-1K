@@ -1286,9 +1286,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             # where it is and shift the object poses over instead, so that running several
             # scenes at once does not pile them all onto the recorded spot and let their
             # objects collide.
-            rec_pos = th.as_tensor(state["pos"], dtype=th.float32).reshape(3)
-            rec_ori = th.as_tensor(state["ori"], dtype=th.float32).reshape(4)
             cur_pos, cur_ori = self.get_position_orientation()
+            # The state may have been saved on another device (e.g. by another physics backend)
+            rec_pos = th.as_tensor(state["pos"], dtype=th.float32, device=cur_pos.device).reshape(3)
+            rec_ori = th.as_tensor(state["ori"], dtype=th.float32, device=cur_ori.device).reshape(4)
             registry_state = state["registry"]
             if not (th.equal(rec_pos, cur_pos) and th.equal(rec_ori, cur_ori)):
                 # rel = cur ∘ rec⁻¹ moves a recorded pose over to this scene. When the two

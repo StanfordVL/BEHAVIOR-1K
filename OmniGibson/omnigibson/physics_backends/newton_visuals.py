@@ -440,6 +440,9 @@ def _mesh_xform_relative_to_body(prim, body_idx, body_path):
     s = gf_xf.GetScale()
     if body_world_scale is not None:
         s = (s[0] * body_world_scale[0], s[1] * body_world_scale[1], s[2] * body_world_scale[2])
+        # rel_mat's translation is in the body's unscaled frame too, so the mesh's offset from its
+        # body needs the same scale (else e.g. a scaled fridge door's frame renders off its hinge)
+        t = (t[0] * body_world_scale[0], t[1] * body_world_scale[1], t[2] * body_world_scale[2])
     pos = wp.vec3(t[0], t[1], t[2])
     rot = wp.quat(*q.GetImaginary(), q.GetReal())
     scale = wp.vec3(s[0], s[1], s[2])
