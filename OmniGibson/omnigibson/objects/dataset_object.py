@@ -83,9 +83,9 @@ def _add_mirrored_attachment_meta_link(stage, default_prim, meta_link_id, src_su
     """
     src_link = _get_meta_link_prim(default_prim, "attachment", meta_link_id, src_sub_id)
     assert src_link is not None, f"Could not find attachment meta link {meta_link_id}_{src_sub_id} to mirror!"
-    assert (
-        _get_meta_link_prim(default_prim, "attachment", meta_link_id, new_sub_id) is None
-    ), f"Attachment meta link {meta_link_id}_{new_sub_id} already exists; the mirroring hotfix should be removed!"
+    assert _get_meta_link_prim(default_prim, "attachment", meta_link_id, new_sub_id) is None, (
+        f"Attachment meta link {meta_link_id}_{new_sub_id} already exists; the mirroring hotfix should be removed!"
+    )
 
     # Find the fixed joint anchoring the source meta link to its parent link
     src_joint = None
@@ -397,9 +397,9 @@ class DatasetObject(USDObject):
         # If neither was provided, default to ones(3) (no scaling).
         if self._load_config.get("scale", None) is None:
             self._load_config["scale"] = th.ones(3)
-        assert th.all(
-            th.abs(self._load_config["scale"]) > 1e-4
-        ), f"Scale of {self.name} is too small: {self._load_config['scale']}"
+        assert th.all(th.abs(self._load_config["scale"]) > 1e-4), (
+            f"Scale of {self.name} is too small: {self._load_config['scale']}"
+        )
         # Run super last
         super()._post_load()
 
@@ -526,9 +526,9 @@ class DatasetObject(USDObject):
         Returns:
             3-array: (x,y,z) bounding box
         """
-        assert (
-            "ig:nativeBB" in self.property_names
-        ), f"This dataset object '{self.name}' is expected to have native_bbox specified, but found none!"
+        assert "ig:nativeBB" in self.property_names, (
+            f"This dataset object '{self.name}' is expected to have native_bbox specified, but found none!"
+        )
         return th.tensor(self.get_attribute(attr="ig:nativeBB"))
 
     @property

@@ -162,9 +162,9 @@ class BaseObjectState(BaseObjectRequirement, Serializable, Registerable, Recreat
 
         # Validate compatibility with the created object
         init_args = {k: v for k, v in self.get_init_info()["args"].items() if k != "obj"}
-        assert self.is_compatible(
-            obj=self.obj, **init_args
-        ), f"ObjectState {self.__class__.__name__} is not compatible with object {self.obj.name}."
+        assert self.is_compatible(obj=self.obj, **init_args), (
+            f"ObjectState {self.__class__.__name__} is not compatible with object {self.obj.name}."
+        )
 
         # Clear cache
         self.clear_cache()
