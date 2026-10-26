@@ -102,9 +102,9 @@ class TiledVisionSensor:
                             self.modalities[sensor_name] = sensor.modalities
                             self._camera_resolution[sensor_name] = (sensor.image_width, sensor.image_height)
                             self._camera_prims[sensor_name] = []
-                        assert (
-                            sensor.modalities == self.modalities[sensor_name]
-                        ), f"All sensors named {sensor_name} must have the same modalities!"
+                        assert sensor.modalities == self.modalities[sensor_name], (
+                            f"All sensors named {sensor_name} must have the same modalities!"
+                        )
                         assert self._camera_resolution[sensor_name] == (
                             sensor.image_width,
                             sensor.image_height,
