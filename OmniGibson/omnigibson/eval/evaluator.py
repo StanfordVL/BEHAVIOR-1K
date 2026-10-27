@@ -753,7 +753,7 @@ class BatchedEvaluator:
         """
         task_name = self.cfg.task.name
 
-        first_policy_result = None
+        self._first_policy_result = None
 
         def load_fn(env_idx_to_instance):
             self.load_batch(
@@ -765,7 +765,6 @@ class BatchedEvaluator:
             )
 
         def initialize_fn():
-            nonlocal first_policy_result
             # Bound initial connection/reset separately, without consuming the rollout budget.
             if isinstance(self.policy, MultiWebsocketPolicy):
                 self.policy.set_time_budget(POLICY_INITIALIZATION_TIMEOUT)
@@ -783,12 +782,12 @@ class BatchedEvaluator:
             # One uncharged query per rollout, still bounded by the client's 600-second limit.
             # Reconnects stay inside that query's deadline and do not grant another allowance.
             if isinstance(self.policy, MultiWebsocketPolicy):
-                first_policy_result = self.policy.forward(
+                self._first_policy_result = self.policy.forward(
                     obs=[state.obs for state in self.instance_eval_states],
                     active_env_indices=list(range(self.num_envs)),
                 )
             elif isinstance(self.policy, WebsocketPolicy):
-                first_policy_result = self.policy.forward(obs=self._batch_obs())
+                self._first_policy_result = self.policy.forward(obs=self._batch_obs())
 
         def start_fn(deadline):
             # Begin scoring after the first query, before executing its first action.
@@ -798,11 +797,10 @@ class BatchedEvaluator:
                 self.policy.set_deadline(deadline)
 
         def step_fn(active_env_indices):
-            nonlocal first_policy_result
-            if first_policy_result is None:
+            if self._first_policy_result is None:
                 step_result = self._step_fn(active_env_indices)
             else:
-                policy_result, first_policy_result = first_policy_result, None
+                policy_result, self._first_policy_result = self._first_policy_result, None
                 step_result = self._step_fn(active_env_indices, policy_result=policy_result)
             if write_video:
                 for env_idx in active_env_indices:
