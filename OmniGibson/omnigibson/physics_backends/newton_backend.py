@@ -1756,10 +1756,12 @@ class NewtonBackend(PhysicsBackend):
     # a capture, and SolverMuJoCo loads its modules lazily over its first few steps.
     _STEP_GRAPH_WARMUP_SUBSTEPS = 3
 
-    def _step_graph(self, dt):
+    def _step_graph(self, dt, collide=False):
         """
         CUDA graph replaying one SolverMuJoCo substep for the current state-buffer pair, or None to
         take the uncaptured path (graph disabled, still warming up, CPU device, or capture failed).
+        With @collide, the graph replays one XPBD-coupled substep instead: clearing forces, the
+        collision pipeline and the coupled solver step.
 
         Returns a graph that has NOT been launched -- capturing records launches without executing
         them, so the caller must launch the returned graph to actually advance this substep.
@@ -1785,7 +1787,7 @@ class NewtonBackend(PhysicsBackend):
         if self._solver is None or self._model is None or self._model.device.is_cpu:
             return None
 
-        key = (id(self._state_0), id(self._state_1), dt)
+        key = (id(self._state_0), id(self._state_1), dt, collide)
         graph = self._step_graphs.get(key)
         if graph is not None:
             return graph
@@ -1798,6 +1800,9 @@ class NewtonBackend(PhysicsBackend):
 
         try:
             with wp.ScopedCapture() as capture:
+                if collide:
+                    self._state_0.clear_forces()
+                    self._collision_pipeline.collide(self._state_0, self._contacts)
                 self._solver.step(self._state_0, self._state_1, self._control, self._contacts, dt)
             graph = capture.graph
         except Exception as e:
@@ -1856,17 +1861,24 @@ class NewtonBackend(PhysicsBackend):
                 for i in range(self._PARTICLE_SUBSTEPS):
                     if self._kinematic_moves:
                         self._apply_kinematic_moves((i + 1) / self._PARTICLE_SUBSTEPS)
-                    self._state_0.clear_forces()
-                    self._collision_pipeline.collide(self._state_0, self._contacts)
-                    self._solver.step(self._state_0, self._state_1, self._control, self._contacts, substep_dt)
+                    # Host-bound like the rigid path below, and more so (collision pipeline + both solvers per
+                    # substep), so replay it from a CUDA graph too when one is available
+                    graph = self._step_graph(substep_dt, collide=True)
+                    if graph is not None:
+                        import warp as wp
+
+                        wp.capture_launch(graph)
+                    else:
+                        self._state_0.clear_forces()
+                        self._collision_pipeline.collide(self._state_0, self._contacts)
+                        self._solver.step(self._state_0, self._state_1, self._control, self._contacts, substep_dt)
                     self._state_0, self._state_1 = self._state_1, self._state_0
                 self._kinematic_moves = {}
                 self._stepped_since_rebuild = True
             else:
                 # Replay this substep from a CUDA graph when one is available -- see _step_graph() for
-                # why (that call is host-bound) and for what invalidates a capture. Only this plain
-                # rigid path is captured: the MPM and XPBD branches above interleave a collision
-                # pipeline and, for XPBD, several sub-substeps per call.
+                # why (that call is host-bound) and for what invalidates a capture. The MPM branch above
+                # is not captured.
                 step_dt = self.get_physics_dt()
                 graph = self._step_graph(step_dt)
                 if graph is not None:
