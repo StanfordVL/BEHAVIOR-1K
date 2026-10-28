@@ -341,7 +341,7 @@ def test_next_to(env, bottom_cabinet, bowl, dishtowel):
         bowl.states[NextTo].set_value(bottom_cabinet, None)
 
 
-@pytest.mark.skip(reason="disable cloth tests until #2042")
+@pytest.mark.skipif(gm.PHYSICS_BACKEND == "physx", reason="disable PhysX cloth tests until #2042")
 def test_overlaid(env, breakfast_table, carpet):
     place_obj_on_floor_plane(breakfast_table)
     place_objA_on_objB_bbox(carpet, breakfast_table)
@@ -1259,7 +1259,7 @@ def test_open(env, microwave, bottom_cabinet):
     assert not bottom_cabinet.states[Open].get_value()
 
 
-@pytest.mark.skip(reason="disable cloth tests until #2042")
+@pytest.mark.skipif(gm.PHYSICS_BACKEND == "physx", reason="disable PhysX cloth tests until #2042")
 def test_folded_unfolded(env, carpet):
     place_obj_on_floor_plane(carpet)
 
@@ -1294,7 +1294,7 @@ def test_folded_unfolded(env, carpet):
     total_points = increments * 2
 
     # Create interpolation weights
-    t = th.linspace(0, 1, total_points).unsqueeze(1).unsqueeze(2)
+    t = th.linspace(0, 1, total_points, device=pos.device).unsqueeze(1).unsqueeze(2)
 
     # Interpolate between start, mid, and end
     first_half = t < 0.5
@@ -1315,7 +1315,7 @@ def test_folded_unfolded(env, carpet):
         carpet.states[Folded].set_value(True)
 
 
-@pytest.mark.skip(reason="disable cloth tests until #2042")
+@pytest.mark.skipif(gm.PHYSICS_BACKEND == "physx", reason="disable PhysX cloth tests until #2042")
 def test_draped(env, breakfast_table, carpet):
     place_obj_on_floor_plane(breakfast_table)
     place_objA_on_objB_bbox(carpet, breakfast_table)
