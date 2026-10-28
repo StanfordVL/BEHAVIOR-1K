@@ -2750,8 +2750,12 @@ class NewtonBackend(PhysicsBackend):
             # Zero-DOF joints (e.g. the FIXED joints attaching massless reference frames like
             # laser_link/eyes/eef_link) don't reserve a target_ke/kd slot at all -- their qd_start is
             # just a "one past the end" placeholder shared with whatever joint comes next (or the total
-            # dof count, if they're last). Nothing to overwrite for these.
-            if qd_start >= len(builder.joint_target_ke):
+            # dof count, if they're last). Nothing to overwrite for these: writing through it would
+            # clobber the next joint's gains, mode and effort limit (e.g. Fetch's l_wheel_joint).
+            next_qd_start = (
+                joint_qd_start[joint_idx + 1] if joint_idx + 1 < len(joint_qd_start) else len(builder.joint_target_ke)
+            )
+            if qd_start >= next_qd_start:
                 continue
             prim = self.sim.stage.GetPrimAtPath(joint_path)
             drive = lazy.pxr.UsdPhysics.DriveAPI.Get(prim, "angular") or lazy.pxr.UsdPhysics.DriveAPI.Get(
