@@ -7,7 +7,7 @@ import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.objects import DatasetObject
 from omnigibson.robots import Robot
-from omnigibson.utils.constants import ParticleModifyCondition, ParticleModifyMethod
+from omnigibson.utils.constants import ParticleModifyCondition, ParticleModifyMethod, PrimType
 
 from utils import MULTI_ENV_ROBOTS
 
@@ -121,11 +121,14 @@ def dishtowel(stopped_env):
 
 @pytest.fixture
 def carpet(stopped_env):
-    # TODO(#2042): Re-enable cloth behaviors for this object
+    # TODO(#2042): Re-enable cloth behaviors for this object on PhysX
+    cloth = gm.PHYSICS_BACKEND != "physx"
     obj = DatasetObject(
         name="carpet",
         category="carpet",
         model="ctclvd",
+        prim_type=PrimType.CLOTH if cloth else PrimType.RIGID,
+        abilities={"cloth": {}} if cloth else None,
     )
     _add_obj(stopped_env, obj)
     return obj
