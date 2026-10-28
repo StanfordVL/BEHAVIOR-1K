@@ -1472,7 +1472,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             else:
                 partial_action = ControllerView.compute_no_op_action(group_key, controller_idx)
             action_idx = self.robot.controller_action_idx[name]
-            action[action_idx] = partial_action
+            # No-op actions come back on the CPU while the action lives on the sim device
+            action[action_idx] = th.as_tensor(partial_action, dtype=action.dtype, device=action.device)
         return action
 
     def _reset_robot(self):
