@@ -387,6 +387,14 @@ class PhysicsBackend(ABC):
         """
         return None
 
+    def set_kinematic_world_pose(self, prim_path, position, orientation):
+        """
+        Moves the kinematic-only rigid body at @prim_path to the world-frame pose (position (3,), orientation (4,)
+        xyzw) while the sim is playing. Called after its USD xform was already written, so a backend that picks up
+        USD xform changes on its own (e.g. PhysX) does nothing here.
+        """
+        pass
+
     # ---- Per-prim articulation view I/O (backs EntityPrim / JointPrim) ----
 
     @abstractmethod

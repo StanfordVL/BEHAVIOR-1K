@@ -1430,6 +1430,12 @@ class NewtonBackend(PhysicsBackend):
         self._joint_break_cb = None
         self._path_body_map = {}
         self._body_path_map = {}
+        # body index -> index of the FIXED joint welding that body to the world (see set_kinematic_world_pose())
+        self._kinematic_world_joints = None
+        # body index -> (world joint index, start pose, target pose) of kinematic moves pending for the next step
+        self._kinematic_moves = {}
+        # Whether the model has been stepped since it was last rebuilt (see set_kinematic_world_pose())
+        self._stepped_since_rebuild = False
         # Whether the shape BVH (used by raycast_closest/raycast_all) needs a refit before its next use --
         # set on anything that can move a body_q (steps, direct pose writes, FK sync), cleared once
         # refit. Avoids refitting on every single raycast call: BDDL's online object-placement sampling
@@ -1847,11 +1853,15 @@ class NewtonBackend(PhysicsBackend):
                 # example_mujoco_xpbd_coupled_solver.py subdivides each frame into 16 substeps for
                 # exactly this reason; match that here.
                 substep_dt = self.get_physics_dt() / self._PARTICLE_SUBSTEPS
-                for _ in range(self._PARTICLE_SUBSTEPS):
+                for i in range(self._PARTICLE_SUBSTEPS):
+                    if self._kinematic_moves:
+                        self._apply_kinematic_moves((i + 1) / self._PARTICLE_SUBSTEPS)
                     self._state_0.clear_forces()
                     self._collision_pipeline.collide(self._state_0, self._contacts)
                     self._solver.step(self._state_0, self._state_1, self._control, self._contacts, substep_dt)
                     self._state_0, self._state_1 = self._state_1, self._state_0
+                self._kinematic_moves = {}
+                self._stepped_since_rebuild = True
             else:
                 # Replay this substep from a CUDA graph when one is available -- see _step_graph() for
                 # why (that call is host-bound) and for what invalidates a capture. Only this plain
@@ -2118,6 +2128,66 @@ class NewtonBackend(PhysicsBackend):
             return None
         body_q = _wp_to_torch(self._state_0.body_q)
         return body_q[body_idx, :3].clone(), body_q[body_idx, 3:7].clone()
+
+    def set_kinematic_world_pose(self, prim_path, position, orientation):
+        # A kinematic-only body is welded to the world by a FIXED joint (a MuJoCo mocap body), and its USD xform is only
+        # read at rebuild, so move it by rewriting that joint's parent frame. Like a PhysX kinematic target, the move is
+        # spread over the next physics step: on the XPBD path, a whole step's move in its first substep flings any cloth
+        # it touches (5 mm in one 0.26 ms substep is ~20 m/s).
+        if self._rebuilding or self._live_state_discarded or self._state_0 is None or self._solver is None:
+            return
+        body_idx = self._path_body_map.get(prim_path)
+        if body_idx is None:
+            return
+        import newton
+
+        model = self._model
+        if self._kinematic_world_joints is None:
+            joint_parent, joint_child = model.joint_parent.numpy(), model.joint_child.numpy()
+            fixed = model.joint_type.numpy() == int(newton.JointType.FIXED)
+            self._kinematic_world_joints = {
+                int(joint_child[j]): j for j in range(model.joint_count) if fixed[j] and joint_parent[j] == -1
+            }
+        joint_idx = self._kinematic_world_joints.get(body_idx)
+        if joint_idx is None:
+            return
+        body_q = _wp_to_torch(self._state_0.body_q)
+        target = th.cat([th.as_tensor(position, dtype=th.float32), th.as_tensor(orientation, dtype=th.float32)])
+        target = target.to(body_q.device)
+        # Keep the pose this step started from if the body was already moved since the last step
+        start = self._kinematic_moves[body_idx][1] if body_idx in self._kinematic_moves else body_q[body_idx].clone()
+        self._kinematic_moves[body_idx] = (joint_idx, start, target)
+        # Readers see the target right away, as with PhysX
+        body_q[body_idx] = target
+        # Teleport bodies placed before the first step since the last rebuild (e.g. just added at the origin): there
+        # is no motion to spread yet, and sweeping them in from where the rebuild put them would push whatever is there
+        if not self._substeps_particles() or not self._stepped_since_rebuild:
+            self._apply_kinematic_moves(1.0)
+            self._kinematic_moves = {}
+
+    def _substeps_particles(self):
+        """Whether step_physics_once() splits each step into XPBD substeps (the cloth/particle-coupled path)."""
+        return self._collision_pipeline is not None and not self._mpm_in_place
+
+    def _apply_kinematic_moves(self, frac):
+        """Places every body moved by set_kinematic_world_pose() @frac of the way from its start to its target pose."""
+        import newton
+
+        body_idx = list(self._kinematic_moves)
+        joint_idx, start, target = zip(*(self._kinematic_moves[b] for b in body_idx))
+        start, target = th.stack(start), th.stack(target)
+        pos = start[:, :3] + frac * (target[:, :3] - start[:, :3])
+        quat = T.quat_slerp(start[:, 3:], target[:, 3:], th.full((len(body_idx), 1), frac, device=start.device))
+        joint_X_c = _wp_to_torch(self._model.joint_X_c)[list(joint_idx)]
+        # A fixed joint places its child at X_p * inv(X_c), so X_p = pose * X_c
+        u, w, v = quat[:, :3], quat[:, 3:], joint_X_c[:, :3]
+        uv = th.linalg.cross(u, v)
+        joint_X_p = _wp_to_torch(self._model.joint_X_p)
+        joint_X_p[list(joint_idx), :3] = pos + v + 2.0 * (w * uv + th.linalg.cross(u, uv))
+        joint_X_p[list(joint_idx), 3:] = T.quat_multiply(quat.T, joint_X_c[:, 3:].T).T
+        _wp_to_torch(self._state_0.body_q)[body_idx] = th.cat([pos, quat], dim=1)
+        self._solver.notify_model_changed(newton.ModelFlags.JOINT_PROPERTIES)
+        self._bvh_dirty = True
 
     # ---- Model build (before_play hook) ----
 
@@ -2621,6 +2691,9 @@ class NewtonBackend(PhysicsBackend):
                 self._attachment_slots.append(slot["mujoco:equality_constraint_type"])
 
         self._path_body_map = path_body_map
+        self._kinematic_world_joints = None
+        self._kinematic_moves = {}
+        self._stepped_since_rebuild = False
         self._body_path_map = {idx: path for path, idx in path_body_map.items()}
         self._path_joint_map = path_joint_map
         self._path_cloth_particle_map = path_cloth_particle_map
