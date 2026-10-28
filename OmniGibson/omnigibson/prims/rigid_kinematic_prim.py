@@ -2,6 +2,8 @@ from typing import Literal
 
 import torch as th
 
+import omnigibson as og
+import omnigibson.lazy as lazy
 from omnigibson.utils.usd_utils import RigidBodyViewAPI
 
 from .rigid_prim import RigidPrim
@@ -55,6 +57,17 @@ class RigidKinematicPrim(RigidPrim):
                 Scene frame sets position relative to the scene.
         """
         super().set_position_orientation(position=position, orientation=orientation, frame=frame)
+
+        if not og.sim.is_stopped():
+            # Read back the world pose just written to USD (not the backend's live pose, which hasn't moved yet)
+            world = lazy.pxr.UsdGeom.Xformable(self.prim).ComputeLocalToWorldTransform(lazy.pxr.Usd.TimeCode.Default())
+            world = world.RemoveScaleShear()
+            quat = world.ExtractRotationQuat()
+            og.sim.physics_backend.set_kinematic_world_pose(
+                self.prim_path,
+                th.tensor(world.ExtractTranslation()),
+                th.tensor([*quat.GetImaginary(), quat.GetReal()]),
+            )
 
         RigidBodyViewAPI.invalidate_kinematic([self])
 
