@@ -477,7 +477,12 @@ class ClothPrim(GeomPrim):
                     span,
                 ]
                 wall = PrimitiveObject(
-                    name=f"crumple_wall_{i}", primitive_type="Cube", scale=size, kinematic_only=True, visible=False
+                    name=f"crumple_wall_{i}",
+                    primitive_type="Cube",
+                    scale=size,
+                    fixed_base=True,
+                    kinematic_only=True,
+                    visible=False,
                 )
                 self.scene.add_object(wall)
                 wall.set_position_orientation(position=pc - plane_z * wall_offset)
