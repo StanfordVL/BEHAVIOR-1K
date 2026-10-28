@@ -1379,7 +1379,8 @@ class NewtonBackend(PhysicsBackend):
     # base_footprint_x/y/rz joints instead, so the wheels can never roll and instead sit on the floor
     # at default_shape_cfg.mu (0.9), pinning the whole robot in place. Real casters roll freely;
     # approximate that by dropping their friction. Matches feat/newton's own
-    # _apply_chassis_caster_friction() value and rationale.
+    # _apply_chassis_caster_friction() value and rationale. Also used for a two-wheel robot's chassis, whose casters
+    # are part of its collision hull (e.g. Fetch's base_link) and would otherwise drag along the floor.
     _FLOOR_CONTACT_FRICTION = 0.02
     # Generalized armature / dry-friction floors applied to EVERY non-FIXED joint at build time,
     # free-body root joints included. PhysX quiets a settled scene through per-body sleep plus solver
@@ -2284,7 +2285,14 @@ class NewtonBackend(PhysicsBackend):
                 self._joints_dirty = True
                 return
 
-    def _apply_floor_contact_friction(self, builder, robot, robot_path_body_map):
+    def _drive_wheel_joint_paths(self, robot, robot_path_joint_map):
+        """USD paths of @robot's drive wheel joints if it is a two-wheel robot, else an empty set."""
+        if not getattr(robot, "is_two_wheel", False):
+            return set()
+        names = set(robot.base_joint_names)
+        return {path for path in robot_path_joint_map if path.rsplit("/", 1)[-1] in names}
+
+    def _apply_floor_contact_friction(self, builder, robot, robot_path_body_map, wheel_joint_paths=()):
         """Drop contact friction on @robot's floor-touching base links, returning the newton body
         indices affected (empty set if @robot has none, i.e. anything but a holonomic base).
 
@@ -2305,9 +2313,19 @@ class NewtonBackend(PhysicsBackend):
         # exactly these links, so doing this to one would destroy its traction instead. No shipped
         # diff-drive asset declares floor_touching_base_link_names today (only r1/r1pro/tiago do, all
         # holonomic), but the field is a generic enough concept that one plausibly could later.
-        if not getattr(robot, "is_holonomic_base", False):
+        if wheel_joint_paths:
+            # A two-wheel robot keeps its wheels' traction, but its chassis (the wheel joints' parent link) carries its
+            # casters in its collision hull, so drop the chassis's friction instead -- feat/newton's
+            # _apply_chassis_caster_friction()
+            link_names = set()
+            for path in wheel_joint_paths:
+                for target in self.sim.stage.GetPrimAtPath(path).GetRelationship("physics:body0").GetTargets():
+                    link_names.add(str(target).split("/")[-1])
+            link_names = sorted(link_names)
+        elif not getattr(robot, "is_holonomic_base", False):
             return set()
-        link_names = getattr(robot, "floor_touching_base_link_names", None) or []
+        else:
+            link_names = getattr(robot, "floor_touching_base_link_names", None) or []
         if not link_names:
             return set()
 
@@ -2497,6 +2515,8 @@ class NewtonBackend(PhysicsBackend):
         path_joint_map = {}
         path_cloth_particle_map = {}
         robot_joint_paths = set()
+        # A two-wheel robot's drive wheel joints, which keep their authored effort limit (see _FORCE_INF_ROBOT_EFFORT)
+        drive_wheel_joint_paths = set()
         low_friction_body_idx = set()
         finger_body_idx = set()
         # Macro-particle roots go last, so every object's body indices are unaffected by particle changes
@@ -2543,7 +2563,11 @@ class NewtonBackend(PhysicsBackend):
             path_joint_map.update(info["path_joint_map"])
             if isinstance(obj, Robot):
                 robot_joint_paths.update(info["path_joint_map"].keys())
-                low_friction_body_idx |= self._apply_floor_contact_friction(builder, obj, info["path_body_map"])
+                wheel_joint_paths = self._drive_wheel_joint_paths(obj, info["path_joint_map"])
+                drive_wheel_joint_paths |= wheel_joint_paths
+                low_friction_body_idx |= self._apply_floor_contact_friction(
+                    builder, obj, info["path_body_map"], wheel_joint_paths
+                )
                 if obj.is_manipulation:
                     for names in obj.finger_link_names.values():
                         for name in names:
@@ -2797,8 +2821,14 @@ class NewtonBackend(PhysicsBackend):
             # binds there. Matching that is what makes the two backends agree, and it's also what this
             # backend's own get_max_efforts() already advertises (it unconditionally reports inf).
             # Left alone for non-robot objects: nothing drives their joints, so the limit is harmless
-            # there and their authored values stay meaningful.
-            if self._FORCE_INF_ROBOT_EFFORT and joint_path in robot_joint_paths:
+            # there and their authored values stay meaningful. Also left alone for a two-wheel robot's
+            # velocity-driven wheels, which hold no pose: unlimited, their first step's velocity servo
+            # torque (thousands of N*m on Fetch) blows up the wheel-floor contacts and launches the robot.
+            if (
+                self._FORCE_INF_ROBOT_EFFORT
+                and joint_path in robot_joint_paths
+                and joint_path not in drive_wheel_joint_paths
+            ):
                 builder.joint_effort_limit[qd_start] = float("inf")
 
             # Passive damping for non-robot object joints with no authored drive (cabinets, doors,

@@ -96,6 +96,12 @@ m.NEWTON_TRUNK_POSITION_KD = 2000.0
 m.NEWTON_GRIPPER_POSITION_KP = 30.0
 m.NEWTON_GRIPPER_POSITION_KD = 3.0
 
+# A two-wheel base's velocity-driven wheels need far less damping than the generic Newton velocity gain (kd =
+# DEFAULT_NEWTON_KP = 3000): with it, Fetch's wheels push thousands of N*m into the floor contacts on the first step
+# and launch the robot. Measured on Fetch (with its chassis friction dropped and wheel effort limit kept): kd 50
+# rolls without slip and starts smoothly (0.5 m/s commanded -> 0.46 m/s), 200 jolts it at start-up, 10 lags.
+m.NEWTON_TWO_WHEEL_VELOCITY_KD = 50.0
+
 # Passive damping/stiffness for a holonomic base's unactuated z/rx/ry virtual joints under Newton --
 # see _newton_passive_base_dofs() for why these need it at all. Damping alone was measured to only
 # halve the tip-over (peak pitch 109deg -> 61deg, still climbing) because a damper supplies no
@@ -696,6 +702,14 @@ class Robot(USDObject, GymObservable):
             ):
                 isaac_kp = th.full_like(isaac_kp, m.NEWTON_GRIPPER_POSITION_KP)
                 isaac_kd = th.full_like(isaac_kd, m.NEWTON_GRIPPER_POSITION_KD)
+            if (
+                name == "base"
+                and self.is_two_wheel
+                and gm.PHYSICS_BACKEND == "newton"
+                and control_type == ControlType.VELOCITY
+                and ControllerView.isaac_gains_are_default(group_key)
+            ):
+                isaac_kd = th.full_like(isaac_kd, m.NEWTON_TWO_WHEEL_VELOCITY_KD)
             for i, dof in enumerate(ControllerView.get_dof_idx(group_key).tolist()):
                 # Make sure the DOF has not already been set yet, and remove it afterwards
                 assert dof in unused_dofs
