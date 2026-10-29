@@ -1327,6 +1327,8 @@ class _NewtonPhysicsSimView:
                 continue
             if body_flags is not None and not bool(int(body_flags[idx]) & int(newton.BodyFlags.DYNAMIC)):
                 continue
+            if path not in self._backend._contact_report_paths:
+                continue
             sensor_paths.append(path)
             sensor_body_idx.append(idx)
 
@@ -1439,6 +1441,8 @@ class NewtonBackend(PhysicsBackend):
         self._body_path_map = {}
         # body index -> index of the FIXED joint welding that body to the world (see set_kinematic_world_pose())
         self._kinematic_world_joints = None
+        # Prim paths of the bodies that opted into contact reporting (see enable_contact_reporting())
+        self._contact_report_paths = set()
         # body index -> (world joint index, start pose, target pose) of kinematic moves pending for the next step
         self._kinematic_moves = {}
         # Whether the model has been stepped since it was last rebuilt (see set_kinematic_world_pose())
@@ -2138,6 +2142,16 @@ class NewtonBackend(PhysicsBackend):
     def get_local_transform_with_scale(self, prim_path):
         prim = self.sim.stage.GetPrimAtPath(prim_path)
         return lazy.pxr.UsdGeom.Xformable(prim).GetLocalTransformation(lazy.pxr.Usd.TimeCode.Default())
+
+    def enable_contact_reporting(self, prim):
+        # Newton reports contacts for every body, so just record which bodies opted in: like PhysX's, the rigid contact
+        # view only gets rows for these (not e.g. a robot's visual-only eef links)
+        self._contact_report_paths.add(str(prim.GetPath()))
+
+    def contact_reporting_enabled(self, prim, visual_only):
+        # Whether @prim opted in, as PhysX checks for its contact report API -- a link made visual-only after loading
+        # (e.g. a robot's eef link) keeps it there too
+        return str(prim.GetPath()) in self._contact_report_paths
 
     def get_live_world_pose(self, prim_path):
         if self._rebuilding or self._live_state_discarded or self._state_0 is None or self._state_0.body_q is None:
