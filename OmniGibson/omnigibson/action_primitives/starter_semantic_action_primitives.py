@@ -2047,6 +2047,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 - 4-array: (x,y,z,w) Quaternion orientation in the world frame
         """
         body_pose = self.robot.get_position_orientation()
+        # Callers may pass a pose on another device (e.g. CPU tensors while the sim runs on CUDA)
+        pose = [th.as_tensor(x, dtype=th.float32, device=body_pose[0].device) for x in pose]
         return T.relative_pose_transform(*pose, *body_pose)
 
     def _robot_pose_to_world_pose(self, pose):
