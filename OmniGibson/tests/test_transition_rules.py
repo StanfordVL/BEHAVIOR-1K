@@ -351,7 +351,7 @@ def test_cooking_physical_particle_rule_failure_recipe_systems(env, stove, stock
     og.sim.step()
     assert stockpot.states[OnTop].get_value(stove)
 
-    brown_rice.generate_particles(positions=[(stockpot.aabb_center + th.tensor([0.03, 0.0, 0.0])).tolist()])
+    brown_rice.generate_particles(positions=[(stockpot.aabb_center.cpu() + th.tensor([0.03, 0.0, 0.0])).tolist()])
     # This fails the recipe because water (recipe system) is not in the stockpot
     water.generate_particles(positions=[[-0.25, 0.17, 1.95]])
 
@@ -388,8 +388,8 @@ def test_cooking_physical_particle_rule_success(env, stove, stockpot):
     og.sim.step()
     assert stockpot.states[OnTop].get_value(stove)
 
-    brown_rice.generate_particles(positions=[(stockpot.aabb_center + th.tensor([0.03, 0.0, 0.0])).tolist()])
-    water.generate_particles(positions=[(stockpot.aabb_center + th.tensor([-0.03, 0.0, 0.0])).tolist()])
+    brown_rice.generate_particles(positions=[(stockpot.aabb_center.cpu() + th.tensor([0.03, 0.0, 0.0])).tolist()])
+    water.generate_particles(positions=[(stockpot.aabb_center.cpu() + th.tensor([-0.03, 0.0, 0.0])).tolist()])
 
     assert stockpot.states[Contains].get_value(brown_rice)
     assert stockpot.states[Contains].get_value(water)
@@ -1316,7 +1316,7 @@ def test_single_toggleable_machine_rule_output_system_failure_nonrecipe_objects(
     # Spawning the bowl in the blender's location causes PhysX to crash,
     # resulting in "Invalid PhysX transform detected" errors. To avoid this, we temporarily move the blender aside.
     blender.set_position_orientation(
-        position=blender.get_position_orientation()[0] + th.tensor([1.0, 0.0, 0.0], dtype=th.float32)
+        position=blender.get_position_orientation()[0].cpu() + th.tensor([1.0, 0.0, 0.0], dtype=th.float32)
     )
     for obj_cfg in deleted_objs_cfg:
         obj = DatasetObject(**obj_cfg)

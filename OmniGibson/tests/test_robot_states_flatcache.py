@@ -1,5 +1,6 @@
 import torch as th
 import pytest
+from utils import with_device_override
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives
@@ -41,7 +42,7 @@ def setup_environment():
         ],
     }
 
-    env = og.Environment(configs=config)
+    env = og.Environment(configs=with_device_override(config))
     return env
 
 
@@ -148,7 +149,7 @@ def test_robot_load_drive(robot_name):
             },
         }
 
-        env = og.Environment(configs=config)
+        env = og.Environment(configs=with_device_override(config))
         og.sim.stop()
 
         robot = Robot(
@@ -167,11 +168,12 @@ def test_robot_load_drive(robot_name):
 
         og.sim.step()
 
-        # Set viewer in front facing robot
-        og.sim.viewer_camera.set_position_orientation(
-            position=[2.69918369, -3.63686664, 4.57894564],
-            orientation=[0.39592411, 0.1348514, 0.29286304, 0.85982],
-        )
+        # Set viewer in front facing robot (there is none without a render backend)
+        if og.sim.viewer_camera is not None:
+            og.sim.viewer_camera.set_position_orientation(
+                position=[2.69918369, -3.63686664, 4.57894564],
+                orientation=[0.39592411, 0.1348514, 0.29286304, 0.85982],
+            )
 
         # If this is a manipulation robot, we want to test moving the arm
         if robot.is_manipulation:
@@ -193,7 +195,7 @@ def test_robot_load_drive(robot_name):
             target_eef_orn = eef_orn
             for action in action_primitives._move_hand_direct_ik((target_eef_pos, target_eef_orn)):
                 env.step(action)
-            assert th.norm(robot.get_eef_position() - target_eef_pos) < 0.05
+            assert th.norm(robot.get_eef_position().cpu() - target_eef_pos) < 0.05
 
         # If this is a locomotion robot, we want to test driving
         if robot.is_locomotion:
@@ -201,8 +203,8 @@ def test_robot_load_drive(robot_name):
             goal_location = th.tensor([0, 1, 0], dtype=th.float32)
             for action in action_primitives._navigate_to_pose_direct(goal_location):
                 env.step(action)
-            assert th.norm(robot.get_position()[:2] - goal_location[:2]) < 0.1
-            yaw_diff = robot.get_rpy()[2] - goal_location[2]
+            assert th.norm(robot.get_position()[:2].cpu() - goal_location[:2]) < 0.1
+            yaw_diff = robot.get_rpy()[2].cpu() - goal_location[2]
             wrapped_yaw_diff = th.atan2(th.sin(yaw_diff), th.cos(yaw_diff))
             assert th.abs(wrapped_yaw_diff) < 0.1
 
@@ -272,11 +274,12 @@ def test_grasping_mode(grasping_mode):
         )
         cfg = dict(scene=scene_cfg, objects=objects_cfg)
 
-        env = og.Environment(configs=cfg)
-        og.sim.viewer_camera.set_position_orientation(
-            position=[1.0170, 0.5663, 1.0554],
-            orientation=[0.1734, 0.5006, 0.8015, 0.2776],
-        )
+        env = og.Environment(configs=with_device_override(cfg))
+        if og.sim.viewer_camera is not None:
+            og.sim.viewer_camera.set_position_orientation(
+                position=[1.0170, 0.5663, 1.0554],
+                orientation=[0.1734, 0.5006, 0.8015, 0.2776],
+            )
         og.sim.stop()
 
         robot = Robot(
@@ -407,7 +410,7 @@ def test_holonomic_robot_tuck_untuck_base_joint_invariance():
         ],
     }
 
-    env = og.Environment(configs=config)
+    env = og.Environment(configs=with_device_override(config))
     robot = env.scene.robots[0]
     env.reset()
     og.sim.step()

@@ -1,4 +1,5 @@
 import math
+import os
 
 import torch as th
 
@@ -7,6 +8,16 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.systems import FluidSystem, GranularSystem, MacroPhysicalParticleSystem, MacroVisualParticleSystem
 from omnigibson.utils.constants import PrimType
+
+
+def with_device_override(cfg):
+    """Applies OMNIGIBSON_DEVICE (see conftest.py) to an env config built by a test itself, as the shared env
+    fixture does, so a backend that should run on CUDA (e.g. Newton) isn't left on the CPU default."""
+    device = os.environ.get("OMNIGIBSON_DEVICE")
+    if device:
+        cfg.setdefault("env", {})["device"] = device
+    return cfg
+
 
 SYSTEM_EXAMPLES = {
     "water": FluidSystem,

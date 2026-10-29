@@ -1,5 +1,6 @@
 import numpy as np
 import torch as th
+from utils import with_device_override
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
@@ -32,7 +33,7 @@ def _make_two_fetch_env():
             },
         ],
     }
-    return og.Environment(configs=cfg)
+    return og.Environment(configs=with_device_override(cfg))
 
 
 def _stabilize_and_reset(robots):
@@ -129,7 +130,7 @@ def test_arm_control():
         ],
     }
 
-    env = og.Environment(configs=cfg)
+    env = og.Environment(configs=with_device_override(cfg))
 
     # Define error functions to use
     def check_zero_error(curr_position, init_position, tol=1e-2):
@@ -560,7 +561,7 @@ def test_mixed_models_no_cross_group_contamination():
             },
         ],
     }
-    env = og.Environment(configs=cfg)
+    env = og.Environment(configs=with_device_override(cfg))
 
     for i, robot in enumerate(env.scene.robots):
         robot.set_position_orientation(

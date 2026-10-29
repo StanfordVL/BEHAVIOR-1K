@@ -1,3 +1,5 @@
+from utils import with_device_override
+
 import omnigibson as og
 from omnigibson.macros import gm
 
@@ -35,7 +37,7 @@ def task_tester(task_type):
         og.sim.stop()
 
     # Create the environment
-    env = og.Environment(configs=cfg)
+    env = og.Environment(configs=with_device_override(cfg))
 
     env.reset()
     for _ in range(5):
@@ -84,7 +86,7 @@ def test_rs_int_full_load():
         og.sim.stop()
 
     # Create the environment
-    env = og.Environment(configs=cfg)
+    env = og.Environment(configs=with_device_override(cfg))
 
     env.reset()
     for _ in range(5):
