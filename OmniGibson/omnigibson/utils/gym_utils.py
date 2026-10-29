@@ -57,6 +57,9 @@ def recursively_generate_compatible_dict(dic):
         elif isinstance(v, th.Tensor) and v.dim() > 1:
             # Map to list of tuples
             out[k] = tuple(tuple(row.tolist()) for row in v)
+        elif isinstance(v, th.Tensor):
+            # Gym spaces only check CPU values (e.g. Box.contains() is False for a tuple of CUDA tensors)
+            out[k] = tuple(v.cpu())
         elif isinstance(v, Iterable):
             # bounding box modalities give a list of tuples
             out[k] = tuple(v)
