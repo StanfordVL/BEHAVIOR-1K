@@ -3349,7 +3349,11 @@ class NewtonBackend(PhysicsBackend):
     # tested asset. Only validated for stability (cloth dropped onto the ground), not for how stiff the cloth looks.
     _CLOTH_DEFAULT_EDGE_KE = 0.1
     _CLOTH_DEFAULT_EDGE_KD = 1.0e-2
-    _CLOTH_DEFAULT_SPRING_KE = 1.0
+    # At 1.0 hanging cloth stretched like dough (total spring length +28% on jeans, +14% on table_runner draped over a
+    # table): XPBD's compliance 1 / (ke * dt^2) dwarfed the particles' inverse masses, so each iteration barely corrected
+    # the springs (more iterations made it worse). 100 keeps that within 1% and every tested asset stable when dropped
+    # from 3 m; 1000 blew up dishtowel and rubber_glove.
+    _CLOTH_DEFAULT_SPRING_KE = 100.0
     _CLOTH_DEFAULT_SPRING_KD = 1.0e-2
     # Upper bound for the cloth particle radius; the actual radius is derived per cloth mesh from its edge lengths
     # (see _add_cloth_object). A fixed 0.01 equals ClothPrim._remesh's 1 cm target edge length, so neighboring
