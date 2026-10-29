@@ -36,6 +36,12 @@ log = create_module_logger(module_name=__name__)
 def _wp_to_torch(array):
     import warp as wp
 
+    if array.size == 0 and array.device.is_cpu:
+        # wp.to_torch() goes through numpy for CPU arrays, which raises on an empty one (e.g. joint_q of a model with
+        # no joints yet)
+        scalar_type = getattr(array.dtype, "_wp_scalar_type_", array.dtype)
+        shape = tuple(array.shape) + tuple(getattr(array.dtype, "_shape_", ()))
+        return th.empty(shape, dtype=wp.dtype_to_torch(scalar_type))
     return wp.to_torch(array)
 
 
