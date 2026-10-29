@@ -9,7 +9,9 @@ keywords = ["experience", "app", "usd", "isaacsim"] # That makes it browsable in
 [dependencies]
 "isaacsim.exp.base" = {}
 "omni.flowusd" = {}
-#"omni.kit.xr.profile.vr" = {}
+"omni.kit.xr.core" = {}
+"omni.kit.xr.system.openxr" = {}
+"omni.kit.xr.ui.window.profile" = {}
 "omni.physx.supportui" = {}
 #"omni.isaac.physics_inspector" = {}
 
@@ -45,7 +47,6 @@ outDirectory = "${data}"
     "${app}",
     "${app}/../exts",
     "${app}/../extscache",
-    "${app}/../extsPhysics",
     "${app}/../extsUser",
     "${app}/../extsDeprecated",
 ]
