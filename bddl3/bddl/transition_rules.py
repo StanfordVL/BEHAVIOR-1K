@@ -18,12 +18,12 @@ Recipe types
 from __future__ import annotations
 
 import json
-import pathlib
 from dataclasses import dataclass, field
 
+from bddl.config import GENERATED_DATA_DIR
 from bddl.predicates import TOKEN_TO_PREDICATE, Predicate
 
-_TM_JSON_DIR = pathlib.Path(__file__).parent / "generated_data" / "transition_map" / "tm_jsons"
+_TM_JSON_DIR = GENERATED_DATA_DIR / "transition_map" / "tm_jsons"
 
 
 # ---------------------------------------------------------------------------
@@ -192,9 +192,9 @@ def load_cooking_recipes(json_filename="heat_cook.json"):
         list[CookingRecipe]: Parsed cooking recipes.
     """
     fpath = _TM_JSON_DIR / json_filename
-    if not fpath.exists():
+    if not fpath.is_file():
         return []
-    with open(fpath, "r") as f:
+    with fpath.open("r") as f:
         raw_list = json.load(f)
     return [
         _parse_recipe(
@@ -215,9 +215,9 @@ def load_mixing_recipes(json_filename="mixing_stick.json"):
         list[MixingRecipe]: Parsed mixing recipes.
     """
     fpath = _TM_JSON_DIR / json_filename
-    if not fpath.exists():
+    if not fpath.is_file():
         return []
-    with open(fpath, "r") as f:
+    with fpath.open("r") as f:
         raw_list = json.load(f)
     return [_parse_recipe(raw, MixingRecipe) for raw in raw_list]
 
@@ -229,9 +229,9 @@ def load_machine_recipes(json_filename="single_toggleable_machine.json"):
         list[MachineRecipe]: Parsed machine recipes.
     """
     fpath = _TM_JSON_DIR / json_filename
-    if not fpath.exists():
+    if not fpath.is_file():
         return []
-    with open(fpath, "r") as f:
+    with fpath.open("r") as f:
         raw_list = json.load(f)
     return [
         _parse_recipe(
@@ -258,9 +258,9 @@ def load_substance_cooking_recipes(*json_filenames):
     recipes = []
     for fn in json_filenames:
         fpath = _TM_JSON_DIR / fn
-        if not fpath.exists():
+        if not fpath.is_file():
             continue
-        with open(fpath, "r") as f:
+        with fpath.open("r") as f:
             raw_list = json.load(f)
         recipes.extend(_parse_recipe(raw, SubstanceCookingRecipe) for raw in raw_list)
     return recipes
@@ -273,8 +273,8 @@ def load_washer_rule(json_filename="washer.json"):
         WasherRecipe | None: Parsed washer rule, or None if file not found.
     """
     fpath = _TM_JSON_DIR / json_filename
-    if not fpath.exists():
+    if not fpath.is_file():
         return None
-    with open(fpath, "r") as f:
+    with fpath.open("r") as f:
         conditions = json.load(f)
     return WasherRecipe(conditions=conditions)

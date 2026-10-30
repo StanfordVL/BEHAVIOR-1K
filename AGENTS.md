@@ -15,7 +15,7 @@ BEHAVIOR-1K is a monorepo for a simulation benchmark testing embodied AI agents 
 - **BDDL3** (`bddl3/`) - Behavior Domain Definition Language. Defines a symbolic knowledge base with 1,000+ activity definitions, object taxonomy/ontology, and condition evaluation logic.
 - **JoyLo** (`joylo/`) - Teleoperation framework for robot control using physical hardware (GELLO devices).
 
-Supporting components: `asset_pipeline/` (3D asset conversion), `knowledgebase/` (Flask web app for browsing BDDL data), `docs/` (MkDocs site), `eval-jobqueue/` (evaluation infrastructure).
+Supporting components: `asset_pipeline/` (3D asset conversion), `knowledgebase/` (Flask web app for browsing BDDL data), `docs/` (MkDocs site).
 
 ## Commands
 

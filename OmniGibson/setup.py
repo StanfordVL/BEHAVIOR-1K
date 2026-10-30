@@ -24,6 +24,8 @@ setup(
         "huggingface-hub[cli]>=0.34.4",
         "gymnasium>=0.28.1",
         "numpy<2.0.0,>=1.23.5",
+        # pyarrow 26 drops numpy 1.x support, but isaacsim-kernel pins numpy==1.26.0.
+        "pyarrow<26",
         "scipy>=1.10.1",
         "GitPython>=3.1.40",
         "transforms3d>=0.4.1",
@@ -55,7 +57,8 @@ setup(
         "pillow~=11.0.0",
         "websockets>=15.0.1",
         "omegaconf>=2.3.0",
-        "lerobot[dataset] @ git+https://github.com/wensi-ai/lerobot@release/b1k",
+        # release/b1k-challenge-2026: Python 3.11 / NumPy 1.x compatible challenge release.
+        "lerobot[dataset] @ git+https://github.com/wensi-ai/lerobot@436812bd8ee39b768c645c248c91f1330834e687",
     ],
     extras_require={
         "dev": [

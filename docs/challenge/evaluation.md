@@ -49,6 +49,8 @@ python -m omnigibson.eval.eval \
 
 The evaluator connects to the policy server at `--host` and `--port`; the policy server is responsible for receiving observations and returning robot actions. The websocket interface is implemented by the evaluation utilities adapted from [openpi](https://github.com/Physical-Intelligence/openpi), and baseline servers such as OpenPI or GR00T can expose compatible endpoints.
 
+For vectorized evaluation with one policy server per rollout, pass `--policy-endpoints` with one `HOST:PORT` for each `--instance-indices` value, in the same order. The evaluator queries these ports concurrently and advances the shared simulator after the active ports respond.
+
 Key arguments:
 
 <table class="challenge-data-table">
@@ -60,6 +62,10 @@ Key arguments:
     <tr>
       <td><code>--host</code> and <code>--port</code></td>
       <td>Address of the websocket policy server. The default port is <code>8000</code>. The evaluator waits for the server health check at <code>/healthz</code>, then opens the websocket connection.</td>
+    </tr>
+    <tr>
+      <td><code>--policy-endpoints</code></td>
+      <td>One <code>HOST:PORT</code> per environment, in <code>--instance-indices</code> order. Uses a separate websocket connection for each rollout and overrides <code>--host</code> and <code>--port</code>.</td>
     </tr>
     <tr>
       <td><code>--instance-indices</code></td>
@@ -102,28 +108,38 @@ Key arguments:
 
 The evaluator sends flattened observations to the policy server. The server should return a msgpack-encoded response containing an `action` array with the robot action for the current step. The helper server implementation is `WebsocketPolicyServer` in `OmniGibson/omnigibson/eval/utils/network_utils.py`, and the evaluator-side client is `omnigibson.eval.policies.WebsocketPolicy`.
 
+After scene initialization and instance loading, initial policy connection and sending the rollout reset have a separate 600-second allowance per endpoint, excluded from the episode budget. The current reset message has no acknowledgment. The evaluator does not restart participant servers.
+
+Each rollout also receives a **first-query allowance**: the first action query must finish within 600 seconds, but its duration is excluded from the episode budget. This allowance includes any checkpoint loading, GPU transfer, reset processing, warm-up, and inference performed during that query. Its returned action or action chunk is executed normally, and every simulator step is charged. In multi-port evaluation, the allowance applies independently to each port. A failed first query fails the affected rollout; it does not grant a replacement free query.
+
+Episode accounting starts after the first query completes and before its first action is executed. In multi-port evaluation, each rollout has an accounted time budget of max_steps seconds. The evaluator charges each active rollout for subsequent policy query time, including reconnections, plus the shared simulator step time divided by the total number of environments in the batch. This divisor stays fixed because finished or failed environments remain in the shared simulation; their timers stop accumulating charges. The evaluator waits for all active policy queries before stepping the simulator, but waiting for another port's response is not charged to a rollout's policy time. Subsequent action queries must complete within 600 seconds and the remaining time for that rollout. If the websocket connection drops, the evaluator attempts to reconnect up to three times and resends the current observation without advancing the simulation step; reconnection does not restart the episode budget or grant another allowance. Reconnection attempts during the first query share its original 600-second limit. A failed or over-budget rollout receives zero score; other active rollouts continue. In multi-port evaluation, a port that fails initialization or its first query does not prevent healthy ports from proceeding. Recorded evaluation time and evaluation FPS exclude initialization and the first-query allowance.
+
 ### Optional action-chunk replay protocol
 
 Action-chunk replay is disabled by default. Setting <code>--replay-action-chunk-size K</code> with
-<code>K &gt; 1</code> asks a compatible policy server for <code>K</code> actions by adding the reserved
+<code>K &gt; 1</code> asks a compatible policy server for up to <code>K</code> actions by adding the reserved
 <code>__action_chunk_size__</code> field to the observation request. The server response must contain:
 
 ```python
 {
     "action": ...,        # shape: (..., action_dim)
-    "action_chunk": ...,  # shape: (..., K, action_dim)
+    "action_chunk": ...,  # shape: (..., L, action_dim), where 1 <= L <= K
 }
 ```
 
 The first action in <code>action_chunk</code> must exactly equal <code>action</code>. The client returns that first
-action immediately, then executes the remaining <code>K - 1</code> actions without another websocket request.
+action immediately, then executes the remaining <code>L - 1</code> actions without another websocket request.
+The server may choose a different length on each inference. Once the returned chunk is exhausted, the client
+queries the policy with a new observation. In multi-port evaluation, each port independently caches and replays
+its own chunk; simulator stepping remains synchronized. Each replayed action still counts as one simulation step,
+and rollout termination and time-budget checks remain in effect.
 The cached chunk is cleared on episode reset. If a server omits <code>action_chunk</code>, the client logs a warning
 and falls back to one request per simulator step. The generic <code>WebsocketPolicyServer</code> implements this
 fallback protocol; a chunk-capable policy server must implement the optional response field itself.
 
 Only enable replay when the server returns an action sequence intended to be executed open-loop from the current
-observation, such as one receding-horizon policy chunk, and choose <code>K</code> so replay never crosses the policy's
-replanning boundary. Do not enable it for temporal ensembling or for a server that repeatedly re-runs or blends the
+observation, such as one receding-horizon policy chunk. Return a length <code>L</code> that never crosses the policy's
+replanning boundary, up to the configured maximum <code>K</code>. Do not enable it for temporal ensembling or for a server that repeatedly re-runs or blends the
 policy on the same stale observation; those actions are not equivalent to normal closed-loop evaluation.
 
 Each successful rollout produces a JSON result containing `q_score`, `time`, `agent_distance`, and normalized efficiency metrics. For challenge submissions, run evaluation with `--write-video`; this records the head and wrist camera videos that must be submitted with the rollout metrics.
@@ -214,6 +230,8 @@ controller_config:
 ```
 
 The optional `eval.camera_sensor_names` block maps evaluation camera roles to robot sensor names. It is used by the provided wrappers and video writer to identify the head and wrist cameras. `--write-video` requires the `head`, `left_wrist`, and `right_wrist` roles. The official `RGBDFullResWrapper` uses these roles to set the head camera to `720 x 720` and wrist cameras to `480 x 480`; all other vision sensors are treated as wrist-resolution sensors.
+
+The optional `eval.use_presampled_pose_key` field names the presampled robot start pose to use when a task instance has no generic `robot` pose. The tasks carried over from the 2025 challenge store poses only per robot model (`fetch`, `r1`, `r1pro`, `stretch`, `tiago`). A robot whose `model` is not one of these must set this field, for example `use_presampled_pose_key: r1pro`, or environment creation fails on those tasks. By default the robot's own `model` is used.
 
 For controller syntax and supported controller types, see the [OmniGibson controller documentation](https://behavior.stanford.edu/omnigibson/controllers.html). For the recommended R1Pro baseline config, start from the bundled `OmniGibson/omnigibson/eval/r1pro.yaml` and modify `controller_config` or other robot fields as needed.
 
