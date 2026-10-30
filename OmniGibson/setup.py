@@ -54,7 +54,8 @@ setup(
         "pillow>=11.0.0",
         "websockets>=15.0.1",
         "omegaconf>=2.3.0",
-        "lerobot[dataset] @ git+https://github.com/huggingface/lerobot@1427d35ef58ab46651dc7ef78bde81642090c861",
+        # release/b1k: Python 3.12 / NumPy 2.x compatible Isaac Sim 6 release.
+        "lerobot[dataset] @ git+https://github.com/wensi-ai/lerobot@bcbfa2e33eba607279ebdf472c4181a2123bed34",
     ],
     extras_require={
         "dev": [
