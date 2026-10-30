@@ -141,7 +141,7 @@ class LeRobotDataWrapper(DataWrapper):
     def get_lerobot_obs_mapping(
         cls,
         env: Environment,
-        depth_output_unit: str = "m",
+        depth_unit: str = "m",
     ) -> tuple[dict[str, str], dict[str, dict]]:
         obs_mapping, obs_features = dict(), dict()
         for key, gym_shape in env.observation_space.items():
@@ -166,7 +166,7 @@ class LeRobotDataWrapper(DataWrapper):
                 info["names"] = ["height", "width", "channel"]
                 info["info"] = {
                     "is_depth_map": True,
-                    "video.output_unit": depth_output_unit,
+                    "depth_unit": depth_unit,
                 }
 
                 # We also add relative camera transforms (wrt robot egocentric frame) in case we
@@ -294,7 +294,7 @@ class LeRobotDataWrapper(DataWrapper):
 
         obs_mapping, obs_features = self.get_lerobot_obs_mapping(
             env=env,
-            depth_output_unit="m",
+            depth_unit="m",
         )
         self.obs_mapping = obs_mapping
         features.update(obs_features)
@@ -329,8 +329,8 @@ class LeRobotDataWrapper(DataWrapper):
                 sensor_name = "_".join(sensor_name.split(":")[1:]).lower()
                 K = sensor.intrinsic_matrix.cpu()
                 cam_intrinsics[sensor_name] = K.numpy().tolist()
-        self.dataset.meta.info["cam_intrinsics"] = cam_intrinsics
-        self.dataset.meta.info["omnigibson_git_hash"] = get_omnigibson_git_hash()
+        self.dataset.meta.info.cam_intrinsics = cam_intrinsics
+        self.dataset.meta.info.omnigibson_git_hash = get_omnigibson_git_hash()
         write_info(self.dataset.meta.info, self.dataset.meta.root)
 
     def process_traj_to_dataset(self, traj_data: list[dict]) -> None:
