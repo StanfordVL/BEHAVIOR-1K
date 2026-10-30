@@ -2,7 +2,7 @@ import logging
 import os
 import shutil
 import torch as th
-from lerobot.configs import DepthEncoderConfig, VideoEncoderConfig
+from lerobot.configs import DepthEncoderConfig, RGBEncoderConfig
 from lerobot.datasets import LeRobotDataset
 from lerobot.datasets.io_utils import write_info
 from lerobot.utils.constants import HF_LEROBOT_HOME
@@ -89,7 +89,7 @@ class LeRobotDataWrapper(DataWrapper):
             "robot_type": env.scene.robots[0].__class__.__name__.lower() if robot_type is None else robot_type,
             "use_videos": True,
             "streaming_encoding": True,
-            "camera_encoder": VideoEncoderConfig(
+            "rgb_encoder": RGBEncoderConfig(
                 vcodec="hevc",
                 pix_fmt="yuv420p",
                 g=8,
@@ -105,7 +105,6 @@ class LeRobotDataWrapper(DataWrapper):
                 depth_max=MAX_DEPTH,
                 shift=DEPTH_SHIFT,
                 use_log=True,
-                output_unit="m",
                 extra_options={"x265-params": "log-level=0:bframes=0"},
             ),
         }
@@ -142,7 +141,7 @@ class LeRobotDataWrapper(DataWrapper):
     def get_lerobot_obs_mapping(
         cls,
         env: Environment,
-        depth_output_unit: str = "m",
+        depth_unit: str = "m",
     ) -> tuple[dict[str, str], dict[str, dict]]:
         obs_mapping, obs_features = dict(), dict()
         for key, gym_shape in env.observation_space.items():
@@ -167,7 +166,7 @@ class LeRobotDataWrapper(DataWrapper):
                 info["names"] = ["height", "width", "channel"]
                 info["info"] = {
                     "is_depth_map": True,
-                    "video.output_unit": depth_output_unit,
+                    "depth_unit": depth_unit,
                 }
 
                 # We also add relative camera transforms (wrt robot egocentric frame) in case we
@@ -295,7 +294,7 @@ class LeRobotDataWrapper(DataWrapper):
 
         obs_mapping, obs_features = self.get_lerobot_obs_mapping(
             env=env,
-            depth_output_unit=self.lerobot_dataset_kwargs["depth_encoder"].output_unit,
+            depth_unit="m",
         )
         self.obs_mapping = obs_mapping
         features.update(obs_features)
@@ -330,8 +329,8 @@ class LeRobotDataWrapper(DataWrapper):
                 sensor_name = "_".join(sensor_name.split(":")[1:]).lower()
                 K = sensor.intrinsic_matrix.cpu()
                 cam_intrinsics[sensor_name] = K.numpy().tolist()
-        self.dataset.meta.info["cam_intrinsics"] = cam_intrinsics
-        self.dataset.meta.info["omnigibson_git_hash"] = get_omnigibson_git_hash()
+        self.dataset.meta.info.cam_intrinsics = cam_intrinsics
+        self.dataset.meta.info.omnigibson_git_hash = get_omnigibson_git_hash()
         write_info(self.dataset.meta.info, self.dataset.meta.root)
 
     def process_traj_to_dataset(self, traj_data: list[dict]) -> None:
