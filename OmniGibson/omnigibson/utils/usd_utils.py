@@ -3342,6 +3342,77 @@ def get_mesh_volume_and_com(mesh_prim, world_frame=False):
     return volume, com.to(dtype=th.float32)
 
 
+def _point_to_segment_distance(point, seg_starts, seg_ends):
+    """
+    Computes the distance from @point to each line segment defined by the corresponding rows of
+    @seg_starts and @seg_ends
+
+    Args:
+        point (th.tensor): (3,) query point
+        seg_starts (th.tensor): (N, 3) tensor of segment start points
+        seg_ends (th.tensor): (N, 3) tensor of segment end points
+
+    Returns:
+        th.tensor: (N,) tensor of the distance from @point to each segment
+    """
+    seg_dir = seg_ends - seg_starts
+    seg_len_sq = (seg_dir * seg_dir).sum(dim=-1, keepdim=True).clamp(min=1e-12)
+    # Project @point onto the (infinite) line, then clamp to the segment's extent
+    t = ((point - seg_starts) * seg_dir).sum(dim=-1, keepdim=True) / seg_len_sq
+    t = t.clamp(0.0, 1.0)
+    closest = seg_starts + t * seg_dir
+    return th.norm(point - closest, dim=-1)
+
+
+def _min_distance_to_mesh_surface(points, faces, point):
+    """
+    Computes the minimum distance from @point to the surface of the triangle mesh defined by @points and @faces
+
+    Note that the closest surface point is generally NOT one of the mesh's vertices, so this can be meaningfully
+    smaller than the minimum distance to the vertices. See https://github.com/StanfordVL/BEHAVIOR-1K/issues/773
+
+    Args:
+        points (th.tensor): (N, 3) tensor of mesh vertex positions
+        faces (th.tensor): (F, 3) tensor of triangle vertex indices
+        point (th.tensor): (3,) query point
+
+    Returns:
+        th.tensor: Scalar minimum distance from @point to the mesh surface
+    """
+    triangles = points[faces]
+    a, b, c = triangles[:, 0], triangles[:, 1], triangles[:, 2]
+    ab, ac, ap = b - a, c - a, point - a
+
+    # Normal of each triangle's plane (unnormalized)
+    normals = th.cross(ab, ac, dim=-1)
+
+    # Barycentric coordinates of @point's projection onto each triangle's plane
+    d00 = (ab * ab).sum(dim=-1)
+    d01 = (ab * ac).sum(dim=-1)
+    d11 = (ac * ac).sum(dim=-1)
+    d20 = (ap * ab).sum(dim=-1)
+    d21 = (ap * ac).sum(dim=-1)
+    denom = d00 * d11 - d01 * d01
+    # Guard against degenerate (zero-area) triangles
+    denom = th.where(denom.abs() < 1e-12, th.full_like(denom, 1e-12), denom)
+    v = (d11 * d20 - d01 * d21) / denom
+    w = (d00 * d21 - d01 * d20) / denom
+    u = 1.0 - v - w
+    projection_inside = (u >= 0.0) & (v >= 0.0) & (w >= 0.0)
+
+    # If the projection falls inside the triangle, the closest point lies on the triangle's plane...
+    plane_distance = (normals * ap).sum(dim=-1).abs() / th.norm(normals, dim=-1).clamp(min=1e-12)
+    # ...otherwise the closest point lies on one of the triangle's three edges
+    edge_distance = th.minimum(
+        th.minimum(
+            _point_to_segment_distance(point, a, b),
+            _point_to_segment_distance(point, b, c),
+        ),
+        _point_to_segment_distance(point, c, a),
+    )
+    return th.where(projection_inside, plane_distance, edge_distance).min()
+
+
 def check_extent_radius_ratio(geom_prim, com):
     """
     Checks if the min extent in world frame and the extent radius ratio in local frame of @geom_prim is within the
@@ -3368,7 +3439,9 @@ def check_extent_radius_ratio(geom_prim, com):
         return False
 
     max_radius = extent.max() / 2.0
-    min_radius = th.min(th.norm(geom_prim.points - com, dim=-1), dim=0).values
+    # Min radius is the distance from the CoM to the closest point on the mesh surface (not necessarily a vertex)
+    points, faces = geom_prim.points_and_faces
+    min_radius = _min_distance_to_mesh_surface(points, faces, com)
     ratio = max_radius / min_radius
 
     # PhysX requires ratio to be < 100.0. We use 95.0 to be safe.
