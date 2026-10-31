@@ -59,13 +59,11 @@ class _NewtonCameraResource:
         self.prim_path = prim_path
         self.width, self.height = resolution
         self._viewer = None
-        self._released = False
-        backend._register_viewer_user(self.width, self.height)
 
     def _ensure_viewer(self):
         # Re-fetched every capture rather than cached on the resource: the backend rebinds the shared
         # viewer when the physics model is rebuilt, and a cached reference would keep rendering the
-        # old model's geometry (or a closed viewer).
+        # old model's geometry.
         self._viewer = self.backend._get_viewer(self.width, self.height)
 
     def _sync_camera(self):
@@ -96,12 +94,15 @@ class _NewtonCameraResource:
             self._viewer.camera.fov = math.degrees(2.0 * math.atan(math.tan(horizontal_fov / 2.0) / aspect))
 
     def capture_rgb(self, device):
+        from omnigibson.utils.newton_viewer_recording import log_fluid_surfaces
+
         self._ensure_viewer()
         self._sync_camera()
 
         backend = self.sim.physics_backend
         self._viewer.begin_frame(0.0)
         self._viewer.log_state(backend._state_0)
+        log_fluid_surfaces(self._viewer, backend)
         self._viewer.end_frame()
 
         # (H, W, 3) uint8, host copy regardless of the GL viewer's own rendering device.
@@ -119,11 +120,8 @@ class _NewtonCameraResource:
         return lazy.warp.array(rgba, dtype=lazy.warp.uint8, device=device)
 
     def destroy(self):
-        # Hand the shared viewer back; it only actually closes once its last user is gone.
-        if not self._released:
-            self._released = True
-            self._viewer = None
-            self.backend._release_viewer(self.width, self.height)
+        # The shared viewer stays open for the next resource of this size (see NewtonRenderBackend._get_viewer)
+        self._viewer = None
 
 
 class _NewtonAnnotator:
@@ -146,15 +144,9 @@ class NewtonRenderBackend(UsdStageServicesMixin, RenderBackend):
 
     def __init__(self, sim=None):
         super().__init__(sim=sim)
-        # Offscreen ViewerGLs shared by every camera resource of the same resolution, and how many
-        # resources currently want one of that size: (width, height) -> viewer / -> user count. See
-        # _get_viewer() for why they are shared rather than one per camera.
+        # Offscreen ViewerGLs shared by every camera resource of the same resolution: (width, height) -> viewer.
+        # See _get_viewer() for why they are shared rather than one per camera.
         self._shared_viewers = {}
-        self._viewer_users = {}
-
-    def _register_viewer_user(self, width, height):
-        """Note that one more camera resource wants a shared viewer of this size (see _get_viewer)."""
-        self._viewer_users[(width, height)] = self._viewer_users.get((width, height), 0) + 1
 
     def _get_viewer(self, width, height):
         """
@@ -181,11 +173,11 @@ class NewtonRenderBackend(UsdStageServicesMixin, RenderBackend):
         model = self.sim.physics_backend._model
         viewer = self._shared_viewers.get((width, height))
         if viewer is not None and viewer.model is not model:
-            # Model was rebuilt (dynamic object add/remove): a viewer still bound to the old one
-            # renders stale geometry. Replace it in place, so the other resources sharing this size
-            # pick the new one up on their own next capture without disturbing the user count.
-            viewer.close()
-            viewer = None
+            # Model was rebuilt (dynamic object add/remove, fluid particles generated): a viewer still bound to the
+            # old one renders stale geometry. Rebind rather than close and rebuild -- once a process's first ViewerGL
+            # is closed, every ViewerGL built after it renders all-black frames, with no error.
+            viewer.set_model(model)
+            viewer._og_fluid_surfaces = {}  # set_model() destroyed the meshes log_fluid_surfaces() logged
         if viewer is None:
             # cam_pos/look_at are throwaway placeholders -- _sync_camera() overwrites them from the
             # tracked prim's own live pose before every capture.
@@ -200,18 +192,6 @@ class NewtonRenderBackend(UsdStageServicesMixin, RenderBackend):
             )
             self._shared_viewers[(width, height)] = viewer
         return viewer
-
-    def _release_viewer(self, width, height):
-        """Drop one resource's claim on a shared viewer, closing it once nobody is left using it."""
-        key = (width, height)
-        remaining = self._viewer_users.get(key, 0) - 1
-        if remaining > 0:
-            self._viewer_users[key] = remaining
-            return
-        self._viewer_users.pop(key, None)
-        viewer = self._shared_viewers.pop(key, None)
-        if viewer is not None:
-            viewer.close()
 
     def render(self):
         # Nothing to tick globally: each camera resource renders on-demand in get_modality_data().

@@ -3,16 +3,12 @@ Utilities for recording an OmniGibson environment through one of Newton's own st
 (``ViewerRTX`` or ``ViewerGL``) instead of Omniverse Kit's renderer.
 
 This path only makes sense when ``gm.PHYSICS_BACKEND == "newton"`` and ``gm.RENDER_BACKEND ==
-"none"`` -- running Newton physics in the same process as a live Kit render (``RENDER_BACKEND ==
-"kit"``) hits an upstream OpenUSD 25.11 heap-corruption bug in Isaac Sim's own bundled USD library
-(see ``docs/other/newton_migration.md``'s known-workarounds section). Callers must set those two
-``gm`` flags -- and, for the GL viewer, ``pyglet.options["headless"] = True`` -- *before* importing
-``omnigibson`` at all.
+"none"`` (Newton physics does not support Kit rendering). Callers must set those two ``gm`` flags --
+and, for the GL viewer, ``pyglet.options["headless"] = True`` -- *before* importing ``omnigibson`` at
+all.
 
-Under Kit rendering, OmniGibson's Newton physics model carries only collision geometry (rendering
-reads the original USD's separate visual mesh subtree directly, via Kit). With ``RENDER_BACKEND ==
-"none"``, ``physics_backends.newton_backend.NewtonBackend`` bakes real, textured visual-only shapes
-into the model itself instead (see ``physics_backends/newton_visuals.py``), so ``viewer.log_state()``
+``physics_backends.newton_backend.NewtonBackend`` bakes real, textured visual-only shapes into the
+model itself (see ``physics_backends/newton_visuals.py``), so ``viewer.log_state()``
 below renders them automatically -- this module only needs to build the viewer, place the camera, and
 step/capture frames.
 """
@@ -246,6 +242,45 @@ def build_viewer(renderer, model, cam_pos, look_at, width=640, height=480, headl
     return viewer
 
 
+def log_fluid_surfaces(viewer, backend):
+    """Draw each fluid system as its reconstructed surface instead of as particles. Call after ``viewer.log_state()``.
+
+    MPM particles are ~2 cm beads at the default radius, so log_state()'s particle spheres read as a pile of marbles.
+    """
+    meshes = backend.get_fluid_surface_meshes()
+    viewer.show_particles = not meshes
+    # Last mesh logged per system, re-logged hidden when its surface goes away: the GL viewer can't take an empty mesh
+    logged = getattr(viewer, "_og_fluid_surfaces", {})
+    for system_name, last_mesh in logged.items():
+        if meshes.get(system_name) is None:
+            viewer.log_mesh(f"/fluid/{system_name}", *last_mesh, hidden=True, dynamic=True)
+    for system_name, mesh in meshes.items():
+        if mesh is None:
+            continue
+        color, opacity = _fluid_look(system_name)
+        viewer.log_mesh(
+            f"/fluid/{system_name}",
+            *mesh,
+            dynamic=True,
+            color=color,
+            roughness=0.15,
+            metallic=0.0,
+            opacity=opacity,
+        )
+        logged[system_name] = mesh
+    viewer._og_fluid_surfaces = logged
+
+
+def _fluid_look(system_name):
+    """The fluid system's (color, opacity), or a translucent water blue if its material preset is unknown."""
+    for scene in og.sim.scenes:
+        if scene.is_system_active(system_name):
+            system = scene.get_system(system_name, force_init=False)
+            if getattr(system, "render_opacity", None) is not None:
+                return tuple(float(c) for c in system.color), system.render_opacity
+    return (0.12, 0.42, 0.8), 0.6
+
+
 def capture_frame(viewer, renderer):
     """Grab the last-rendered frame as an (H, W, 3) uint8 numpy array."""
     if renderer == "gl":
@@ -292,6 +327,7 @@ def record_with_newton_viewer(env, robot, renderer, output_path=None, num_steps=
 
         viewer.begin_frame(i / fps)
         viewer.log_state(backend._state_0)
+        log_fluid_surfaces(viewer, backend)
         viewer.end_frame()
 
         if headless:
@@ -581,6 +617,7 @@ def run_teleop_with_newton_viewer(env, robot, renderer, fps=30):
     # whose window/renderer already exist from build_viewer() above.
     viewer.begin_frame(0.0)
     viewer.log_state(backend._state_0)
+    log_fluid_surfaces(viewer, backend)
     viewer.end_frame()
 
     kb_controller = _PygletTeleopController(robot)
@@ -598,6 +635,7 @@ def run_teleop_with_newton_viewer(env, robot, renderer, fps=30):
 
         viewer.begin_frame(i / fps)
         viewer.log_state(backend._state_0)
+        log_fluid_surfaces(viewer, backend)
         viewer.end_frame()
 
         # Pace to roughly real time, matching record_with_newton_viewer's live-window branch.

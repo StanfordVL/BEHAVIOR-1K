@@ -367,9 +367,7 @@ class PhysicsBackend(ABC):
         """
         Live (position (3,), orientation (4,) xyzw) world-frame pose for a tracked rigid body's own
         prim path, read directly from this backend's own simulation state -- or None if untracked
-        (e.g. sim not yet played) or not applicable. Only meaningful for a backend whose USD prim
-        attributes don't automatically reflect live physics state (see sync_to_render_layer() above);
-        the main consumer is that backend's own get_world_transform_with_scale().
+        (e.g. sim not yet played) or not applicable.
         """
         return None
 
@@ -529,6 +527,16 @@ class PhysicsBackend(ABC):
     def set_particle_velocities(self, system_name, velocities, idxs=None):
         """Set world-frame particle velocities (shape must match get_particle_velocities)."""
 
+    # ---- Joint-break events ----
+
+    @abstractmethod
+    def is_joint_break_event(self, event):
+        pass
+
+    @abstractmethod
+    def decode_joint_break_event(self, event):
+        """Return the broken joint's prim path as a string, given a raw backend event."""
+
     # ---- Runtime attachment constraints ----
 
     def create_attachment_constraint(
@@ -544,8 +552,7 @@ class PhysicsBackend(ABC):
     ):
         """
         Rigidly (FixedJoint) or point-wise (SphericalJoint) attaches @body1 to @body0 at runtime, e.g. for
-        assisted grasping. This default implementation authors a USD joint for the engine to pick up; a
-        backend only needs to override it when it can toggle such a constraint more cheaply than that.
+        assisted grasping. This default implementation authors a USD joint for the engine to pick up.
 
         Args:
             prim_path (str): where a USD joint prim would be created (also used as an identifier)
@@ -582,13 +589,3 @@ class PhysicsBackend(ABC):
 
         delete_or_deactivate_prim(handle.GetPath().pathString)
         og.sim.update_handles()
-
-    # ---- Joint-break events ----
-
-    @abstractmethod
-    def is_joint_break_event(self, event):
-        pass
-
-    @abstractmethod
-    def decode_joint_break_event(self, event):
-        """Return the broken joint's prim path as a string, given a raw backend event."""
