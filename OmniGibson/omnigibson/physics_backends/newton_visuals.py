@@ -58,7 +58,8 @@ def add_usd_visual_shapes(newton, builder, stage, root_path, path_body_map, *, l
 
     root_prim = stage.GetPrimAtPath(root_path)
     for prim in Usd.PrimRange(root_prim):
-        if prim.GetTypeName() != "Mesh":
+        # Some visuals are UsdGeom.Cube primitives instead of meshes (e.g. Fetch's gripper fingers)
+        if prim.GetTypeName() not in ("Mesh", "Cube"):
             continue
         if _is_enabled_collider(prim) or not _is_effectively_visible(prim) or not _has_render_purpose(prim):
             continue
@@ -77,7 +78,11 @@ def add_usd_visual_shapes(newton, builder, stage, root_path, path_body_map, *, l
         # rotation order doesn't matter when the rotation is ~identity). Baking scale into the raw
         # points removes the ambiguity entirely, matching this same codebase's prior workaround for
         # anisotropic per-instance Cube scales corrupting unrelated meshes under ViewerRTX.
-        meshes = _load_render_meshes(newton, prim, scale)
+        meshes = (
+            _load_render_cube(newton, prim, scale)
+            if prim.IsA(UsdGeom.Cube)
+            else _load_render_meshes(newton, prim, scale)
+        )
         if not meshes:
             continue
 
@@ -100,6 +105,32 @@ def add_usd_visual_shapes(newton, builder, stage, root_path, path_body_map, *, l
             visual_mesh_sources.append(mesh)
 
     return VisualImportResult(tuple(visual_shape_indices), tuple(visual_body_indices), tuple(visual_mesh_sources))
+
+
+def _load_render_cube(newton, prim, scale):
+    """A UsdGeom.Cube as a render mesh: an axis-aligned box of edge length ``size``, scaled like a mesh."""
+    from newton._src.usd import utils as usd_utils
+
+    half = 0.5 * float(UsdGeom.Cube(prim).GetSizeAttr().Get() or 2.0)
+    corners = np.array([[x, y, z] for x in (-1, 1) for y in (-1, 1) for z in (-1, 1)], dtype=np.float64)
+    points = corners * half * np.array([scale[0], scale[1], scale[2]], dtype=np.float64)
+    # Two outward-facing triangles per face (corner index = 4 * (x > 0) + 2 * (y > 0) + (z > 0))
+    faces = np.array(
+        [[0, 1, 3], [0, 3, 2], [4, 6, 7], [4, 7, 5], [0, 4, 5], [0, 5, 1],
+         [2, 3, 7], [2, 7, 6], [0, 2, 6], [0, 6, 4], [1, 5, 7], [1, 7, 3]],
+        dtype=np.int32,
+    )  # fmt: skip
+    material_props = usd_utils.resolve_material_properties_for_prim(prim)
+    mesh = newton.Mesh(
+        points,
+        faces.reshape(-1),
+        compute_inertia=False,
+        is_solid=False,
+        color=material_props.get("color"),
+        roughness=material_props.get("roughness"),
+        metallic=material_props.get("metallic"),
+    )
+    return (("", mesh),)
 
 
 def _load_render_meshes(newton, prim, scale):
