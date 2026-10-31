@@ -3,10 +3,7 @@ No-op implementation of the RenderBackend interface: renders nothing, needs no K
 
 This is the default render backend. Its whole purpose is to preserve exactly what "no render backend
 at all" used to mean before this abstraction existed -- in particular, a non-PhysX physics
-backend (e.g. Newton) continues to boot with zero Kit dependency unless the caller
-explicitly opts into ``gm.RENDER_BACKEND = "kit"``. Without this class, defaulting straight to
-``KitRenderBackend`` would silently force a live Kit application even for callers who never asked for
-rendering, since ``Simulator._launch_app()`` launches Kit if *either* backend needs it.
+backend (e.g. Newton) boots with zero Kit dependency.
 """
 
 from omnigibson.render_backends.base import RenderBackend

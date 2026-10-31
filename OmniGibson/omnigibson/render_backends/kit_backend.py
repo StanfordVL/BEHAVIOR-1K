@@ -5,9 +5,9 @@ This module owns everything about having a live Omniverse Kit application: launc
 (``launch_kit_app()``) and, once it exists, driving its rendering (Replicator, RTX, the viewport
 system) behind the RenderBackend interface. Nothing outside this module needs to know Kit exists.
 
-Kit is launched by ``PhysXBackend.create_app()``, since PhysX cannot run without it. PhysX then
-owns the render tick itself (``PhysXBackend.render()`` -> ``SimulationContext.render()``), so this
-class's own ``render()`` is only invoked by a physics backend that does not.
+Kit is launched by ``PhysXBackend.create_app()``, since PhysX cannot run without it, and is only
+supported with PhysX physics. PhysX owns the render tick itself (``PhysXBackend.render()`` ->
+``SimulationContext.render()``).
 """
 
 import contextlib
@@ -159,8 +159,8 @@ def launch_kit_app():
     """
     Launches the Isaac Sim / Omniverse Kit application and returns its `SimulationApp`.
 
-    Called from `PhysXBackend.create_app()` / `KitRenderBackend.create_app()`, so a configuration in
-    which no backend needs Kit never reaches any of this code.
+    Called from `PhysXBackend.create_app()`, so a configuration without PhysX never reaches any of
+    this code.
 
     Returns:
         isaacsim.SimulationApp: The launched Kit application.

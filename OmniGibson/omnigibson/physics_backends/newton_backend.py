@@ -4,7 +4,6 @@ solver) directly.
 """
 
 import math
-import os
 from collections import deque
 
 import torch as th
@@ -17,7 +16,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import _live_matrix_from_pose, get_world_pose_with_scale
+from omnigibson.utils.usd_utils import _live_matrix_from_pose
 
 log = create_module_logger(module_name=__name__)
 
@@ -30,6 +29,27 @@ def _wp_to_torch(array):
     return wp.to_torch(array)
 
 
+def _physx_schema_resolver():
+    """
+    newton's PhysX schema resolver, extended to read joint friction from `physxJoint:jointFriction`, which is
+    where JointPrim.friction authors it. Stock SchemaResolverPhysx has no friction entry, so every rebuild
+    would otherwise reset joint friction to 0 and discard what the friction setter pushed into the live model.
+    """
+    import newton
+    from newton._src.usd.schema_resolver import SchemaAttribute
+
+    base = newton.usd.SchemaResolverPhysx
+    joint_type = newton.usd.PrimType.JOINT
+
+    class _SchemaResolverPhysx(base):
+        mapping = {
+            **base.mapping,
+            joint_type: {**base.mapping[joint_type], "friction": SchemaAttribute("physxJoint:jointFriction", 0.0)},
+        }
+
+    return _SchemaResolverPhysx()
+
+
 _SPHERE_SHAPE_OVERLAP_KERNEL = None
 
 
@@ -37,7 +57,7 @@ def _sphere_shape_overlap_kernel():
     """
     Warp kernel testing a sphere against each candidate shape's exact geometry: overlap iff the shape's signed
     distance at the sphere center is <= the radius. Follows newton's own particle-vs-shape contact kernel conventions.
-    Built lazily since newton must not be imported before enable_extensions() runs.
+    Built lazily so importing this module does not import newton.
     """
     global _SPHERE_SHAPE_OVERLAP_KERNEL
     if _SPHERE_SHAPE_OVERLAP_KERNEL is not None:
@@ -267,22 +287,9 @@ class NewtonArticulationHandle:
             self._valid = False
             return
 
-        # This articulation's bodies = the root body plus every body whose path falls under the OWNING
-        # ENTITY prim. Link hierarchies in these dataset assets are flat -- all links are siblings
-        # directly under the entity prim, not nested under the root link -- so the prefix must be the
-        # entity's path, not the root link's own path.
         entity_prefix = self._root_link_prim_path.rsplit("/", 1)[0] + "/"
         body_idx_set = {root_body_idx} | {idx for path, idx in path_body_map.items() if path.startswith(entity_prefix)}
 
-        # For a FIXED-base object there's no synthetic free joint on the root body (`floating=False` was
-        # passed to add_usd for it) -- in that case, `articulation_root_path` (see
-        # objects/usd_object.py) identifies the articulation by the ENTITY prim's own path instead of
-        # the root link's, and ControllableObjectViewAPI/the batch view rely on that identity matching.
-        # Self-correct here since we were constructed with the root-link path regardless. Some robots
-        # (e.g. R1Pro) decompose their floating base into a serial chain of single-DOF joints instead
-        # of one 6-DOF FREE joint -- also "fixed-base-shaped" by this same free-joint check, and indeed
-        # expected to resolve to the entity-level path here too (matching what articulation_root_path
-        # computes on the OmniGibson side for the same object).
         joint_child = model.joint_child.numpy()
         joint_type = model.joint_type.numpy()
         import newton
@@ -293,9 +300,6 @@ class NewtonArticulationHandle:
             None,
         )
         has_free_joint = root_free_joint is not None
-        # Recompute from the stable root path every call (rather than leaving whatever self.prim_path
-        # was mutated to on a previous call) so this stays correct across repeat initialize() calls
-        # against a rebuilt model.
         self.prim_path = entity_prefix[:-1] if not has_free_joint else self._root_link_prim_path
         self._root_free_joint_q_start = int(model.joint_q_start.numpy()[root_free_joint]) if has_free_joint else None
 
@@ -308,15 +312,10 @@ class NewtonArticulationHandle:
         def qd_count_at(j):
             return (model.joint_dof_count if j == n_joints_total - 1 else joint_qd_start[j + 1]) - joint_qd_start[j]
 
-        # Exclude synthetic joints with no corresponding USD prim (e.g. the implicit free/floating joint
-        # `floating=True` adds for a non-fixed-base root body) -- OmniGibson's JointPrim always expects
-        # an articulated joint to wrap a pre-existing USD prim, never to synthesize one. A floating
-        # base's root freedom is instead exposed via the root link's own world pose (RigidBodyHandle),
-        # already implemented above; it just isn't independently controllable as a named DOF here yet.
         global_joint_idx = sorted(
             i for i in range(n_joints_total) if joint_child[i] in body_idx_set and i in path_by_joint_idx
         )
-        # ...then re-emit them in PhysX's DOF order, so this handle (and therefore EntityPrim.joints,
+        # Re-emit joints in PhysX's DOF order, so this handle (and therefore EntityPrim.joints,
         # every *_control_idx, and the serialized state layout) is backend-independent.
         global_joint_idx = _breadth_first_joint_order(model, global_joint_idx)
 
@@ -336,11 +335,6 @@ class NewtonArticulationHandle:
             self._joint_dof_offsets.append(offset)
             self._joint_names.append(name)
             for k in range(n_dof):
-                # joint_q (position) and joint_qd/control (velocity/target) live in SEPARATE index
-                # spaces that diverge once a free/floating joint precedes these (7-wide in Q, 6-wide in
-                # QD) -- excluded from this handle's own joint list, but still shifting every subsequent
-                # joint's absolute offset. Every joint type here is a simple 1-dof revolute/prismatic
-                # joint, so q-count == qd-count per joint and this per-k pairing is exact.
                 global_qd_idx.append(int(joint_qd_start[j]) + k)
                 global_q_idx.append(int(joint_q_start[j]) + k)
                 self._local_dof_to_path.append(path)
@@ -353,9 +347,7 @@ class NewtonArticulationHandle:
     @property
     def is_valid(self):
         # Looser than is_physics_handle_valid(): whether this handle refers to a prim that structurally
-        # exists, not whether it's been bound to the current Newton model yet. Callers (e.g.
-        # RigidDynamicPrim.update_handles()) check this BEFORE calling initialize() on this very same
-        # pass, so it must not depend on _valid (which initialize() itself sets).
+        # exists, not whether it's been bound to the current Newton model yet.
         return True
 
     def is_physics_handle_valid(self):
@@ -363,7 +355,6 @@ class NewtonArticulationHandle:
 
     @property
     def has_dof_metadata(self):
-        # The DOF-layout accessors below are only populated by initialize().
         return self._valid
 
     @property
@@ -396,9 +387,6 @@ class NewtonArticulationHandle:
         return self._global_qd_idx if joint_indices is None else self._global_qd_idx[joint_indices]
 
     def _idx_q(self, joint_indices=None):
-        # Separate index space from _idx(): joint_q (raw position state) diverges from joint_qd/control
-        # (velocity/target) once a preceding free/floating joint (7-wide in Q, 6-wide in QD) shifts every
-        # subsequent joint's absolute offset -- see initialize()'s comment.
         return self._global_q_idx if joint_indices is None else self._global_q_idx[joint_indices]
 
     # ---- Joint state get/set ----
@@ -410,20 +398,16 @@ class NewtonArticulationHandle:
         return _wp_to_torch(self._backend._state_0.joint_qd)[self._idx(joint_indices)].unsqueeze(0)
 
     def get_measured_joint_efforts(self, joint_indices=None, clone=True):
-        # No separate "measured/sensed" effort concept found on newton.State; joint_f lives on Control
-        # (the commanded feedforward force) instead. Use that as the best available proxy.
-        return _wp_to_torch(self._backend._control.joint_f)[self._idx(joint_indices)].unsqueeze(0)
+        idx = self._idx(joint_indices)
+        effort = _wp_to_torch(self._backend._control.joint_f)[idx]
+        qfrc_actuator = getattr(getattr(self._backend._state_0, "mujoco", None), "qfrc_actuator", None)
+        if qfrc_actuator is not None:
+            effort = effort + _wp_to_torch(qfrc_actuator)[idx]
+        return effort.unsqueeze(0)
 
     def set_joint_positions(self, positions, joint_indices=None, indices=None):
         idx = self._idx_q(joint_indices)
-        # Clamp into the joint's own limit range before writing. PhysX enforces joint limits as a
-        # near-exact, unyielding constraint; MuJoCo/Newton instead models them as a soft spring that
-        # continuously fights a position stuck in permanent violation. At least one BEHAVIOR-1K asset
-        # (Fetch's head_tilt_joint) authors a default/reset position outside its own limit range --
-        # found empirically to destabilize the whole coupled articulation within ~100 steps,
-        # independent of any drive/actuator gains. Clamping here (rather than only at model-build
-        # time) matters because callers like Robot.reset() re-apply the raw, un-clamped reset position
-        # after the model is built.
+        # Clamp into the joint's own limit range before writing.
         model = self._backend._model
         qd_idx = self._idx(joint_indices)
         lower = _wp_to_torch(model.joint_limit_lower)[qd_idx]
@@ -463,10 +447,6 @@ class NewtonArticulationHandle:
         return _AppliedActions(pos, vel)
 
     def get_dof_is_rotational(self):
-        # Per-DOF rotational/translational classification -- True for rotational, False for
-        # translational. Every joint this handle tracks is a simple 1-dof revolute or prismatic joint
-        # (initialize() explicitly excludes free/floating joints, which never appear as named DOFs
-        # here), so classifying by joint_type alone (no per-axis decomposition needed) is exact.
         import newton
 
         joint_type = self._backend._model.joint_type.numpy()
@@ -476,16 +456,10 @@ class NewtonArticulationHandle:
             is_rotational.extend([joint_type[j] == revolute] * n_dof)
         return is_rotational
 
-    # ---- Gains / limits / friction (best-effort; MuJoCo bakes actuator mode at solver-build time) ----
+    # ---- Gains / limits / friction ----
 
-    # PhysX applies a position-actuator's damping gain as an explicit per-step velocity-error force,
-    # but MuJoCo's implicit integrator folds kd into the step's effective mass matrix (~kd * physics_dt
-    # added to the joint's own inertia). PhysX-scale gains (controllers.controller_base.DEFAULT_ISAAC_KP/KD,
-    # ~1e7/1e5) behave under Newton as a huge added inertia rather than damping, and previously caused a
-    # gravity-loaded joint (e.g. a robot torso holding a deployed pose) to diverge. Callers
-    # (controller_base.py) now source Newton-native gains (DEFAULT_NEWTON_KP/KD and friends) instead of
-    # the PhysX-tuned ones when this backend is active, so kps/kds arriving here are already on Newton's
-    # own scale and are passed straight through with no additional scaling.
+    # MuJoCo's implicit integrator folds kd into the step's effective mass matrix (~kd * physics_dt
+    # added to the joint's own inertia).
     def get_gains(self, joint_indices=None):
         idx = self._idx(joint_indices)
         model = self._backend._model
@@ -528,6 +502,7 @@ class NewtonArticulationHandle:
     def set_friction_coefficients(self, values, joint_indices=None):
         idx = self._idx(joint_indices)
         _assign(self._backend._model.joint_friction, idx, values)
+        self._backend._notify_dof_properties_changed()
 
     def get_joint_limits(self, joint_indices=None):
         idx = self._idx(joint_indices)
@@ -542,14 +517,11 @@ class NewtonArticulationHandle:
         limits = th.as_tensor(limits)
         _assign(model.joint_limit_lower, idx, limits[..., 0])
         _assign(model.joint_limit_upper, idx, limits[..., 1])
+        self._backend._notify_dof_properties_changed()
 
     # ---- World pose (root link) ----
 
     def set_world_poses(self, positions, orientations):
-        # Always use the stable, never-mutated root-link path here -- see __init__'s note on why
-        # self.prim_path itself (self-corrected to the entity-level path for fixed-base objects, see
-        # initialize()) isn't a valid key into path_body_map, which only has entries for actual link
-        # paths.
         root_body_idx = self._backend._path_body_map[self._root_link_prim_path]
         body_q = _wp_to_torch(self._backend._state_0.body_q)
         positions = th.as_tensor(positions).reshape(-1).to(device=body_q.device, dtype=body_q.dtype)
@@ -559,15 +531,6 @@ class NewtonArticulationHandle:
         body_q[root_body_idx, :3] = positions
         body_q[root_body_idx, 3:7] = orientations
         if self._root_free_joint_q_start is not None:
-            # The solver's own authoritative starting state for the next physics step is joint_q, not
-            # body_q -- SolverMuJoCo.step() reconstructs body_q FROM joint_q at the start of every
-            # step, so writing only body_q here is silently discarded on the very next
-            # step_physics_once() call (confirmed empirically: get_world_poses() reads back the new
-            # value correctly immediately after this call, but reverts to the OLD position after one
-            # physics step). Every non-fixed-base object has a synthetic FREE joint as its root (see
-            # _rebuild()'s own free-joint pose-seeding logic, which this mirrors), so this must be kept
-            # in sync here too whenever the object's pose is set directly (as opposed to moving via
-            # joint control, which already updates joint_q as its natural side effect).
             q_start = self._root_free_joint_q_start
             joint_q = _wp_to_torch(self._backend._state_0.joint_q)
             joint_q[q_start : q_start + 3] = positions
@@ -591,8 +554,7 @@ class NewtonArticulationHandle:
 
 class _AlwaysValidPhysicsView:
     """
-    Stand-in for Isaac's private `_physics_view` attribute, whose only use in shared code
-    (`RigidDynamicPrim.update_handles()`) is a `.check()` consistency probe. Newton has no equivalent
+    Stand-in for Isaac's private `_physics_view` attribute. Newton has no equivalent
     notion of a tensor view going stale independently of the handle itself, so this is a no-op.
     """
 
@@ -610,9 +572,7 @@ class NewtonRigidBodyHandle:
         self._valid = False
         self._physics_view = _AlwaysValidPhysicsView()
         # q_start of the FREE joint whose child is this body (7-wide: pos(3)+quat(4)), or None if this
-        # body isn't a free-joint root (e.g. a non-root link of a real articulation, moved via FK from
-        # its own revolute/prismatic joint instead). See set_world_poses()'s own comment for why this
-        # matters -- populated in initialize(), like NewtonArticulationHandle's identical attribute.
+        # body isn't a free-joint root.
         self._root_free_joint_q_start = None
         self._root_free_joint_qd_start = None
 
@@ -636,7 +596,6 @@ class NewtonRigidBodyHandle:
 
     @property
     def is_valid(self):
-        # See NewtonArticulationHandle.is_valid for why this can't depend on _valid.
         return True
 
     def is_physics_handle_valid(self):
@@ -644,17 +603,11 @@ class NewtonRigidBodyHandle:
 
     def get_world_poses(self, clone=True):
         if not self._valid:
-            # Not yet incorporated into the model (e.g. added to the scene after the last play()
-            # rebuilt it, or the sim has never played) -- fall back to the plain USD-authored pose,
-            # mirroring how RigidDynamicPrim.set_position_orientation() falls back to XFormPrim while
-            # stopped.
+            # Not yet incorporated into the model, so fall back to the plain USD-authored pose.
             from omnigibson.utils.usd_utils import get_world_pose
 
             pos, quat_wxyz_from_xyzw = get_world_pose(self.prim_path)
             return pos.unsqueeze(0), _xyzw_to_wxyz(quat_wxyz_from_xyzw).unsqueeze(0)
-        # body_q is a zero-copy view of the live warp state buffer, which the solver overwrites in place.
-        # Callers that keep a pose (e.g. KinematicsMixin's change-detection snapshots) rely on clone=True
-        # actually decoupling it from future steps, as PhysX's views do.
         body_q = _wp_to_torch(self._backend._state_0.body_q)
         pos = body_q[self._body_idx, :3].unsqueeze(0)
         quat_wxyz = _xyzw_to_wxyz(body_q[self._body_idx, 3:7]).unsqueeze(0)
@@ -671,14 +624,6 @@ class NewtonRigidBodyHandle:
         body_q[self._body_idx, :3] = positions
         body_q[self._body_idx, 3:7] = orientations
         if self._root_free_joint_q_start is not None:
-            # See NewtonArticulationHandle.set_world_poses()'s identical fix for why this matters --
-            # the solver reconstructs body_q FROM joint_q at the start of every physics step, so a
-            # free-floating body's position write here would otherwise be silently discarded on the
-            # very next step. Confirmed this class needs the same fix: a plain (non-articulated)
-            # DatasetObject with no real joints has no NewtonArticulationHandle at all (no
-            # create_articulation_view() call for it), so its whole-object pose is set through this
-            # class instead, even though the underlying Newton model still gives it a synthetic free
-            # root joint.
             q_start = self._root_free_joint_q_start
             joint_q = _wp_to_torch(self._backend._state_0.joint_q)
             joint_q[q_start : q_start + 3] = positions
@@ -693,10 +638,6 @@ class NewtonRigidBodyHandle:
         return vel.clone() if clone else vel
 
     def _set_root_free_joint_qd(self, offset, values):
-        # Like set_world_poses()'s joint_q mirror: joint_qd is the authoritative state, and any FK (e.g. the
-        # one a later pose write triggers) recomputes body_qd from it -- so a body_qd-only write gets reverted
-        # (e.g. keep_still() followed by a teleport kept the body's old fall velocity). A free joint's qd is
-        # [COM linear, angular] in the world frame, the same layout as body_qd.
         if self._root_free_joint_qd_start is None:
             return
         qd_start = self._root_free_joint_qd_start + offset
@@ -731,12 +672,9 @@ class NewtonRigidBodyHandle:
 
     def set_coms(self, positions):
         _assign(self._backend._model.body_com, self._body_idx, th.as_tensor(positions).reshape(-1)[:3])
+        self._backend._notify_inertial_properties_changed()
 
-    # Mass and density are authored on the body's USD MassAPI, which every _rebuild() imports from -- the
-    # live model is rebuilt from USD on any object add/remove, so a model-only write would silently revert
-    # (and is impossible before the model exists, which is exactly when DatasetObject assigns its category
-    # masses). A live model is additionally updated in place, or rebuilt when only density changed.
-
+    # Mass and density are authored on the body's USD MassAPI, which is read during _rebuild().
     def _mass_api(self, apply=False):
         prim = self._backend.sim.stage.GetPrimAtPath(self.prim_path)
         return lazy.pxr.UsdPhysics.MassAPI.Apply(prim) if apply else lazy.pxr.UsdPhysics.MassAPI(prim)
@@ -767,10 +705,6 @@ class NewtonRigidBodyHandle:
         if self._valid:
             self._backend._mass_properties_dirty = True
 
-    # Gravity is switched per body through MuJoCo's gravity compensation (a body with gravcomp 1 gets an
-    # upward m*g at its COM), authored on USD so every _rebuild() imports it. OmniGibson disables gravity
-    # on each robot link not fixed to the base instead of compensating it in the controllers
-
     def _set_gravcomp(self, value):
         prim = self._backend.sim.stage.GetPrimAtPath(self.prim_path)
         prim.CreateAttribute("mjc:gravcomp", lazy.pxr.Sdf.ValueTypeNames.Float).Set(value)
@@ -786,12 +720,8 @@ class NewtonRigidBodyHandle:
 
 class _NewtonBatchArticulationView:
     """
-    Pattern-matched, multi-robot batch view backing `ControllableObjectViewAPI`/`BatchControlViewAPIImpl`,
-    built by aggregating already-registered per-robot `NewtonArticulationHandle`s. Exercised for
-    joint-position/velocity/effort control (`get`/`set_dof_*`), root/link transforms, jacobians (see
-    `NewtonBackend._compute_jacobian`), and generalized mass matrices (see
-    `NewtonBackend._compute_mass_matrix`) -- gravity/coriolis compensation forces still have no found
-    Newton equivalent and raise, matching `NewtonArticulationHandle`'s own limitation.
+    Aggregates per-robot `NewtonArticulationHandle`s. Exercised for joint-position/velocity/effort control, root/link
+    transforms, jacobians, and generalized mass matrices.
     """
 
     def __init__(self, backend, handles):
@@ -800,11 +730,6 @@ class _NewtonBatchArticulationView:
         self._link_paths_per_robot = []
         self._body_idx_per_robot = []
         for h in handles:
-            # See NewtonArticulationHandle.initialize() for why this is the entity prefix, not the root
-            # link's own path -- link hierarchies in these assets are flat. Also mirrors that method's
-            # floating-vs-fixed-base path convention split: for a floating-base object, h.prim_path is
-            # the root LINK's path (one level below the entity prim); for a fixed-base object, it's
-            # already the entity prim's own path.
             entity_prefix = (
                 h.prim_path + "/" if h.prim_path not in backend._path_body_map else h.prim_path.rsplit("/", 1)[0] + "/"
             )
@@ -828,11 +753,6 @@ class _NewtonBatchArticulationView:
         return self._link_paths_per_robot
 
     def _stack_dof(self, getter):
-        # PhysX's real ArticulatedObjectView pads every row to the batch's own max DOF count (a plain
-        # torch.stack requires uniform size, but this batch can span heterogeneous objects together --
-        # e.g. a cabinet with real joints alongside a bowl with none, both matched by the same
-        # ArticulatedObjectViewAPI query). Zero-pad to match; callers already know each row's real DOF
-        # count separately (see ArticulatedObjectViewAPI.get_max_dof()) and only read the valid prefix.
         per_handle = [getter(h)[0] for h in self._handles]
         max_dof = max((t.numel() for t in per_handle), default=0)
         padded = [t if t.numel() == max_dof else th.cat([t, t.new_zeros(max_dof - t.numel())]) for t in per_handle]
@@ -854,14 +774,7 @@ class _NewtonBatchArticulationView:
         return self._stack_dof(lambda h: h.get_measured_joint_efforts())
 
     def get_root_transforms(self):
-        # Quaternions stay xyzw here, unlike NewtonRigidBodyHandle.get_world_poses(). The two mirror
-        # different Isaac APIs: isaacsim.core's RigidPrimView.get_world_poses() returns wxyz, but
-        # omni.physics.tensors' ArticulationView.get_*_transforms() -- which this class stands in for
-        # -- returns xyzw, and every consumer in usd_utils.py (ControllableObjectViewAPI's link /
-        # relative-pose readers) parses it as xyzw. Reordering here instead silently rotated the
-        # holonomic base's commands: the base controller reads its heading through
-        # ControllableObjectViewAPI.get_position_orientation(), so a wxyz quat read as xyzw made the
-        # base_link yaw come back as ~0 and drove the robot in the world frame.
+        # Quaternions stay xyzw here, unlike NewtonRigidBodyHandle.get_world_poses().
         body_q = _wp_to_torch(self._backend._state_0.body_q)
         transforms = []
         for idxs in self._body_idx_per_robot:
@@ -874,8 +787,7 @@ class _NewtonBatchArticulationView:
         return th.stack([body_qd[idxs[0]] for idxs in self._body_idx_per_robot], dim=0)
 
     def get_link_transforms(self):
-        # xyzw, matching omni.physics.tensors -- see get_root_transforms() for why this must not be
-        # reordered to wxyz.
+        # returns xyzw
         body_q = _wp_to_torch(self._backend._state_0.body_q)
         result = []
         for idxs in self._body_idx_per_robot:
@@ -883,9 +795,7 @@ class _NewtonBatchArticulationView:
         return th.stack(result, dim=0)
 
     def get_link_velocities(self):
-        # body_qd is already [linear(3), angular(3)] per body (see NewtonRigidBodyHandle.get_linear/
-        # angular_velocities()) -- same convention PhysX's ArticulationView.get_link_velocities()
-        # callers expect, so no reordering needed here (unlike get_link_transforms()'s quat reorder).
+        # body_qd is already [linear(3), angular(3)] per body, so no reordering needed here
         body_qd = _wp_to_torch(self._backend._state_0.body_qd)
         return th.stack([th.stack([body_qd[idx] for idx in idxs], dim=0) for idxs in self._body_idx_per_robot], dim=0)
 
@@ -928,8 +838,7 @@ class _NewtonBatchArticulationView:
 class _ParticleImportRoot:
     """
     Stands in for a scene object in _rebuild_impl()'s import loop, for a macro particle system. Imported from the
-    system prim (the particles' physics material lives there, beside the "particles" scope) while ignoring every
-    other child, e.g. the particle template.
+    system prim  while ignoring every other child, e.g. the particle template.
     """
 
     prim_type = PrimType.RIGID
@@ -963,17 +872,12 @@ def _match_paths(pattern, paths):
 
 
 class _NewtonRigidBodyBatchView:
-    """Duck-typed stand-in for PhysX's pattern-based `omni.physics.tensors.RigidBodyView`, backing
-    `RigidContactAPI`'s own `create_rigid_body_view(pattern)` usage as well as
-    `macro_particle_system.py`'s particle-view (positions/orientations/velocities for potentially
-    thousands of individual rigid-body particles, read and written every step they're active).
-    Includes every matched body regardless of dynamic/kinematic status, matching PhysX's own semantics --
-    unlike `_NewtonRigidContactView`'s sensor rows, which are dynamic-only."""
+    """Stand-in for PhysX's pattern-based `omni.physics.tensors.RigidBodyView`."""
 
     def __init__(self, backend, body_indices, prim_paths, pattern=None):
         self._backend = backend
-        # A pattern-created view re-resolves its bodies whenever the model is rebuilt (or a deferred rebuild is
-        # pending) -- see _refresh_if_stale()
+        # A pattern-created view re-resolves its bodies whenever the model is rebuilt or a deferred rebuild is
+        # pending.
         self._pattern = pattern
         self._generation = backend._model_generation
         self._set_bodies(body_indices, prim_paths)
@@ -983,20 +887,16 @@ class _NewtonRigidBodyBatchView:
         self._body_indices = th.as_tensor(body_indices, dtype=th.long, device=backend.sim.device)
         self._prim_paths = list(prim_paths)
         # body_idx -> q_start of the FREE joint whose child is that body, for every body in this view
-        # that's a free-floating root (e.g. a real MassAPI/RigidBodyAPI particle) -- see
-        # set_transforms()'s own comment for why writes need this too, mirroring
-        # NewtonRigidBodyHandle.set_world_poses()'s identical single-body fix.
+        # that's a free-floating root (e.g. a real MassAPI/RigidBodyAPI particle).
         self._root_free_joint_q_start = self._compute_root_free_joint_starts(qd=False)
-        # Same, for qd_start -- see set_velocities()
         self._root_free_joint_qd_start = self._compute_root_free_joint_starts(qd=True)
 
     def _refresh_if_stale(self):
         if self._pattern is None:
             return
         backend = self._backend
-        # Only a view that would actually see the pending particles (e.g. a particle system's own view) forces
-        # the deferred rebuild -- scene-wide views (RigidBodyViewAPI, RigidContactAPI) are re-created on every
-        # update_handles(), which runs once per added particle, and must not rebuild each time
+        # Only a view that would actually see the pending particles forces the deferred rebuild -- scene-wide views
+        # (RigidBodyViewAPI, RigidContactAPI) are re-created on every update_handles().
         if backend._macro_particles_dirty and _match_paths(self._pattern, backend._macro_particle_roots()):
             backend.ensure_model_current()
         if self._generation != backend._model_generation:
@@ -1033,8 +933,8 @@ class _NewtonRigidBodyBatchView:
 
     def get_transforms(self):
         self._refresh_if_stale()
-        # [x, y, z, qx, qy, qz, qw] -- PhysX's own documented convention (w-last), which also happens
-        # to be exactly Newton's native body_q layout, so no conversion is needed.
+        # [x, y, z, qx, qy, qz, qw] -- PhysX convention (w-last), which also matches Newton's native body_q layout, so
+        # no conversion is needed.
         if self.count == 0:
             return th.zeros((0, 7), device=self._backend.sim.device)
         return _wp_to_torch(self._backend._state_0.body_q)[self._body_indices].clone()
@@ -1050,10 +950,6 @@ class _NewtonRigidBodyBatchView:
         body_q = _wp_to_torch(self._backend._state_0.body_q)
         data = th.as_tensor(data).to(device=body_q.device, dtype=body_q.dtype)
         body_q[idx] = data
-        # SolverMuJoCo reconstructs body_q FROM joint_q at the start of every physics step, so a
-        # free-floating body's position write here would otherwise be silently discarded on the very
-        # next step -- same fix as NewtonRigidBodyHandle.set_world_poses(), just batched: any of these
-        # bodies that are their own free-joint root also needs the matching joint_q slice written.
         if self._root_free_joint_q_start:
             joint_q = _wp_to_torch(self._backend._state_0.joint_q)
             for row, body_idx in enumerate(idx.tolist()):
@@ -1079,8 +975,6 @@ class _NewtonRigidBodyBatchView:
         body_qd = _wp_to_torch(self._backend._state_0.body_qd)
         data = th.as_tensor(data).to(device=body_qd.device, dtype=body_qd.dtype)
         body_qd[idx] = data
-        # joint_qd is authoritative and the next FK would revert a body_qd-only write -- see
-        # NewtonRigidBodyHandle._set_root_free_joint_qd()
         if self._root_free_joint_qd_start:
             joint_qd = _wp_to_torch(self._backend._state_0.joint_qd)
             for row, body_idx in enumerate(idx.tolist()):
@@ -1090,18 +984,9 @@ class _NewtonRigidBodyBatchView:
 
 
 class _NewtonRigidContactView:
-    """Duck-typed stand-in for PhysX's `omni.physics.tensors.RigidContactView`, backing
-    `RigidContactAPI` (the `Touching`/`OnTop`/`Inside`/... object-state family) and
-    `ManipulationRobot`'s assisted-grasping finger-contact-position lookup. Real per-contact
-    world-frame forces/positions come from `SolverMuJoCo.update_contacts()`, Newton's own production
-    mujoco_warp-to-`Contacts` converter (see `NewtonBackend._ensure_contacts_fresh()`/
-    `_contact_matrix_data()`) -- this class only resolves that data against the requested
-    sensor/filter prim-path sets and packs it into PhysX's exact return shapes.
-
-    Sensor (row) and filter (col) sets can overlap (e.g. two dynamic bodies each acting as both a
-    sensor and a filter of the other) -- a single physical contact then contributes two independent
-    entries, one per (sensor, filter) perspective with an appropriately negated/re-referenced force,
-    matching how PhysX would report the same contact from both sides' own matrix cells.
+    """Stand-in for PhysX's `omni.physics.tensors.RigidContactView`, backing RigidContactAPI` and
+    `ManipulationRobot`'s assisted-grasping finger-contact-position lookup. World-frame forces/positions come
+    from `SolverMuJoCo.update_contacts()` and are converted into PhysX shapes.
     """
 
     def __init__(self, backend, sensor_paths, sensor_body_idx, filter_paths, filter_body_idx, max_contact_data_count):
@@ -1110,25 +995,14 @@ class _NewtonRigidContactView:
         self._filter_paths = list(filter_paths)
         # -1 marks both "untracked filter path" (no dedicated Newton body) and, on the contact side,
         # "world/static shape" (Contacts.shape_body == -1, e.g. the ground plane's own collision
-        # shape) -- excluding it from both lookup dicts means neither case can ever spuriously match
-        # the other, which would otherwise misattribute world-shape contacts to an unrelated untracked
-        # filter column (or vice versa).
+        # shape).
         self._body_to_row = {int(b): i for i, b in enumerate(sensor_body_idx) if int(b) >= 0}
         self._body_to_col = {int(b): i for i, b in enumerate(filter_body_idx) if int(b) >= 0}
         self._max_contact_data_count = max_contact_data_count
 
-        # Vectorized equivalents of _body_to_row/_body_to_col, for get_contact_force_matrix()/
-        # get_net_contact_forces() -- those run every single step (via RigidContactAPI's per-step
-        # refresh) over every live contact, so a per-contact Python `dict.get()` + `int(tensor[i])`
-        # loop (each `int(...)` a GPU->CPU sync) dominated env.step() time on any scene with more than
-        # a handful of contacts -- confirmed empirically: 71% of env.step() time on a 64-object scene,
-        # dropping to near-zero with 1 object. Index by body_idx+1 so the -1 sentinel (world/static
-        # shapes, and any body genuinely untracked by either side) safely maps to slot 0 instead of
-        # wrapping around to the last row via negative indexing.
-        device = backend.sim.device
         n_slots = (backend._model.body_count if backend._model is not None else 0) + 1
-        row_lookup = th.full((n_slots,), -1, dtype=th.long, device=device)
-        col_lookup = th.full((n_slots,), -1, dtype=th.long, device=device)
+        row_lookup = th.full((n_slots,), -1, dtype=th.long, device=backend.sim.device)
+        col_lookup = th.full((n_slots,), -1, dtype=th.long, device=backend.sim.device)
         for b, i in self._body_to_row.items():
             row_lookup[b + 1] = i
         for b, i in self._body_to_col.items():
@@ -1140,12 +1014,6 @@ class _NewtonRigidContactView:
     def sensor_paths(self):
         return self._sensor_paths
 
-    # Named to match real PhysX (`omni.physics.tensors.RigidContactView.filter_paths`), NOT
-    # `filter_patterns` -- both `RigidContactAPIImpl.initialize_view()` and `robot.py`'s
-    # `_refresh_rigid_contact_view()` already `getattr(view, "filter_patterns", <input list>)`, which
-    # misses on real PhysX too (an existing, harmless quirk) and falls back to the constructor's own
-    # `filter_patterns` argument -- matching that name here keeps this backend's fallback behavior
-    # identical to PhysX's, rather than accidentally taking a different (but likely equivalent) path.
     @property
     def filter_paths(self):
         return self._filter_paths
@@ -1163,11 +1031,7 @@ class _NewtonRigidContactView:
         return self._max_contact_data_count
 
     def get_contact_force_matrix(self, dt):
-        # PhysX's own contract divides an accumulated per-step IMPULSE by dt to get an average force.
-        # Newton's Contacts.force is already a real, instantaneous, correctly-scaled force straight
-        # from the constraint solve (not an impulse) -- confirmed empirically (per-contact magnitudes
-        # for a resting object's own weight are already physically sane without any division), so dt
-        # is accepted (matching PhysX's signature, for callers that always pass it) but unused here.
+        # dt is accepted to match PhysX's signature but unused here.
         matrix = th.zeros((self.sensor_count, self.filter_count, 3), device=self._backend.sim.device)
         if self.sensor_count == 0 or self.filter_count == 0:
             return matrix
@@ -1178,10 +1042,7 @@ class _NewtonRigidContactView:
         if len(shape0) == 0:
             return matrix
         body0, body1 = self._contact_bodies(shape0, shape1)
-        # Vectorized equivalent of the old per-contact dict-lookup loop -- see _row_lookup/_col_lookup's
-        # own comment for why. r0/c1 is the "forward" (sensor=body0, filter=body1) cell for every
-        # contact; r1/c0 is the "reverse" cell, skipped where it would double-write the same cell the
-        # forward write already touched (matches the original loop's `!= (r0, c1)` guard).
+        # Vectorized equivalent of the per-contact dict-lookup loop.
         r0, c1 = self._row_lookup[body0 + 1], self._col_lookup[body1 + 1]
         r1, c0 = self._row_lookup[body1 + 1], self._col_lookup[body0 + 1]
         fwd = (r0 >= 0) & (c1 >= 0)
@@ -1193,9 +1054,6 @@ class _NewtonRigidContactView:
         return matrix
 
     def get_net_contact_forces(self, dt):
-        # Unlike get_contact_force_matrix, includes forces from ANY interacting body, not just
-        # tracked filters -- matches PhysX's own documented semantics for this method. See
-        # get_contact_force_matrix's own comment on why dt isn't used to rescale Newton's force data.
         net = th.zeros((self.sensor_count, 3), device=self._backend.sim.device)
         if self.sensor_count == 0:
             return net
@@ -1215,8 +1073,6 @@ class _NewtonRigidContactView:
         return net
 
     def get_contact_data(self, dt):
-        # Real PhysX types these uint32; every current caller only ever does int(...) on a single
-        # entry, so a signed dtype (better-supported for indexed assignment) is equivalent in practice.
         device = self._backend.sim.device
         contact_counts = th.zeros((self.sensor_count, self.filter_count), dtype=th.int64, device=device)
         start_indices = th.zeros((self.sensor_count, self.filter_count), dtype=th.int64, device=device)
@@ -1242,8 +1098,6 @@ class _NewtonRigidContactView:
         point0_local = _wp_to_torch(self._backend._contact_report_contacts.rigid_contact_point0)[: len(shape0)]
         point1_local = _wp_to_torch(self._backend._contact_report_contacts.rigid_contact_point1)[: len(shape0)]
         normal = _wp_to_torch(self._backend._contact_report_contacts.rigid_contact_normal)[: len(shape0)]
-        # Vectorized world-frame conversion for every contact's own two body-local reference points,
-        # up front -- the per-(row,col) grouping loop below only does cheap dict lookups afterward.
         world_point0 = body_q[body0, :3] + _quat_rotate_batch(body_q[body0, 3:7], point0_local)
         world_point1 = body_q[body1, :3] + _quat_rotate_batch(body_q[body1, 3:7], point1_local)
         force_mag = force.norm(dim=-1)
@@ -1271,8 +1125,7 @@ class _NewtonRigidContactView:
         points = th.stack(points_list)
         normals = th.stack(normals_list)
         forces = th.stack(forces_list).reshape(-1, 1)
-        # separation (penetration/gap distance) isn't populated -- no current caller reads it
-        # (robot.py's _find_finger_contact_position unpacks it but only ever uses `points`).
+        # separation (penetration/gap distance) isn't populated as it is currently unused.
         separations = th.zeros((len(points_list), 1), device=device)
         return forces, points, normals, separations, contact_counts, start_indices
 
@@ -1283,11 +1136,7 @@ class _NewtonRigidContactView:
 
 class _NewtonPhysicsSimView:
     """
-    Duck-typed stand-in for Isaac's `physics_sim_view` batch-view factory, exposing only
-    `create_articulation_view(pattern)` (regex over already-registered per-robot handles' prim paths;
-    used by `ControllableObjectViewAPI`) -- kept as a separate object (rather than `NewtonBackend`
-    itself) so its pattern-based lookup can't be confused with `NewtonBackend.create_articulation_view`'s
-    exact-prim-path, per-object semantics, even though both happen to share a method name.
+    Stand-in for Isaac's `physics_sim_view` batch-view factory, exposing only `create_articulation_view(pattern)`.
     """
 
     def __init__(self, backend):
@@ -1297,9 +1146,7 @@ class _NewtonPhysicsSimView:
         import re
 
         # vector's ArticulatedObjectViewAPI calls this with a list of exact prim paths rather than a
-        # glob pattern string (every other real caller still passes a pattern string) -- match by
-        # direct membership in that case rather than trying to treat the paths as a regex (would need
-        # escaping, and isn't semantically a "pattern" anyway).
+        # glob pattern string  -- match by direct membership in that case.
         if isinstance(pattern, (list, tuple, set)):
             path_set = set(pattern)
 
@@ -1312,17 +1159,6 @@ class _NewtonPhysicsSimView:
                 return re.fullmatch(regex, prim_path) is not None
 
         # Match against each handle's own (possibly self-corrected, see NewtonArticulationHandle.
-        # initialize()'s fixed-base handling) prim_path, not the dict key it was registered under --
-        # those can differ for a fixed-base object. Only include handles that have actually been bound
-        # to the current model (is_physics_handle_valid()) -- a handle is registered in
-        # _articulation_handles at OBJECT-LOAD time (before the model exists), but .initialize() only
-        # runs later, once per object, during Simulator.update_handles(). With multiple robots loaded
-        # in the same batch, one robot's own _initialize()/reset() can run (and query this same batch
-        # view, e.g. via ControllableObjectViewAPI.clear_object()) before a sibling robot added earlier
-        # in the same call has had its own handle initialized -- an uninitialized handle's
-        # _global_q_idx/_global_qd_idx are still None, and indexing a tensor with None in torch adds a
-        # new axis rather than raising, silently producing a whole-model-sized array instead of an
-        # error. Filtering here avoids that footgun instead of relying on every call site to check.
         matched = [
             h
             for h in self._backend._articulation_handles.values()
@@ -1333,12 +1169,9 @@ class _NewtonPhysicsSimView:
     def create_rigid_contact_view(self, pattern, filter_patterns, max_contact_data_count):
         import newton
 
-        # `*` matches within one path component, as in PhysX -- see _match_paths()
         matching = set(_match_paths(pattern, self._backend._path_body_map))
         body_flags = _wp_to_torch(self._backend._model.body_flags) if self._backend._model is not None else None
-        # Sensor (row) set is dynamic-only, matching PhysX's own semantics (confirmed by
-        # RigidContactAPIImpl.initialize_view()'s own assertion that view.sensor_paths equals only
-        # the dynamic subset of the requested pattern).
+
         sensor_paths, sensor_body_idx = [], []
         for path, idx in self._backend._path_body_map.items():
             if path not in matching:
@@ -1348,17 +1181,6 @@ class _NewtonPhysicsSimView:
             sensor_paths.append(path)
             sensor_body_idx.append(idx)
 
-        # filter_patterns is always a list of exact prim paths in every real call site (never an
-        # actual glob pattern despite the parameter name) -- a direct dict lookup avoids treating a
-        # path containing a regex-special character as a pattern by accident. Every entry must appear
-        # as its own column here, 1:1 with the input list, even when it isn't tracked as its own body
-        # (e.g. the ground plane, which has no dedicated Newton body) -- RigidContactAPIImpl builds
-        # its OWN column index map directly from this method's *input* filter_patterns list, not from
-        # this view's filter_paths (neither PhysX nor this view exposes an attribute actually named
-        # "filter_patterns", so its own `getattr(view, "filter_patterns", filter_patterns)` always
-        # falls back to the input, on every backend) -- dropping an entry here would desync this
-        # view's column count from what that caller's own index map expects. Untracked filter paths
-        # simply receive no contact data (see _NewtonRigidContactView's -1 sentinel handling).
         filter_paths = list(filter_patterns)
         filter_body_idx = [self._backend._path_body_map.get(path, -1) for path in filter_paths]
 
@@ -1372,66 +1194,31 @@ class _NewtonPhysicsSimView:
 
 
 class NewtonBackend(PhysicsBackend):
-    # overlap_sphere/overlap_box/overlap_sphere_any and raycast_closest/raycast_all are implemented
-    # (approximate AABB-based overlap against tracked rigid-body shapes; real BVH raycasting via
-    # newton.intersect_ray). overlap_mesh/overlap_shape remain NotImplementedError -- only reachable from
-    # motion-planning collision checks, which are unreachable anyway since Jacobians (IK) aren't
-    # supported on this backend.
     supports_scene_queries = True
-    # Real per-contact forces/positions via SolverMuJoCo.update_contacts() (Newton's own production
-    # mujoco_warp-to-Contacts converter), resolved against requested sensor/filter prim-path sets by
-    # _NewtonRigidContactView/_NewtonRigidBodyBatchView -- see those classes and
-    # NewtonBackend._contact_matrix_data() for the full pipeline.
     supports_contact_reporting = True
-    # Real dynamic cloth (SolverXPBD, see _add_cloth_object()) and fluid/granular particle systems
-    # (SolverImplicitMPM, see the "Fluid/granular particle-system state I/O" section below) -- every
-    # abstract method in both of PhysicsBackend's cloth/particle sections is implemented here.
     supports_cloth = True
     supports_particles = True
-    # Isaac/PhysX keeps settled scene articulations quiet via joint damping/friction baked into their
-    # imported drive properties. Newton/MuJoCo imports many BEHAVIOR object joints (cabinets, doors,
-    # drawers) as zero-gain effort DOFs instead, so without an explicit passive damper they can drift
-    # under contact/gravity even when the scene is supposed to start at rest -- matches feat/newton's
-    # own _add_passive_object_joint_damping() constant. Robots are excluded (see _rebuild_impl): their
-    # own controllers set real position-servo gains later via update_controller_mode()/set_gains(), and
-    # a damping floor here would fight that before it's applied.
+
+    # Newton/MuJoCo imports many BEHAVIOR object joints (cabinets, doors, drawers) as zero-gain effort
+    # DOFs instead, so without an explicit passive damper they can drift under contact/gravity even when
+    # the scene is supposed to start at rest. Robots are excluded (see _rebuild_impl): their
+    # own controllers set real position-servo gains later via update_controller_mode()/set_gains().
     _PASSIVE_OBJECT_JOINT_KD = 5.0
     # Contact friction for a holonomic robot's floor-touching base links (its "wheels"). Those links
     # are non-articulated pads, not driven joints -- a holonomic base is driven through its virtual
     # base_footprint_x/y/rz joints instead, so the wheels can never roll and instead sit on the floor
     # at default_shape_cfg.mu (1.0), pinning the whole robot in place. Real casters roll freely;
-    # approximate that by dropping their friction. Matches feat/newton's own
-    # _apply_chassis_caster_friction() value and rationale.
+    # approximate that by dropping their friction.
     _FLOOR_CONTACT_FRICTION = 0.02
     # Generalized armature / dry-friction floors applied to every articulated robot joint at build time.
-    # Object joints, free-body roots included, are left out: on a light part the floors swamp its real mass
-    # and inertia. PhysX quiets a settled scene through per-body sleep plus solver
-    # damping; MuJoCo-Warp keeps every imported free body fully active every substep, so a pile of
-    # resting contacts (a coffee table on the floor carrying a laptop, a plant and a modem) can pump
-    # velocity into the stack indefinitely from contact-solve residue alone. A small armature raises
-    # each DOF's effective inertia so that residue can't accelerate the body much, and a small dry
-    # friction gives it a threshold to overcome before moving at all. Matches feat/newton's own
-    # _add_scaled_joint_stabilization() constants and rationale.
-    #
-    # Scope note: robot joints keep both floors (feat/newton applies them to every joint). 1e-2 kg*m^2 of
-    # rotor inertia and 0.2 N*m of stiction are negligible against r1pro's real link inertias and
-    # actuator torques. A previous attempt at this pass used a *stiffness-derived* per-joint armature
-    # (5*ke*dt^2) on every joint rather than a flat floor, which at OmniGibson's default gains worked
-    # out orders of magnitude larger and made the whole robot visibly sluggish -- keep the floor flat.
-    #
-    # Auditing note: verify coverage against the solver's `mjw_model` (the one actually stepped), NOT its
-    # CPU-side `mj_model`, which can disagree with it.
     _JOINT_ARMATURE_FLOOR = 1.0e-2
     _JOINT_FRICTION_FLOOR = 2.0e-1
-    # Whether to override every robot joint's authored USD effort limit with inf -- see the use site in
-    # _rebuild_impl() for the full rationale. Exposed as a flag purely so it can be A/B'd.
-    _FORCE_INF_ROBOT_EFFORT = True
     # Critically damped finger contacts, with MuJoCo's timestep safety clamp enabled. The
     # scene-wide soft contacts allow centimeter-scale penetration during gripper closure.
     _FINGER_CONTACT_SOLREF = (0.01, 1.0)
     _FINGER_CONTACT_SOLMIX = 1000.0
-    # Disabled WELD equality slots preallocated on every rebuild for create_attachment_constraint() (two
-    # arms' worth of assisted grasps for two robots). Grows on demand, at the cost of one rebuild.
+    # Disabled WELD equality slots preallocated on every rebuild for create_attachment_constraint() (by default two
+    # arms' worth of assisted grasps for two robots). Can be increased but requires a rebuild of the graph.
     _MIN_ATTACHMENT_SLOTS = 4
 
     def __init__(self, sim=None):
@@ -1453,98 +1240,56 @@ class NewtonBackend(PhysicsBackend):
         self._path_body_map = {}
         self._body_path_map = {}
         # Whether the shape BVH (used by raycast_closest/raycast_all) needs a refit before its next use --
-        # set on anything that can move a body_q (steps, direct pose writes, FK sync), cleared once
-        # refit. Avoids refitting on every single raycast call: BDDL's online object-placement sampling
-        # (utils/sampling_utils.py's per-candidate-pose raytest loop) issues tens of thousands of
-        # raycasts per scene without moving anything in between, and an unconditional refit-per-call
-        # was measured to dominate total runtime at that volume even though each refit is individually
-        # cheap and each raycast itself is ~2ms.
+        # set on anything that can change body_q.
         self._bvh_dirty = True
-        # Dedicated CollisionPipeline/Contacts for rigid contact reporting (create_rigid_contact_view),
-        # separate from self._collision_pipeline/self._contacts (cloth/fluid particle coupling only).
-        # See _rebuild()'s own comment for why these are kept separate. _contacts_dirty mirrors
-        # _bvh_dirty's lazy-refresh pattern -- solver.update_contacts() is only called once per physics
-        # step, on first actual use, not unconditionally every step.
-        self._contact_report_pipeline = None
+        # Dedicated contacts buffer for rigid contact reporting (create_rigid_contact_view).
         self._contact_report_contacts = None
         self._contacts_dirty = True
-        # Guards get_live_world_pose() -- see _rebuild()'s own comment on why it must return None
-        # while a rebuild is in progress.
         self._rebuilding = False
         self._path_joint_map = {}
         self._path_cloth_particle_map = {}  # cloth entity prim_path -> (particle_start, particle_end)
         # Fluid/granular particle systems (MicroPhysicalParticleSystem, e.g. "water") -- unlike cloth,
         # particle count changes at runtime (generate_particles()/remove_particles()), so the
         # authoritative current state lives here (synced from the live model before each mutation),
-        # not just derived from a fixed USD mesh. See create_particle_system()/generate_particles().
+        # not just derived from a fixed USD mesh.
         self._fluid_systems = {}  # system_name -> {"pos": (N, 3) tensor, "vel": (N, 3) tensor}
         self._path_fluid_particle_map = {}  # system_name -> (particle_start, particle_end) in the CURRENT model
+        self._fluid_surface_cache = {}  # see get_fluid_surface_meshes()
         self._articulation_handles = {}
         self._rigid_body_handles = {}
         self._gravity = 9.81
         # Object set the model was last built from (entity prim paths) -- used by
         # refresh_physics_sim_view() to detect when a dynamic add/remove needs a full rebuild.
         self._known_object_paths = frozenset()
-        # Set by _on_usd_joint_changed() (a dedicated Tf.Notice listener, registered once in
-        # _rebuild()) whenever a Joint-schema prim is added/removed/resynced -- e.g. AttachedTo
-        # creating or deleting its attachment joint at runtime. Unlike object add/remove,
-        # refresh_physics_sim_view()'s object-path-set check has no way to notice a new/removed joint
-        # between two already-loaded objects, so this needs its own dedicated trigger. Consumed (and
-        # cleared) by step_physics_once(), which calls _rebuild() when set.
         self._joints_dirty = False
         self._joint_change_listener = None
-        # CUDA graphs replaying one solver substep, keyed by what each capture bakes in -- see
-        # _step_graph(). Dropped wholesale by _rebuild() (new model/solver/state objects) and by any
-        # notify_model_changed() call (host-side solver bookkeeping a replay would skip).
+        # CUDA graphs replaying one solver substep.
         self._step_graphs = {}
         self._step_graph_substeps = 0
         self._step_graph_disabled = False
-        # Joints with authored physics:breakForce/physics:breakTorque -- prim_path -> (break_force,
-        # break_torque, newton_joint_idx). Populated during _rebuild_impl(); consumed by
-        # _check_joint_breaks().
         self._breakable_joints = {}
-        # Joint prim paths already reported broken this "life" of the model -- prevents re-firing the
-        # break callback every step while the physical joint removal (delete_or_deactivate_prim(),
-        # picked up by the listener above) is still working its way through to the next _rebuild().
-        # Cleared on every _rebuild() (a freshly rebuilt model has no stale breaks to suppress).
         self._already_broken_joints = set()
-        # A freshly (re)built WELD/CONNECT equality constraint can show a large one-off "snap into
-        # alignment" reaction force on its very first step even under negligible external load
-        # (confirmed empirically: >11000N on the very first step after a real attach, well past a
-        # 5000N break_force, with only a 10N applied force) -- skip that one step before
-        # _check_joint_breaks() starts comparing against break thresholds. Set to a fresh countdown in
-        # _rebuild_impl() whenever self._breakable_joints changes; decremented once per step in
-        # _check_joint_breaks().
         self._joints_settle_steps_remaining = 0
-        # Runtime attachment constraints (assisted grasping) -- handle -> spec dict, see
-        # create_attachment_constraint(). Kept across rebuilds and re-applied onto the fresh model's pool
-        # of disabled WELD slots (self._attachment_slots, newton equality-constraint indices) afterwards.
         self._attachment_constraints = {}
         self._attachment_slots = []
         # Set when a body's density (or a zero mass, meaning "derive from density") is authored on a live
-        # model -- see NewtonRigidBodyHandle.set_masses(). Consumed by step_physics_once() like _joints_dirty.
+        # model.
         self._mass_properties_dirty = False
         # MacroPhysicalParticleSystem particles are individual rigid-body prims under their system (not scene
-        # objects), imported by _rebuild_impl() after every object so object body indices stay stable. Adding a
-        # particle calls update_handles() each time, so a particle-set change only flags the model stale here;
-        # it is rebuilt once, lazily (see ensure_model_current()). _model_generation lets pattern-based body
-        # views (_NewtonRigidBodyBatchView) notice a rebuild and re-resolve their bodies.
+        # objects), imported by _rebuild_impl() after every object so object body indices stay stable.
         self._known_macro_particle_paths = frozenset()
         self._macro_particles_dirty = False
         self._ensuring_model_current = False
         self._model_generation = 0
         self._attachment_slot_count = self._MIN_ATTACHMENT_SLOTS
+        self._warned_cpu_device = False
 
     # ---- Lifecycle ----
 
     @classmethod
     def create_app(cls):
-        # Newton drives its engine directly, so Kit is only needed when it is the renderer (the
-        # physics=Newton + render=Kit hybrid).
         if gm.RENDER_BACKEND == "kit":
-            from omnigibson.render_backends.kit_backend import launch_kit_app
-
-            return launch_kit_app()
+            raise ValueError("Newton physics does not support gm.RENDER_BACKEND = 'kit'; use 'newton' or 'none'.")
         from omnigibson.simulator import _StandaloneApp
 
         return _StandaloneApp()
@@ -1555,20 +1300,15 @@ class NewtonBackend(PhysicsBackend):
         with self.sim.editing_usd():
             self.sim.stage.DefinePrim(prim_path, "Xform")
 
-    def enable_extensions(self):
-        # Newton's OpenUSD parallel physics traversal has produced native crashes on collider-dense
-        # scenes; must be set before any pxr/newton import (confirmed empirically: importing a robot
-        # USD without this set segfaults). No-op if already set by the environment.
-        os.environ.setdefault("PXR_WORK_THREAD_LIMIT", "1")
-
     def create_physics_context(self, physics_dt, rendering_dt, device):
-        # If the render backend needs a live Kit application (e.g. the physics=Newton + render=Kit
-        # hybrid), attach to Kit's own USD context stage instead of a private in-memory one, so Kit
-        # actually has something to render. render_backend is constructed before create_physics_context
-        # is called (see Simulator.__init__) specifically so this check is possible here.
-        use_kit_stage = gm.RENDER_BACKEND == "kit"
         self._sim_context = StandaloneSimulationContext(
-            backend=self, physics_dt=physics_dt, rendering_dt=rendering_dt, device=device, use_kit_stage=use_kit_stage
+            backend=self, physics_dt=physics_dt, rendering_dt=rendering_dt, device=device
+        )
+        # Watches for Joint-schema prims being added/removed/resynced anywhere on the stage -- e.g.
+        # AttachedTo creating or deleting its attachment joint at runtime -- and flags a rebuild, consumed
+        # lazily by step_physics_once(). Independent of Simulator's own _usd_guard_listener.
+        self._joint_change_listener = lazy.pxr.Tf.Notice.Register(
+            lazy.pxr.Usd.Notice.ObjectsChanged, self._on_usd_joint_changed, self._sim_context.stage
         )
         return self._sim_context
 
@@ -1655,7 +1395,7 @@ class NewtonBackend(PhysicsBackend):
         self._sim_context.render()
 
     def step(self, render):
-        # Apply any deferred particle-set change before physics runs (it can't be done mid-step)
+        # Apply any deferred particle-set change before physics runs.
         self.ensure_model_current()
         self._sim_context.step(render=render)
 
@@ -1694,16 +1434,11 @@ class NewtonBackend(PhysicsBackend):
         the equivalent of MuJoCo's own ``balanceinertia`` compiler flag, which newton never sets.
 
         Without this, a single bad body aborts SolverMuJoCo construction for the WHOLE scene and the
-        run silently continues with no physics at all. It bites on thin flat plates, where the
-        inequality holds only up to rounding: e.g. `roof_*/glass` in the 6 dataset scenes that contain
-        a roof object (house_double_floor_lower, house_single_floor, the *_garden scenes) comes out at
-        principal moments (13.708, 57.830, 71.538), i.e. A + B - C = -4e-6, a -5.6e-8 relative
-        violation. Newton's own inertia validation leaves that one alone because its tolerance is
-        `eps_float32 * C` ~ 8.5e-6, which is looser than MuJoCo's zero.
+        run silently continues with no physics at all.
 
         Corrects by adding a scalar to the diagonal, which shifts all three principal moments equally
         and so preserves the principal axes exactly (the same correction newton's
-        verify_and_correct_inertia() applies when it does act).
+        verify_and_correct_inertia() applies).
         """
         import numpy as np
 
@@ -1714,11 +1449,8 @@ class NewtonBackend(PhysicsBackend):
         moments = np.linalg.eigvalsh(inertia.astype(np.float64))  # (n_bodies, 3), ascending
         largest = moments[:, 2]
         deficit = largest - moments[:, 0] - moments[:, 1]
-        # Anything that does not already clear the inequality by at least the margin gets topped up,
-        # not just outright violators: a body sitting exactly on the boundary (an ideal thin plate)
-        # passes this check but could still fail MuJoCo's, which redoes its own eigendecomposition and
-        # rounds independently. Bodies with no inertia at all (massless/static) are left alone --
-        # MuJoCo accepts all-zero.
+        # Anything that does not already clear the inequality by at least the margin gets affected.
+        # Bodies with no inertia at all (massless/static) are left alone.
         needs_fix = (deficit > -self._INERTIA_BALANCE_MARGIN * largest) & (largest > 0.0)
         if not needs_fix.any():
             return
@@ -1749,24 +1481,8 @@ class NewtonBackend(PhysicsBackend):
         CUDA graph replaying one SolverMuJoCo substep for the current state-buffer pair, or None to
         take the uncaptured path (graph disabled, still warming up, CPU device, or capture failed).
 
-        Returns a graph that has NOT been launched -- capturing records launches without executing
-        them, so the caller must launch the returned graph to actually advance this substep.
-
-        Worth doing because that step is host-bound, not GPU-bound: ~185 warp launches per substep
-        plus the host syncs mujoco-warp does to test its own solver-convergence loops. Measured on
-        r1pro at 15.85 -> 0.52 ms per substep (30x), trajectory-identical to 1e-6 relative in joint_q
-        over 40 substeps (float32 atomics noise -- the conditional solver loops stay dynamic inside
-        the graph).
-
-        What a capture bakes in, and therefore what the key and the invalidation points cover:
-        - the (state_in, state_out) buffer pair, since the graph holds the pointers it recorded. The
-          rigid path ping-pongs _state_0/_state_1 every substep, so both orderings get their own
-          graph and each is replayed on alternating substeps.
-        - dt, which step() pushes into mjw_model.opt.timestep.
-        - the model and solver themselves -- _rebuild() clears the cache.
-        - whichever way step()'s own host-side branches went at capture time. The only one that can
-          differ between substeps is `_step % update_data_interval`, and at newton's default interval
-          of 1 that branch is always taken, so a replay matches.
+        Returns a graph that has NOT been launched so the caller must launch the returned graph to actually
+        advance this substep.
         """
         if self._step_graph_disabled or not gm.USE_NEWTON_STEP_GRAPH:
             return None
@@ -1789,7 +1505,7 @@ class NewtonBackend(PhysicsBackend):
                 self._solver.step(self._state_0, self._state_1, self._control, self._contacts, dt)
             graph = capture.graph
         except Exception as e:
-            # Not fatal: the uncaptured path is always available, just slower. Disable permanently
+            # Not fatal: the uncaptured path is always available, just slower. Fallback permanently
             # rather than paying a failed capture attempt every substep.
             self._step_graph_disabled = True
             log.warning(f"Newton physics step graph capture failed ({e}); falling back to uncaptured steps.")
@@ -1804,10 +1520,6 @@ class NewtonBackend(PhysicsBackend):
             self._macro_particles_dirty = False
             self._joints_dirty = True
         if self._joints_dirty:
-            # A joint was added/removed since the last rebuild (e.g. AttachedTo attach/detach) --
-            # refresh_physics_sim_view()'s object-path-set check has no way to notice this, so
-            # _on_usd_joint_changed() (a dedicated Tf.Notice listener) flags it instead. Rebuild before
-            # stepping so the new/removed joint is actually reflected in the model this step already.
             self._joints_dirty = False
             self._rebuild()
 
@@ -1816,41 +1528,24 @@ class NewtonBackend(PhysicsBackend):
 
         if self._solver is not None:
             if self._mpm_in_place:
-                # SolverImplicitMPM (fluid) steps in-place -- same state object for both state_in/
-                # state_out, matching newton's own coupled-MPM example -- and handles collider contact
-                # internally when uncoupled (validated standalone: no external CollisionPipeline needed
-                # at all for a bare MPM scene). When coupled with rigid bodies, self._collision_pipeline
-                # is still built (SolverMuJoCo's own use_mujoco_contacts=False external contacts), but
-                # its own Proxy explicitly disables it for the MPM side (see _rebuild()). No substep
-                # subdivision needed either -- MPM's own internal iterative solve (config.max_iterations)
-                # was stable at OmniGibson's default physics_dt in standalone validation, unlike XPBD.
+                applied_body_f = self._applied_body_forces()
                 self._state_0.clear_forces()
+                self._restore_applied_body_forces(applied_body_f)
                 if self._collision_pipeline is not None:
                     self._collision_pipeline.collide(self._state_0, self._contacts)
                 self._solver.step(self._state_0, self._state_0, self._control, self._contacts, self.get_physics_dt())
             elif self._collision_pipeline is not None:
-                # Only the cloth/particle-coupled path needs live external contacts (SolverXPBD
-                # resolves particle-shape contacts from this shared buffer); the plain SolverMuJoCo
-                # path below doesn't build a CollisionPipeline at all and relies on MuJoCo's own
-                # internal contact generation instead, matching its existing, already-validated
-                # behavior unchanged.
-                #
-                # XPBD is far more substep-sensitive than MuJoCo's own internal (implicit) integrator --
-                # stepping it with OmniGibson's default physics_dt (1/120s) undivided caused a real
-                # cloth mesh to explode to absurd velocities within a single step. newton's own
-                # example_mujoco_xpbd_coupled_solver.py subdivides each frame into 16 substeps for
-                # exactly this reason; match that here.
                 substep_dt = self.get_physics_dt() / self._PARTICLE_SUBSTEPS
+                # Hold an applied force through every substep, so it delivers one full physics step's impulse
+                applied_body_f = self._applied_body_forces()
                 for _ in range(self._PARTICLE_SUBSTEPS):
                     self._state_0.clear_forces()
+                    self._restore_applied_body_forces(applied_body_f)
                     self._collision_pipeline.collide(self._state_0, self._contacts)
                     self._solver.step(self._state_0, self._state_1, self._control, self._contacts, substep_dt)
                     self._state_0, self._state_1 = self._state_1, self._state_0
             else:
-                # Replay this substep from a CUDA graph when one is available -- see _step_graph() for
-                # why (that call is host-bound) and for what invalidates a capture. Only this plain
-                # rigid path is captured: the MPM and XPBD branches above interleave a collision
-                # pipeline and, for XPBD, several sub-substeps per call.
+                # Replay this substep from a CUDA graph when one is available.
                 step_dt = self.get_physics_dt()
                 if self._rigid_collision_pipeline is not None:
                     self._rigid_collision_pipeline.collide(self._state_0, self._contacts)
@@ -1862,11 +1557,7 @@ class NewtonBackend(PhysicsBackend):
                 else:
                     self._solver.step(self._state_0, self._state_1, self._control, self._contacts, step_dt)
                 self._state_0, self._state_1 = self._state_1, self._state_0
-                # The new state_0 (the solver's just-produced output buffer) may still carry a stale
-                # body_f from an apply_force_at_pos/apply_torque call two steps ago (buffers ping-pong
-                # between two fixed objects) -- clear it so an externally-applied force takes effect for
-                # exactly one step, matching PhysX's one-shot force/torque semantics.
-                self._state_0.clear_forces()
+            self._state_0.clear_forces()
 
             self._bvh_dirty = True
             self._contacts_dirty = True
@@ -1875,13 +1566,19 @@ class NewtonBackend(PhysicsBackend):
         if self._post_step_cb is not None:
             self._post_step_cb()
 
+    def _applied_body_forces(self):
+        """Copy of the apply_force_at_pos()/apply_torque() wrenches pending on state_0, or None."""
+        body_f = self._state_0.body_f
+        return None if body_f is None else _wp_to_torch(body_f).clone()
+
+    def _restore_applied_body_forces(self, applied_body_f):
+        if applied_body_f is not None:
+            _wp_to_torch(self._state_0.body_f).copy_(applied_body_f)
+
     def _compute_mass_matrix(self, handle):
         """
         Generalized (joint-space) mass matrix for one articulation handle, shape (n_dof, n_dof),
-        matching PhysX's ArticulationView.get_generalized_mass_matrices() convention. Mirrors
-        _compute_jacobian()'s exact articulation/dof-range extraction (same art_idx, same
-        dof_start/dof_end derivation) since callers (e.g. OSC) index both with the same
-        self.dof_idx + column-offset convention and therefore require identical column semantics.
+        matching PhysX's ArticulationView.get_generalized_mass_matrices() convention.
         """
         import newton
 
@@ -1896,24 +1593,16 @@ class NewtonBackend(PhysicsBackend):
         dof_end = int(joint_qd_start[art_end].item())
         dof_count = dof_end - dof_start
 
-        # Both axes are DOF-indexed, so both follow the handle's order -- and must stay consistent
-        # with _compute_jacobian()'s columns, since OSC indexes them with the same convention.
+        # Both axes are DOF-indexed, so both follow the handle's order.
         cols = _native_to_handle_dof_cols(handle, dof_start, dof_count)
         H = H_all[art_idx, :dof_count, :dof_count]
         return H[cols][:, cols]
 
     def _compute_jacobian(self, handle):
         """
-        World-frame spatial Jacobian for one articulation handle, matching PhysX's
-        ArticulationView.get_jacobians() convention: shape (n_links, 6, n_dof), where n_links excludes
-        the root body (row 0 is the first non-root link) and the 6 rows are [linear(3), angular(3)]
-        per link (matching NewtonRigidBodyHandle.get_linear/angular_velocities()'s own body_qd split).
-        n_dof spans [virtual_base(6), joints] for a floating-base object or just [joints] for a
-        fixed-base one -- newton.eval_jacobian() already produces this column layout for free, since
-        it zero-bases columns from the articulation's own first joint, which IS the free/root joint
-        for a floating-base robot. Verified numerically against state.body_qd for a real robot
-        (J_link @ joint_qd == body_qd[link], per eval_jacobian's own documented guarantee) to
-        max error ~2e-7 (float32 precision) before wiring this in.
+        World-frame spatial Jacobian for one articulation handle with convention: shape
+        (n_links, 6, n_dof), where n_links excludes the root body (row 0 is the first non-root link)
+        and the 6 rows are [linear(3), angular(3)] per link.
         """
         import newton
 
@@ -1959,8 +1648,6 @@ class NewtonBackend(PhysicsBackend):
     def ensure_model_current(self):
         """
         Applies a lazily-deferred model change (e.g. new macro particles) now, if one is pending and it's safe to.
-        Followed by a full update_handles() -- exactly what an object add/remove's rebuild gets -- since every
-        scene-wide view (RigidContactAPI, RigidBodyViewAPI, the state graph) still indexes the old model's tables.
         """
         if (
             not self._macro_particles_dirty
@@ -1978,27 +1665,12 @@ class NewtonBackend(PhysicsBackend):
             self._ensuring_model_current = False
 
     def refresh_physics_sim_view(self):
-        # Newton's Model is immutable post-finalize() -- unlike PhysX (where this just recreates a
-        # cheap tensor view over an already-updated scene graph), reflecting a dynamic object
-        # add/remove here means a full _rebuild(). Called after every play() too (see
-        # Simulator.play()), so guard on the object set actually having changed to avoid a redundant
-        # double-rebuild during ordinary startup (before_play() already built the model with the
-        # current object set moments earlier, in the same play() call).
         if self._model is None or not self.is_playing():
             return
         if frozenset(self._macro_particle_roots()) != self._known_macro_particle_paths:
             self._macro_particles_dirty = True
         current_paths = frozenset(obj.prim_path for scene in self.sim.scenes for obj in scene.objects)
         if current_paths != self._known_object_paths:
-            # Sync every currently-built fluid system's live state back into self._fluid_systems before
-            # _rebuild() re-imports from it, so this UNRELATED rebuild trigger (e.g. a new robot being
-            # added) doesn't silently reset fluid particles back to wherever they were last explicitly
-            # generated/set. generate_particles()/remove_particles() do this same sync themselves right
-            # before mutating and calling _rebuild() directly -- doing it here too, unconditionally,
-            # would re-read the (not-yet-rebuilt) live model a second time and clobber their fresher,
-            # already-mutated particle counts with stale pre-mutation state.
-            for system_name in self._path_fluid_particle_map:
-                self._sync_fluid_system_from_model(system_name)
             self._rebuild()
 
     def invalidate_physics_sim_view(self):
@@ -2008,62 +1680,10 @@ class NewtonBackend(PhysicsBackend):
         pass
 
     def sync_to_render_layer(self):
-        """
-        Push each tracked body's live world pose into its USD prim's xformOp:translate/xformOp:orient
-        attributes (converting world -> parent-local first, matching
-        XFormPrim.set_position_orientation()'s own convention). Only meaningful when a live Kit
-        application is also present (the physics=Newton + render=Kit hybrid) -- Kit's own renderer
-        reads raw USD xform values directly (no Fabric mirror exists for a non-Kit-owned physics
-        engine, so this can't just push into Fabric the way PhysXBackend does), so without this a
-        Newton-simulated object's visual position in the Kit viewport would stay frozen wherever it
-        was last set in USD, even though OmniGibson's own Python-side pose queries (get_world_pose ->
-        get_live_world_pose() fallback, see that method below) already correctly reflect the live
-        simulated pose. No-op standalone (no Kit renderer to push toward at all).
-        """
-        if gm.RENDER_BACKEND != "kit":
-            return
-        if self._rebuilding or self._state_0 is None or self._state_0.body_q is None:
-            return
-
-        with self.sim.editing_usd():
-            for prim_path, body_idx in self._path_body_map.items():
-                if body_idx >= self._state_0.body_q.shape[0]:
-                    continue
-                pose = self.get_live_world_pose(prim_path)
-                if pose is None:
-                    continue
-                position, orientation = pose
-                prim = self.sim.stage.GetPrimAtPath(prim_path)
-                if not prim.IsValid():
-                    continue
-
-                parent_path = str(prim.GetParent().GetPath())
-                parent_world_transform = get_world_pose_with_scale(parent_path)
-                world_transform = T.pose2mat((position, orientation))
-                local_transform = th.linalg.inv_ex(parent_world_transform).inverse @ world_transform
-                local_transform[:3, :3] /= th.linalg.norm(local_transform[:3, :3], dim=0)
-                local_position, local_orientation = T.mat2pose(local_transform)
-
-                translate_attr = prim.GetAttribute("xformOp:translate")
-                if translate_attr:
-                    translate_attr.Set(lazy.pxr.Gf.Vec3d(*local_position.tolist()))
-
-                orient_attr = prim.GetAttribute("xformOp:orient")
-                if orient_attr:
-                    quat_wxyz = local_orientation[[3, 0, 1, 2]].tolist()
-                    rotq = (
-                        lazy.pxr.Gf.Quatf(*quat_wxyz)
-                        if orient_attr.GetTypeName() == "quatf"
-                        else lazy.pxr.Gf.Quatd(*quat_wxyz)
-                    )
-                    orient_attr.Set(rotq)
-
-        if self.sim.fabric_hierarchy is not None:
-            self.sim.fabric_hierarchy.update_world_xforms()
+        # No render-facing scene mirror: Newton's own viewers read live body poses from the model state.
+        pass
 
     # ---- Batched DOF target writes ----
-    # @view is a _NewtonArticulationBatchView, which takes plain tensors -- no frontend/backend tensor
-    # descriptor split to cast through, so @cast is irrelevant here.
 
     def set_dof_position_targets(self, view, data, indices, cast=False):
         view.set_dof_position_targets_fast(data, indices)
@@ -2077,24 +1697,14 @@ class NewtonBackend(PhysicsBackend):
     # ---- Prim transform reads ----
 
     def get_world_transform_with_scale(self, prim_path):
-        # USD's own xform attributes are never synced from live physics here (see
-        # sync_to_render_layer()), so they only reflect this prim's load-time/last-authored pose.
-        # Compute the raw USD transform first (needed regardless, for its SCALE component -- physics
-        # never changes scale); if this prim is itself a tracked physics body, splice in the live
-        # translation/rotation instead of the stale USD ones.
+        # Compute the raw USD transform first; if this prim is itself a tracked physics body,
+        # add the live translation/rotation instead of the stale USD ones.
         prim = self.sim.stage.GetPrimAtPath(prim_path)
         raw_matrix = lazy.pxr.UsdGeom.Xformable(prim).ComputeLocalToWorldTransform(lazy.pxr.Usd.TimeCode.Default())
         live_pose = self.get_live_world_pose(prim_path)
         if live_pose is not None:
             return _live_matrix_from_pose(raw_matrix, live_pose)
-        # prim_path itself isn't a tracked body, but an ANCESTOR might be (e.g. a visual/collision
-        # sub-mesh, or an "emitter" dummy mesh, under a tracked rigid-body link -- see
-        # objects/usd_object.py::_create_emitter_apis()). The raw hierarchy walk above used each
-        # ancestor's stale USD pose -- if the nearest tracked ancestor has moved, compose the prim's
-        # static local-to-ancestor offset with ITS live pose instead. Without this, a prim's world pose
-        # read via its tracked parent (e.g. XformPrim.set_position_orientation's parent-transform
-        # lookup) and via this raw walk (e.g. its own get_position_orientation()) could disagree,
-        # breaking get-then-set-then-get round trips.
+
         ancestor_prim = prim.GetParent()
         while ancestor_prim and ancestor_prim.IsValid():
             ancestor_live_pose = self.get_live_world_pose(str(ancestor_prim.GetPath()))
@@ -2129,85 +1739,38 @@ class NewtonBackend(PhysicsBackend):
         """
         (Re)builds the entire Newton model from the current scene's USD stage. Used both for the
         initial model build (Simulator.play()'s before_play() hook) and for a mid-episode rebuild
-        triggered by a dynamic object add/remove (refresh_physics_sim_view(), since Newton's Model is
-        immutable post-finalize() -- there is no incremental add/remove, only a full rebuild from
-        scratch). A rebuild-from-USD alone would silently reset every already-simulated object back to
-        its authored/default USD pose and joint values (add_usd() reads design-time values, not
-        current sim state) -- capture every existing handle's state before rebuilding and restore it
-        after, so only the actual added/removed objects' state actually changes.
+        triggered by a dynamic object add/remove. This is an expensive operation.
+
+        A rebuild-from-USD would silently reset every already-simulated object to its initial position,
+        so capture every existing handle's state before rebuilding and restore it after.
         """
         import newton
         import warp as wp
 
-        # get_live_world_pose() must not be reachable while a rebuild is in progress: this method's
-        # own root-joint pose-seeding loop below calls raw_world_transform() wanting the raw USD
-        # ground truth for every body (self._path_body_map is already updated to the NEW model at that point,
-        # but self._state_0 is still the OLD model's state, or None on the very first build --
-        # get_live_world_pose() would either crash on a mismatched/absent state or, worse, silently
-        # return stale pre-rebuild data instead of the fresh USD read this loop actually wants
-        # (preserving already-simulated poses across a rebuild is _capture_state()/_restore_state()'s
-        # job, done separately, later in this same method).
-        self._ensure_joint_change_listener()
-        # Every captured step graph holds pointers into the model/solver/state objects this rebuild is
-        # about to replace (see _step_graph()), and the fresh solver needs its own warmup again.
+        self._joints_dirty = False
         self._step_graphs = {}
         self._step_graph_substeps = 0
         self._rebuilding = True
-        # Kit's own SimulationApp startup unconditionally overwrites PXR_WORK_THREAD_LIMIT (and thus
-        # pxr's own cached thread pool) to the CPU core count, regardless of what enable_extensions()
-        # set it to earlier -- so the env var alone can't protect the add_usd() calls below in the
-        # Newton-physics + Kit-render hybrid config. pxr.Work.SetConcurrencyLimit() is a runtime API
-        # (not just an env var read at process init), so narrow it here around the actual risky
-        # collider-dense USD parsing, then restore whatever it was so Kit's own rendering/Fabric work
-        # keeps its intended parallelism.
-        from pxr import Work
-
-        prev_concurrency_limit = Work.GetConcurrencyLimit()
-        Work.SetConcurrencyLimit(1)
         try:
             self._rebuild_impl(newton, wp)
         finally:
             self._rebuilding = False
-            Work.SetConcurrencyLimit(prev_concurrency_limit)
-
-    def _ensure_joint_change_listener(self):
-        """
-        Registers a dedicated Tf.Notice listener (once, idempotent) that watches for Joint-schema
-        prims being added/removed/resynced anywhere on the stage -- e.g. AttachedTo creating or
-        deleting its attachment joint at runtime via create_joint()/delete_or_deactivate_prim().
-        Independent of Simulator's own _usd_guard_listener (multiple independent Tf.Notice listeners
-        on the same stage coexist fine). Cheap: USD resyncs are rare, deliberate edits, not a
-        per-frame occurrence, so no per-step stage polling is needed -- this just flips
-        self._joints_dirty, consumed lazily by step_physics_once().
-        """
-        if self._joint_change_listener is not None:
-            return
-        self._joint_change_listener = lazy.pxr.Tf.Notice.Register(
-            lazy.pxr.Usd.Notice.ObjectsChanged, self._on_usd_joint_changed, self.sim.stage
-        )
 
     def _on_usd_joint_changed(self, notice, stage):
         if self._joints_dirty or self._rebuilding:
             return
         for path in notice.GetResyncedPaths():
             prim = stage.GetPrimAtPath(path.GetPrimPath())
-            # A removed prim (delete_or_deactivate_prim's delete path) resyncs the path but leaves no
-            # prim behind -- still a joint-set change we need to notice, so treat "no prim" as dirty
-            # too rather than only checking IsA(UsdPhysics.Joint) on a possibly-gone prim.
+            # A removed prim also needs to be handled as dirty.
             if not prim or not prim.IsValid() or prim.IsA(lazy.pxr.UsdPhysics.Joint):
                 self._joints_dirty = True
                 return
 
     def _apply_floor_contact_friction(self, builder, robot, robot_path_body_map):
         """Drop contact friction on @robot's floor-touching base links, returning the newton body
-        indices affected (empty set if @robot has none, i.e. anything but a holonomic base).
+        indices affected.
 
-        See _FLOOR_CONTACT_FRICTION for why. The link names come straight from the robot's own
-        definition (`locomotion.floor_touching_base_link_names`, already used by robot.py to force
-        those same links' collision meshes to sphere approximations), rather than feat/newton's
-        `"wheel" in joint_path` substring heuristic -- same intent, but authored ground truth instead
-        of a name guess, and it correctly finds r1pro's pads, which hang off FIXED joints and so
-        aren't discoverable through wheel *joints* at all.
+        The link names are read from the robot's own definition (`locomotion.floor_touching_base_link_names`)
 
         Lowering mu here is necessary but not sufficient: MuJoCo mixes the two geoms' friction and the
         larger wins at equal priority, so a 0.02 pad against the 0.9 ground plane still resolves to
@@ -2249,10 +1812,6 @@ class NewtonBackend(PhysicsBackend):
         equal priority -- so _apply_floor_contact_friction()'s 0.02 pads would still produce a 0.9
         contact against the ground plane. Raising just those geoms' `geom_priority` makes their own
         friction authoritative (mujoco_warp honors geom_priority in its contact kernels).
-
-        Resolved through the solver's own persistent `mjc_body_to_newton` index map rather than by
-        matching body-label strings (feat/newton's approach) -- no dependence on how add_usd() happens
-        to spell an imported body's label.
         """
         if not body_idx:
             return
@@ -2296,14 +1855,7 @@ class NewtonBackend(PhysicsBackend):
         prim physically nested under one of `objects`' own subtrees whose body0/body1 targets belong
         to two DIFFERENT objects -- e.g. AttachedTo's runtime-created attachment joint, connecting a
         link on the parent object to a link on the (separately, independently add_usd()-imported)
-        child object. add_usd() imports joints per-object, in isolation; when it processes the
-        owning object's own subtree, the OTHER endpoint's body may not exist in the builder yet (if
-        that object hasn't been imported this pass), and add_usd() doesn't defer or error on this --
-        it silently synthesizes a bogus parent=-1 world-root joint using only the resolvable endpoint,
-        which then collides with that same body's real connecting joint and makes newton's own
-        topological sort reject the whole model ("Multiple joints lead to body N"). These joints must
-        instead be excluded from add_usd() (via ignore_paths) and added back manually once every
-        object's bodies exist in the builder -- see _rebuild_impl()'s use of this method.
+        child object.
         """
         prefixes = [(obj.prim_path + "/", obj) for obj in objects]
 
@@ -2367,30 +1919,23 @@ class NewtonBackend(PhysicsBackend):
 
         from omnigibson.physics_backends.newton_visuals import add_usd_visual_shapes, raw_world_transform
 
+        for system_name in list(self._path_fluid_particle_map):
+            self._sync_fluid_system_from_model(system_name)
         captured_state = self._capture_state()
         self._already_broken_joints = set()
 
         builder = newton.ModelBuilder(gravity=[0.0, 0.0, -self._gravity])
-        # Contact stiffness/damping: Newton's stock ke=2.5e3, kd=1e2, which SolverMuJoCo converts to
-        # MuJoCo's default solref (0.02, 1.0). The softer ke=1e2, kd=5e1 carried over from feat/newton
-        # map to (0.04, 2.5): a 1 m/s drop needed ~1.3 cm to stop, so the dough sank through a baking
-        # sheet's plate and was pushed out its bottom, and a body teleported into the floor crept out
-        # at ~0.1 m/s.
-        # IsaacLab's NewtonShapeCfg defaults (isaaclab_newton/physics/newton_manager_cfg.py): mu 1.0 and a
-        # 1 cm contact gap instead of the builder's 10 cm
+        # Use Newton defaults ke=2.5e3, kd=1e2, mu=1.0 and a 1 cm contact gap
         builder.default_shape_cfg.ke = 2.5e3
         builder.default_shape_cfg.kd = 1.0e2
         builder.default_shape_cfg.mu = 1.0
         builder.default_shape_cfg.margin = 0.0
         builder.default_shape_cfg.gap = 0.01
-        # Keep the ground plane collidable but stop it rendering: every dataset scene brings its own
-        # floor meshes whose top face sits at exactly z = 0, which is also where this infinite plane
-        # lands, and two coplanar visible surfaces z-fight -- it shows up as bands of the plane's flat
-        # grey flickering across the floor at grazing angles.
+        # Keep the ground plane collidable but stop it from rendering to prevent visual fighting with floor meshes.
         ground_shape = builder.add_ground_plane()
         builder.shape_flags[ground_shape] = int(builder.shape_flags[ground_shape]) & ~int(newton.ShapeFlags.VISIBLE)
 
-        # Lets add_usd() import mjc:* body/joint/shape attributes (e.g. mjc:gravcomp), as IsaacLab does
+        # Lets add_usd() import mjc:* body/joint/shape attributes (e.g. mjc:gravcomp)
         newton.solvers.SolverMuJoCo.register_custom_attributes(builder)
 
         if self._fluid_systems:
@@ -2400,14 +1945,13 @@ class NewtonBackend(PhysicsBackend):
             SolverImplicitMPM.register_custom_attributes(builder)
 
         objects = [obj for scene in self.sim.scenes for obj in scene.objects]
-        # Robots first (matches feat/newton's documented import-order workaround).
+
         from omnigibson.robots import Robot
 
         objects.sort(key=lambda obj: 0 if isinstance(obj, Robot) else 1)
 
-        # AttachedTo-style joints span two objects and must be excluded from add_usd() (which imports
-        # per-object, in isolation) and added back manually once every object's bodies exist in the
-        # builder -- see _find_cross_object_joints()'s own docstring for why.
+        # AttachedTo-style joints span two objects and must be added back manually only after every object's
+        # bodies exist in the builder.
         cross_object_joints = self._find_cross_object_joints(objects)
         ignore_paths_by_obj = {
             obj: [str(prim.GetPath()) for prim, _, _ in joints] for obj, joints in cross_object_joints.items()
@@ -2419,15 +1963,13 @@ class NewtonBackend(PhysicsBackend):
         robot_joint_paths = set()
         low_friction_body_idx = set()
         finger_body_idx = set()
-        # Macro-particle roots go last, so every object's body indices are unaffected by particle changes
+        # Macro-particle roots go last, so object body indices are unaffected by particle changes
         macro_particle_paths = self._macro_particle_roots()
         particle_systems = sorted({system.prim_path for system in macro_particle_paths.values()})
         import_roots = objects + [_ParticleImportRoot(self.sim.stage.GetPrimAtPath(path)) for path in particle_systems]
         for obj in import_roots:
             is_particle_root = getattr(obj, "is_particle_root", False)
             if obj.prim_type == PrimType.CLOTH:
-                # Cloth has no rigid bodies/joints at all -- entirely separate from the add_usd() rigid
-                # import path below, imported instead via add_cloth_mesh() into the same builder/model.
                 self._add_cloth_object(builder, obj, path_cloth_particle_map)
                 continue
 
@@ -2438,37 +1980,24 @@ class NewtonBackend(PhysicsBackend):
                 floating=not obj.fixed_base,
                 enable_self_collisions=False,
                 collapse_fixed_joints=False,
-                # Apply each collider's authored physics:approximation (convexHull on BEHAVIOR assets), as IsaacLab
-                # does when simulating. Skipped, colliders import as raw triangle meshes: MuJoCo's own collision
-                # hulled them anyway, but Newton's pipeline collides the triangles, and a 10 kg TV slid 35 cm
-                # across a cabinet top on the scattered edge normals. Scenes with fluid keep the raw meshes:
+                # Apply each collider's authored physics:approximation (convexHull on BEHAVIOR assets).
+                # Scenes with fluid keep the raw meshes:
                 # SolverImplicitMPM cannot build a collider from a convex mesh ("Shape type 10 not supported")
                 skip_mesh_approximation=bool(self._fluid_systems),
                 load_visual_shapes=False,
-                # As IsaacLab imports: also read physx* and mjc:* authored attributes, not only newton:*
                 schema_resolvers=[
                     newton.usd.SchemaResolverNewton(),
-                    newton.usd.SchemaResolverPhysx(),
+                    _physx_schema_resolver(),
                     newton.usd.SchemaResolverMjc(),
                 ],
-                # We never load add_usd()'s own visual geometry (load_visual_shapes=False above) --
+                # We never load add_usd()'s own visual geometry (load_visual_shapes=False):
                 # omnigibson/utils/newton_viewer_recording.py registers real textured visual meshes
-                # separately, directly with the viewer. Collision shapes should stay non-rendered
-                # regardless (confirmed empirically that essentially none end up VISIBLE either way in
-                # our current import order, so this is currently a no-op rather than the fix for any
-                # specific visual bug -- but it's still the semantically correct setting to carry, and
-                # protects against a regression if that ever changes).
+                # separately, directly with the viewer. Collision shapes should stay non-rendered.
                 hide_collision_shapes=True,
                 ignore_paths=getattr(obj, "ignore_paths", None) or ignore_paths_by_obj.get(obj),
             )
 
-            if gm.RENDER_BACKEND != "kit":
-                # Under Kit rendering, Kit reads the original USD's visual mesh subtree directly, so
-                # baking it into the physics model too would be pure waste. Newton's own standalone
-                # viewers (omnigibson/utils/newton_viewer_recording.py) have no such separate path --
-                # they render whatever the model itself carries via viewer.log_state() -- so bake
-                # visible-only shapes in here, matching feat/newton's own two-pass USD import.
-                add_usd_visual_shapes(newton, builder, self.sim.stage, obj.prim_path, info["path_body_map"])
+            add_usd_visual_shapes(newton, builder, self.sim.stage, obj.prim_path, info["path_body_map"])
 
             path_body_map.update(info["path_body_map"])
             path_joint_map.update(info["path_joint_map"])
@@ -2483,43 +2012,11 @@ class NewtonBackend(PhysicsBackend):
                                 finger_body_idx.add(int(idx))
 
             # add_usd() only auto-wraps an object's joints into an articulation when the object's own
-            # USD authors a UsdPhysics.ArticulationRootAPI marker -- true for robots (and, per
-            # objects/usd_object.py::_preapply_articulation_root(), for most fixed/floating-base
-            # objects with real joints), but NOT for objects whose only joints are "meta-link"
+            # USD authors a UsdPhysics.ArticulationRootAPI marker -- true for robots and most fixed/floating-base
+            # objects with real joints, but NOT for objects whose only joints are "meta-link"
             # attachments (e.g. a ceiling's light-fixture mount points, imported as ordinary
-            # PhysicsFixedJoints to a massless child body) -- these have no ArticulationRootAPI on
-            # their own entity prim, so their joints come back from add_usd() with no articulation
-            # assigned at all. finalize() hard-errors on any such "orphan" joint (Model._validate_joints,
-            # "Found N joint(s) not belonging to any articulation") -- found empirically the first time
-            # a fully populated scene (not just a robot + a couple of test objects) was loaded.
-            #
-            # The joint's PARENT body (e.g. the ceiling's own massless `base_link`) is often itself
-            # never connected to the world at all -- add_usd()'s own base-joint synthesis explicitly
-            # skips zero-mass bodies ("Skip static bodies"), so it never gets a world-rooted joint of
-            # its own. Without one, MuJoCo's converter (which walks the tree starting from world-rooted
-            # joints) never visits that body, so a later articulation whose *parent* is that body fails
-            # with a bare `KeyError` on the body index. Give any such fully-disconnected body its own
-            # FIXED joint to world first (matching how OmniGibson treats it: static/kinematic-only,
-            # never meant to move) -- this appends right after this object's own joints, keeping the
-            # index range contiguous with the meta-link joints being wrapped below.
-            # Connectivity must be checked against EVERY joint add_usd() added for this object, not
-            # just the ones with a USD-authored path (info["path_joint_map"]) -- add_usd() also
-            # synthesizes its own root joints for bodies that need one (e.g. a robot's free-floating
-            # base), and those synthetic joints have no USD prim/path at all, so they're absent from
-            # path_joint_map. Missing that connection here would make this code think an
-            # already-connected body is still disconnected and add a second, conflicting joint to it
-            # (newton's own topological sort then rejects the model: "Multiple joints lead to body X").
-            # A disconnected body can also be the ROOT of a non-fixed-base object's own floating-base
-            # decomposition (e.g. Tiago/R1Pro's holonomic base, built as a serial chain of single-DOF
-            # joints rather than one 6-DOF FREE joint): newton's own root-joint synthesis inside
-            # add_usd() skips zero-mass bodies regardless of the `floating=True` we requested for the
-            # object as a whole, leaving this specific body disconnected too, exactly like a genuinely
-            # static meta-link attachment. Giving it a FIXED joint here (as if it were static) welds a
-            # supposedly-mobile robot's base to the world -- harmless for tests that never need the
-            # base to move, but produces an internally-contradictory kinematic tree (a "fixed" body
-            # driven by real joints further down its own chain) once something does drive it, which
-            # crashes native model-conversion/solver code rather than failing gracefully. Give it a
-            # FREE joint instead whenever the owning object itself isn't fixed-base.
+            # PhysicsFixedJoints to a massless child body).
+            # Give it a fixed or free joint to attach it to the world root.
             object_body_idx = set(info["path_body_map"].values())
             connected_bodies = set(builder.joint_child[joint_count_before:])
             for body_idx in sorted(object_body_idx - connected_bodies):
@@ -2528,22 +2025,14 @@ class NewtonBackend(PhysicsBackend):
                 else:
                     builder.add_joint_free(parent=-1, child=body_idx)
 
-            # Wrap any still-unassigned joints from this object's own import (including any synthetic
-            # root joints just added above) into their own articulation ourselves; add_articulation()
-            # requires a contiguous, monotonically increasing joint index range, so group by contiguous
-            # runs rather than assuming the whole object is one block. Scoped to just the joint indices
-            # added during this object's own iteration (not the whole model) -- an already-unassigned
-            # joint from an earlier object is either a legitimate standalone world-root joint (exempt
-            # from Model._validate_joints, see newton's own docstring) or was already handled by that
-            # object's own pass through this exact code, so re-scanning the whole model here would be
-            # both redundant and risk mis-grouping joints across unrelated objects.
+            # Wrap any still-unassigned joints from this object into the articulation.
             unassigned = sorted(
                 idx
                 for idx in range(joint_count_before, len(builder.joint_articulation))
                 if builder.joint_articulation[idx] < 0
             )
             if is_particle_root:
-                # Each particle is its own free body, not one articulation spanning them all
+                # Each particle is its own free body, not one articulation
                 for idx in unassigned:
                     builder.add_articulation([idx], label=f"{obj.prim_path}_{idx}")
                 continue
@@ -2555,26 +2044,16 @@ class NewtonBackend(PhysicsBackend):
                     builder.add_articulation(list(range(run_start, idx + 1)), label=f"{obj.prim_path}_meta_links")
                     run_start = None
 
-        # Now that every object's bodies exist in the builder, add back the cross-object joints
-        # deferred above (raw builder calls, resolving both endpoints via the now-complete
-        # path_body_map). Deliberately NOT wrapped into a new articulation (left joint_articulation ==
-        # -1, unlike the per-object "meta_links" wrapping above) -- an unassigned joint whose child
-        # body already has a world-connecting path via its own object's articulation is exactly what
-        # SolverMuJoCo's _convert_to_mjc classifies as a loop closure, converting it into a real
-        # mjEQ_WELD (FIXED) or ball equality constraint automatically. Fighting that classification by
-        # wrapping it into its own articulation instead would recreate the original "Multiple joints
-        # lead to body N" conflict this whole mechanism exists to avoid.
+        # Now that every object's bodies exist in the builder, add back the cross-object joints.
         self._breakable_joints = {}
-        # (parent_body, child_body, is_spherical, parent pos/quat, child pos/quat) per cross-object joint, for
-        # _fix_cross_object_constraint_frames() once the solver exists.
+        # (parent_body, child_body, is_spherical, parent pos/quat, child pos/quat) per cross-object joint.
         self._cross_object_constraints = []
         for joints in cross_object_joints.values():
             for prim, body0_path, body1_path in joints:
                 body0_idx = path_body_map.get(body0_path)
                 body1_idx = path_body_map.get(body1_path)
                 if body0_idx is None or body1_idx is None:
-                    # One endpoint no longer resolves (e.g. its owning object was removed in the same
-                    # rebuild that also picked up this stale joint prim) -- nothing to connect.
+                    # One endpoint no longer exists (possibly removed in the same rebuild), so there's nothing to connect.
                     continue
                 parent_xform, child_xform = self._read_joint_local_frames(prim, wp)
                 joint_kwargs = dict(
@@ -2605,19 +2084,13 @@ class NewtonBackend(PhysicsBackend):
                 path_joint_map[joint_path] = joint_idx
                 break_force, break_torque = self._read_joint_break_thresholds(prim)
                 if break_force is not None or break_torque is not None:
-                    # newton body indices (not joint_idx) -- _check_joint_breaks() matches these
-                    # against the live mjc model's equality-constraint body pairs each step (WELD
-                    # constraints, the common FIXED-joint case, aren't tracked by
-                    # SolverMuJoCo.mjc_eq_to_newton_jnt at all -- see that method's own docstring).
                     self._breakable_joints[joint_path] = (break_force, break_torque, body0_idx, body1_idx)
         if self._breakable_joints:
-            # See __init__'s own comment on self._joints_settle_steps_remaining -- a freshly-added
-            # WELD/CONNECT constraint needs a few steps to settle before break-force checking starts.
+            # Allow the joint to settle before break-force checking starts since the initial attachment force
+            # may be high.
             self._joints_settle_steps_remaining = 1
 
-        # Pool of disabled WELD equality slots for create_attachment_constraint() -- see there for why
-        # these are retargeted in place instead of adding a joint (and rebuilding) per grasp. MuJoCo
-        # rejects a world-world equality, so an idle slot parks on world <-> body 0 instead.
+        # Allocate slots for create_attachment_constraint() so that we don't require a rebuild later.
         self._attachment_slot_count = max(self._attachment_slot_count, len(self._attachment_constraints))
         self._attachment_slots = []
         if builder.body_count > 0:
@@ -2742,21 +2215,7 @@ class NewtonBackend(PhysicsBackend):
             # doesn't affect effort-driven joints either.
             builder.joint_target_mode[qd_start] = int(newton.JointTargetMode.POSITION_VELOCITY)
 
-            # A robot joint's authored USD effort limit must not bind its position servo, or the servo
-            # simply cannot hold a gravity-loaded pose. r1pro's torso_joint1 authors 100 N*m, but
-            # holding the trunk deployed while the arms move needs far more: measured on a real teleop
-            # recording, the joint saturates and sags ~0.95 rad from a correct, unchanging target
-            # (1.025 -> 1.92, i.e. all the way into its upper limit stop) no matter how high kp is,
-            # while raising just this limit 50x holds it to within 0.004 rad.
-            #
-            # PhysX, given the SAME authored 100 N*m, tracks the identical command to *exactly* 0.0000
-            # error (measured, both while holding and with an arm extended) -- its position drive
-            # behaves like a constraint rather than a force-clamped PD, so the authored value never
-            # binds there. Matching that is what makes the two backends agree, and it's also what this
-            # backend's own get_max_efforts() already advertises (it unconditionally reports inf).
-            # Left alone for non-robot objects: nothing drives their joints, so the limit is harmless
-            # there and their authored values stay meaningful.
-            if self._FORCE_INF_ROBOT_EFFORT and joint_path in robot_joint_paths:
+            if joint_path in robot_joint_paths:
                 builder.joint_effort_limit[qd_start] = float("inf")
 
             # Passive damping for non-robot object joints with no authored drive (cabinets, doors,
@@ -2803,6 +2262,13 @@ class NewtonBackend(PhysicsBackend):
         # explicitly requested a device (e.g. gm.USE_NUMPY_CONTROLLER_BACKEND=False + an explicit cuda
         # device for a torch-backed controller pipeline).
         self._model = builder.finalize(device=self._sim_context.device or "cpu")
+        if self._model.device.is_cpu and wp.is_cuda_available() and not self._warned_cpu_device:
+            # MuJoCo-Warp on CPU is ~100x slower (seconds per step on a house) and disables the step graph
+            self._warned_cpu_device = True
+            log.warning(
+                "Newton is simulating on CPU although CUDA is available; pass device='cuda' to og.launch() / "
+                "the env config to run it on the GPU."
+            )
 
         self._balance_body_inertia()
 
@@ -2985,6 +2451,9 @@ class NewtonBackend(PhysicsBackend):
             default_target_q[qd_start : qd_start + n_dof] = joint_q[q_start : q_start + n_dof]
         _wp_to_torch(self._model.joint_target_q).copy_(default_target_q)
 
+        # SolverMuJoCo fills this per step only when the state carries it -- see get_measured_joint_efforts()
+        if self._model.joint_dof_count > 0:
+            self._model.request_state_attributes("mujoco:qfrc_actuator")
         self._state_0 = self._model.state()
         self._state_1 = self._model.state()
         self._control = self._model.control()
@@ -3046,6 +2515,15 @@ class NewtonBackend(PhysicsBackend):
             from newton.solvers import SolverImplicitMPM
 
             rigid_body_indices = list(range(self._model.body_count))
+            # MPM collides KINEMATIC bodies (e.g. kinematic_only furniture) as immovable, but a lagged proxy then
+            # rewinds their velocity by coupling_force / mass every step -- nothing integrates it back, so MPM saw a
+            # welded wall moving at ~10 m/s and flung the water. A staggered proxy skips that rewind.
+            body_flags = self._model.body_flags.numpy()
+            kinematic = int(newton.BodyFlags.KINEMATIC)
+            kinematic_body_indices = [i for i in rigid_body_indices if body_flags[i] & kinematic]
+            dynamic_body_indices = [i for i in rigid_body_indices if not body_flags[i] & kinematic]
+            # One shared factory: SolverCoupledProxy requires every mjc->mpm proxy to use the same one
+            no_proxy_collisions = lambda _model: None
             mpm_config = self._make_mpm_config()
             self._solver = SolverCoupledProxy(
                 model=self._model,
@@ -3058,9 +2536,7 @@ class NewtonBackend(PhysicsBackend):
                     ),
                     SolverCoupledProxy.Entry(
                         name="mjc",
-                        solver=lambda v: newton.solvers.SolverMuJoCo(
-                            model=v, use_mujoco_contacts=False, njmax=32_768, nconmax=self._RIGID_CONTACT_MAX
-                        ),
+                        solver=lambda v: newton.solvers.SolverMuJoCo(model=v, **self._mujoco_solver_kwargs()),
                         bodies=rigid_body_indices,
                         joints=list(range(self._model.joint_count)),
                     ),
@@ -3070,10 +2546,13 @@ class NewtonBackend(PhysicsBackend):
                         SolverCoupledProxy.Proxy(
                             source="mjc",
                             destination="mpm",
-                            bodies=rigid_body_indices,
+                            bodies=bodies,
                             mass_scale=1.0,
-                            collision_pipeline=lambda _model: None,
+                            mode=mode,
+                            collision_pipeline=no_proxy_collisions,
                         )
+                        for bodies, mode in ((dynamic_body_indices, "lagged"), (kinematic_body_indices, "staggered"))
+                        if bodies
                     ],
                     iterations=1,
                 ),
@@ -3111,9 +2590,7 @@ class NewtonBackend(PhysicsBackend):
                     ),
                     SolverCoupledProxy.Entry(
                         name="mjc",
-                        solver=lambda v: newton.solvers.SolverMuJoCo(
-                            model=v, use_mujoco_contacts=False, njmax=32_768, nconmax=self._RIGID_CONTACT_MAX
-                        ),
+                        solver=lambda v: newton.solvers.SolverMuJoCo(model=v, **self._mujoco_solver_kwargs()),
                         bodies=rigid_body_indices,
                         joints=list(range(self._model.joint_count)),
                     ),
@@ -3144,39 +2621,7 @@ class NewtonBackend(PhysicsBackend):
         elif self._model.joint_count > 0:
             self._collision_pipeline = None
             try:
-                # BEHAVIOR-1K assets author very stiff PhysX-style joint drive gains (ke ~1e7), which
-                # MuJoCo's default solver iteration count (100) fails to converge -- found empirically
-                # to diverge to NaN within ~20-30 steps otherwise. feat/newton (the mature reference
-                # implementation) independently tuned these same higher values for the same reason.
-                # nconmax (and the naccdmax it defaults to) is otherwise auto-estimated from the
-                # *initial* contact count -- too small for a populated household scene, where a
-                # Fetch's full arm/torso/head chain colliding against real (non-approximated, per
-                # skip_mesh_approximation=True above) wall/floor/door/ceiling meshes generates far more
-                # simultaneous CCD/EPA candidates than a single-robot-in-empty-scene initial state
-                # predicts. An undersized buffer here doesn't fail gracefully: warp's EPA/CCD scratch
-                # arrays (epa_vert_in/epa_face_in/etc. in mujoco_warp's ccd_kernel) get indexed past
-                # their allocated capacity, corrupting unrelated heap memory and segfaulting later at a
-                # seemingly unrelated, scenario-dependent location -- confirmed via wp.config.mode =
-                # "debug" (adds array bounds-checking), which turned the segfault into a clean
-                # `Assertion failed: 'i >= -arr.shape[0] && i < arr.shape[0]'` in warp/native/array.h
-                # right after a ccd_kernel_builder-specialized kernel load.
-                # IsaacLab's MJWarpSolverCfg defaults (isaaclab_newton/physics/mjwarp_manager_cfg.py), with the
-                # implicitfast integrator its tasks all select; njmax/nconmax stay sized for a whole house
-                self._solver = newton.solvers.SolverMuJoCo(
-                    self._model,
-                    solver="newton",
-                    integrator="implicitfast",
-                    iterations=100,
-                    ls_iterations=50,
-                    ccd_iterations=35,
-                    cone="pyramidal",
-                    impratio=1.0,
-                    tolerance=1e-6,
-                    enable_multiccd=False,
-                    use_mujoco_contacts=False,
-                    njmax=32_768,
-                    nconmax=self._RIGID_CONTACT_MAX,
-                )
+                self._solver = newton.solvers.SolverMuJoCo(self._model, **self._mujoco_solver_kwargs())
                 # Contacts from Newton's own collision pipeline, as IsaacLab's manipulation tasks (lift,
                 # stack) run it, instead of MuJoCo's one-point-per-convex-pair collision
                 self._rigid_collision_pipeline = newton.CollisionPipeline(
@@ -3207,8 +2652,6 @@ class NewtonBackend(PhysicsBackend):
         # isn't enough.
         self._elevate_low_friction_geom_priority(low_friction_body_idx)
         self._configure_finger_contacts(finger_body_idx)
-        # Also solver-dependent: effort limits only exist once the mjc actuators do.
-        self._apply_actuator_force_limits()
         # Re-apply any attachment constraints that were live before this rebuild onto the fresh pool.
         self._sync_attachment_slots()
         self._fix_cross_object_constraint_frames()
@@ -3234,19 +2677,17 @@ class NewtonBackend(PhysicsBackend):
         # to the freshly-built model by Simulator.update_handles() calling .initialize() on each again
         # right after play(); nothing further to do here.
 
-        # A dedicated CollisionPipeline/Contacts for rigid contact reporting, separate from
-        # self._collision_pipeline/self._contacts above (used only for cloth/fluid particle coupling,
-        # sized/configured for that purpose) -- keeps contact reporting purely additive with zero risk
-        # to the already-tuned solver paths. request_contact_attributes("force") must be called before
-        # .contacts() allocates the buffers, or Contacts.force stays None.
-        self._contact_report_pipeline = None
+        # A dedicated Contacts buffer for rigid contact reporting, separate from self._contacts (which the
+        # solver consumes). solver.update_contacts() fills it from MuJoCo's own post-solve contact list, so it
+        # never needs a collision pipeline of its own.
         self._contact_report_contacts = None
         if has_rigid:
-            self._model.request_contact_attributes("force")
-            self._contact_report_pipeline = newton.CollisionPipeline(
-                self._model, rigid_contact_max=self._RIGID_CONTACT_MAX
+            self._contact_report_contacts = newton.Contacts(
+                self._RIGID_CONTACT_MAX,
+                0,
+                device=self._model.device,
+                requested_attributes={"force"},
             )
-            self._contact_report_contacts = self._contact_report_pipeline.contacts()
         self._contacts_dirty = True
 
         self._known_object_paths = frozenset(obj.prim_path for obj in objects)
@@ -3280,18 +2721,17 @@ class NewtonBackend(PhysicsBackend):
     # newton's own example_mujoco_xpbd_coupled_solver.py's substep count.
     _PARTICLE_SUBSTEPS = 32
 
-    # Fluid (SolverImplicitMPM) defaults, validated standalone against a water-like blob (near-zero
-    # yield -- flows immediately under any stress -- low friction, some viscosity; see mpm_material_defaults
-    # in _rebuild()). Mass/radius match a modest voxel-scale water droplet; MicroPhysicalParticleSystem
-    # doesn't currently pass per-particle mass/radius through generate_particles() (PhysX derives them from
-    # its own particle_contact_offset), so these are fixed constants for now, not object-specific.
-    _FLUID_DEFAULT_PARTICLE_MASS = 0.001
+    # Fluid (SolverImplicitMPM) defaults: water as in newton's example_mpm_water_dam_break.py -- frictionless, with
+    # newton's own (incompressible) yield defaults. Don't zero mpm:yield_pressure: that removes all resistance to
+    # compression and water lands as a motionless sheet. MPM gives each particle a (2r)^3 volume, so the mass below
+    # is water's density. MicroPhysicalParticleSystem doesn't pass per-particle mass/radius through
+    # generate_particles() (PhysX derives them from its own particle_contact_offset), so these are fixed constants.
     _FLUID_DEFAULT_PARTICLE_RADIUS = 0.01
+    _FLUID_DEFAULT_PARTICLE_MASS = 1000.0 * (2 * _FLUID_DEFAULT_PARTICLE_RADIUS) ** 3
     _FLUID_MATERIAL_DEFAULTS = {
-        "mpm:friction": 0.05,
-        "mpm:yield_stress": 0.0,
-        "mpm:yield_pressure": 0.0,
-        "mpm:viscosity": 1.0,
+        "mpm:friction": 0.0,
+        "mpm:tensile_yield_ratio": 1.0,
+        "mpm:viscosity": 0.0,
     }
     _FLUID_VOXEL_SIZE = 0.05
 
@@ -3302,6 +2742,32 @@ class NewtonBackend(PhysicsBackend):
     # paths) is at least as large as its own nconmax, and raises otherwise ("MuJoCo naconmax (N)
     # exceeds contacts.rigid_contact_max (M)").
     _RIGID_CONTACT_MAX = 250_000
+
+    def _mujoco_solver_kwargs(self):
+        """
+        SolverMuJoCo settings shared by every solver branch in _rebuild_impl(), so rigid bodies behave the same
+        whether or not the scene also holds cloth or fluid. IsaacLab's MJWarpSolverCfg defaults
+        (isaaclab_newton/physics/mjwarp_manager_cfg.py), with the implicitfast integrator its tasks all select.
+        Contacts come from Newton's CollisionPipeline (use_mujoco_contacts=False), so MuJoCo's own collision
+        options (ccd_iterations, enable_multiccd) don't apply.
+
+        nconmax is otherwise auto-estimated from the *initial* contact count -- too small for a populated
+        household scene. An undersized buffer doesn't fail gracefully: mujoco_warp's EPA/CCD scratch arrays get
+        indexed past their capacity, corrupting heap memory and segfaulting later at an unrelated location
+        (confirmed with wp.config.mode = "debug", which turns it into an array bounds assertion).
+        """
+        return dict(
+            solver="newton",
+            integrator="implicitfast",
+            iterations=100,
+            ls_iterations=50,
+            cone="pyramidal",
+            impratio=1.0,
+            tolerance=1e-6,
+            use_mujoco_contacts=False,
+            njmax=32_768,
+            nconmax=self._RIGID_CONTACT_MAX,
+        )
 
     def _make_mpm_config(self):
         """SolverImplicitMPM.Config, validated standalone against a water-like blob (settles/spreads
@@ -3564,12 +3030,12 @@ class NewtonBackend(PhysicsBackend):
         pass
 
     # ---- Fluid/granular particle-system state I/O ----
-    # self._fluid_systems is the authoritative, always-current per-system particle state; the live
-    # model (when built) is just a cached simulation of it. generate_particles()/remove_particles() are
-    # structural changes (particle count itself changes) and always trigger an explicit _rebuild() --
-    # unlike everything else in this file, there's no dirty-check/deferred-rebuild path for these, since
-    # they're already-explicit, infrequent operations (matching how before_play() itself unconditionally
-    # rebuilds).
+    # A system mapped in self._path_fluid_particle_map lives in the model's state; otherwise (unbuilt, or just
+    # resized) self._fluid_systems holds it, and every rebuild re-imports from there.
+    # generate_particles()/remove_particles() are structural changes (particle count itself changes) and
+    # always trigger an explicit _rebuild() -- unlike everything else in this file, there's no
+    # dirty-check/deferred-rebuild path for these, since they're already-explicit, infrequent operations
+    # (matching how before_play() itself unconditionally rebuilds).
 
     def _sync_fluid_system_from_model(self, system_name):
         """Write the live model's current state for `system_name` back into self._fluid_systems, if built."""
@@ -3611,6 +3077,8 @@ class NewtonBackend(PhysicsBackend):
         system = self._fluid_systems[system_name]
         system["pos"] = th.cat([system["pos"], positions])
         system["vel"] = th.cat([system["vel"], velocities])
+        # The live model no longer matches this system; unmap it so _rebuild_impl()'s sync can't clobber the change
+        self._path_fluid_particle_map.pop(system_name, None)
         self._rebuild()
 
     def remove_particles(self, system_name, idxs):
@@ -3620,6 +3088,7 @@ class NewtonBackend(PhysicsBackend):
         keep[th.as_tensor(idxs, dtype=th.long, device=system["pos"].device)] = False
         system["pos"] = system["pos"][keep]
         system["vel"] = system["vel"][keep]
+        self._path_fluid_particle_map.pop(system_name, None)
         self._rebuild()
 
     def get_particle_positions(self, system_name):
@@ -3680,6 +3149,70 @@ class NewtonBackend(PhysicsBackend):
             else:
                 system["vel"] = velocities
 
+    # Surface reconstruction settings from newton's example_mpm_water_dam_break.py, with the voxel and kernel sized
+    # to _FLUID_VOXEL_SIZE and the 2 cm particle spacing
+    _FLUID_SURFACE_VOXEL_SIZE = 0.3 * _FLUID_VOXEL_SIZE
+    _FLUID_SURFACE_KWARGS = dict(
+        kernel_radius=max(6.0 * _FLUID_DEFAULT_PARTICLE_RADIUS, 1.5 * _FLUID_SURFACE_VOXEL_SIZE),
+        threshold=0.25,
+        smooth_lambda=0.0,
+        anisotropic=True,
+        kernel_scale=0.6,
+        anisotropy_ratio=16.0,
+        anisotropy_scale=2.0,
+        anisotropy_min_neighbors=4,
+        anisotropy_binning=True,
+        anisotropy_strength=0.95,
+        field_smooth_iterations=1,
+        field_smooth_radius=2,
+        field_mode="sdf",
+        redistance_iterations=1,
+        mesh_smooth_iterations=1,
+    )
+
+    def get_fluid_surface_meshes(self):
+        """
+        Surface meshes reconstructed from the live MPM particles, for rendering fluid as a liquid instead of beads.
+
+        Returns:
+            dict: system_name -> (vertices, indices, normals) warp arrays, or None if the system has no surface
+                (e.g. a few isolated droplets). Empty if no fluid is currently simulated.
+        """
+        import warp as wp
+
+        if not self._mpm_in_place:
+            return {}
+        mpm = self._solver.solver("mpm") if hasattr(self._solver, "solver") else self._solver
+        if self._fluid_surface_cache.get("solver") is not mpm:
+            # Each rebuild makes a new solver (and particle layout), so the extraction contexts are per solver
+            self._fluid_surface_cache = {"solver": mpm, "surfaces": {}, "flags": {}}
+        cache = self._fluid_surface_cache
+        systems = {name: span for name, span in self._path_fluid_particle_map.items() if span[1] > span[0]}
+        meshes = {}
+        for system_name, (start, end) in systems.items():
+            if system_name not in cache["surfaces"]:
+                cache["surfaces"][system_name] = mpm.create_particle_surface(
+                    voxel_size=self._FLUID_SURFACE_VOXEL_SIZE, **self._FLUID_SURFACE_KWARGS
+                )
+                flags = None
+                if len(systems) > 1:
+                    # Surface only this system's particles, so separate fluids don't merge into one mesh
+                    flags = mpm._mpm_model.particle_flags.numpy().copy()
+                    flags[:start] = 0
+                    flags[end:] = 0
+                    flags = wp.array(flags, dtype=wp.int32, device=self._model.device)
+                cache["flags"][system_name] = flags
+            mesh = mpm.extract_particle_surface(
+                self._state_0,
+                cache["surfaces"][system_name],
+                extrapolate_into_colliders=True,
+                collider_extrapolation_depth=2.0 * self._FLUID_SURFACE_VOXEL_SIZE,
+                particle_flags=cache["flags"][system_name],
+            )
+            vertices, indices, normals = mesh.to_arrays()
+            meshes[system_name] = None if vertices is None else (vertices, indices, normals)
+        return meshes
+
     def _sync_fk(self):
         import newton
 
@@ -3689,8 +3222,6 @@ class NewtonBackend(PhysicsBackend):
 
     def _scale_body_mass(self, body_idx, mass):
         """Sets a live body's mass, scaling its inertia by the same factor (same geometry, uniform density)."""
-        import newton
-
         model = self._model
         old_mass = float(_wp_to_torch(model.body_mass)[body_idx])
         ratio = mass / old_mass if old_mass > 0.0 else 1.0
@@ -3698,7 +3229,12 @@ class NewtonBackend(PhysicsBackend):
         _wp_to_torch(model.body_inv_mass)[body_idx] = 1.0 / mass
         _wp_to_torch(model.body_inertia)[body_idx] *= ratio
         _wp_to_torch(model.body_inv_inertia)[body_idx] /= ratio
+        self._notify_inertial_properties_changed()
+
+    def _notify_inertial_properties_changed(self):
         if self._solver is not None:
+            import newton
+
             self._solver.notify_model_changed(newton.ModelFlags.BODY_INERTIAL_PROPERTIES)
             self._step_graphs = {}
 
@@ -4041,54 +3577,6 @@ class NewtonBackend(PhysicsBackend):
 
         scale = Gf.Transform(raw_world_transform(self.sim.stage.GetPrimAtPath(prim_path))).GetScale()
         return th.tensor(tuple(scale), dtype=th.float32)
-
-    def _apply_actuator_force_limits(self):
-        """
-        Propagates each joint's effort limit onto its MuJoCo actuator(s).
-
-        SolverMuJoCo does not carry `joint_effort_limit` across when it compiles the model: every
-        actuator comes out with `actuator_forcelimited = False` and `actuator_forcerange = (0, 0)`,
-        MuJoCo's encoding for *unlimited*, so an authored ceiling never reaches the solver that
-        actually runs. MJWarp gates the clamp on the flag rather than the range (forward.py:
-        `if actuator_forcelimited[uid]: force = wp.clamp(force, forcerange[0], forcerange[1])`), so
-        both must be written.
-
-        MuJoCo clamps per actuator, and a POSITION_VELOCITY joint has two (position + velocity), so a
-        joint's combined authority here is up to 2x its limit rather than exactly 1x. That is a far
-        better bound than none, and splitting the limit between them would under-power the servo.
-        """
-        solver = self._get_mujoco_solver()
-        # A scene with no actuated joints (e.g. only free objects) compiles no actuator mapping at all
-        if solver is None or solver.mjw_model is None or solver.mjc_actuator_to_newton_idx is None:
-            return
-        effort = self._model.joint_effort_limit.numpy()
-        actuator_to_dof = _wp_to_torch(solver.mjc_actuator_to_newton_idx)
-        if actuator_to_dof.dim() > 1:
-            actuator_to_dof = actuator_to_dof[0]
-        forcerange = solver.mjw_model.actuator_forcerange.numpy()
-        forcelimited = solver.mjw_model.actuator_forcelimited.numpy()
-        n_actuators = forcerange.shape[1] if forcerange.ndim > 1 else forcerange.shape[0]
-        limited = 0
-        for actuator_idx in range(min(n_actuators, int(actuator_to_dof.shape[0]))):
-            dof = int(actuator_to_dof[actuator_idx])
-            if dof < 0 or dof >= len(effort):
-                continue
-            limit = float(effort[dof])
-            if not math.isfinite(limit) or limit <= 0.0:
-                # inf/0 means "no authored ceiling" -- leave MuJoCo's unlimited encoding in place.
-                forcelimited[actuator_idx] = False
-                continue
-            if forcerange.ndim > 2:
-                forcerange[:, actuator_idx] = (-limit, limit)
-            else:
-                forcerange[actuator_idx] = (-limit, limit)
-            forcelimited[actuator_idx] = True
-            limited += 1
-        solver.mjw_model.actuator_forcerange.assign(forcerange)
-        solver.mjw_model.actuator_forcelimited.assign(forcelimited)
-        # Don't replay a graph captured against the old limits.
-        self._step_graphs = {}
-        log.debug(f"Applied effort limits to {limited}/{n_actuators} MuJoCo actuators.")
 
     def _sync_attachment_slots(self):
         """Writes every live attachment constraint onto the current model's slot pool (in insertion order)

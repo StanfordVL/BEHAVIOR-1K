@@ -13,37 +13,13 @@ import omnigibson.lazy as lazy
 
 
 class StandaloneSimulationContext:
-    def __init__(self, backend, physics_dt, rendering_dt, device=None, use_kit_stage=False):
-        """
-        Args:
-            use_kit_stage (bool): if True, attach to Kit's own USD context stage (via
-                `isaacsim.core.utils.stage.create_new_stage()`, i.e. `omni.usd.get_context().new_stage()`)
-                instead of a private in-memory one -- needed whenever a live Kit application is also
-                present (e.g. the physics=Newton + render=Kit hybrid) so Kit's own Fabric/renderer has
-                a real stage to read from. A Kit-less run (the historical default) keeps using a private
-                in-memory stage, invisible to (and independent of) any Kit application.
-        """
+    def __init__(self, backend, physics_dt, rendering_dt, device=None):
         self._backend = backend
-        if use_kit_stage:
-            # create_new_stage() (== omni.usd.get_context().new_stage()) returns a bool success flag,
-            # not the Stage itself (confirmed empirically -- its own docstring example is misleading);
-            # fetch the actual Usd.Stage object separately afterward.
-            #
-            # Note: once Kit's timeline plays (needed for KitRenderBackend to render at all), the
-            # omni.physx extension can auto-attach to this stage and independently simulate any
-            # UsdPhysics.RigidBodyAPI-tagged prim on it, entirely disconnected from Newton's own
-            # physics -- see KitRenderBackend.render(), which detaches PhysX from the stage every tick
-            # to prevent this. That's handled there (every render tick) rather than here (construction
-            # time only) because the attach can also happen later, e.g. when an object is added after
-            # the timeline is already playing.
-            lazy.isaacsim.core.utils.stage.create_new_stage()
-            self._stage = lazy.isaacsim.core.utils.stage.get_current_stage()
-        else:
-            self._stage = lazy.pxr.Usd.Stage.CreateInMemory()
-            # Kit's create_new_stage() authors these. A bare stage falls back to Y-up, and Newton's
-            # add_usd() then turns every frame it imports 90 degrees about x to convert to Z-up.
-            lazy.pxr.UsdGeom.SetStageUpAxis(self._stage, lazy.pxr.UsdGeom.Tokens.z)
-            lazy.pxr.UsdGeom.SetStageMetersPerUnit(self._stage, 1.0)
+        self._stage = lazy.pxr.Usd.Stage.CreateInMemory()
+        # Kit's create_new_stage() authors these. A bare stage falls back to Y-up, and Newton's
+        # add_usd() then turns every frame it imports 90 degrees about x to convert to Z-up.
+        lazy.pxr.UsdGeom.SetStageUpAxis(self._stage, lazy.pxr.UsdGeom.Tokens.z)
+        lazy.pxr.UsdGeom.SetStageMetersPerUnit(self._stage, 1.0)
 
         self._initial_physics_dt = physics_dt
         self._initial_rendering_dt = rendering_dt
