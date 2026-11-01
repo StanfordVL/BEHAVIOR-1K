@@ -179,11 +179,8 @@ class ClothPrim(GeomPrim):
 
         # We will remesh in pymeshlab, but it doesn't allow programmatic construction of a mesh with texcoords so
         # we convert our mesh into a trimesh mesh, then export it to a temp file, then load it into pymeshlab
-        # Remesh in a pose-independent frame: the mesh's own local transform with the object's scale applied, i.e. its
-        # world transform without the object's position and orientation. pymeshlab's result is sensitive to tiny
-        # floating-point differences in its input, so remeshing in the world frame made the mesh depend on where the
-        # object happened to be placed. The frame is built directly from the USD xform ops so it's exact, and at unit
-        # scale it is the frame the bake step remeshes in (see _apply_baked_remesh).
+        # Remesh in a pose-independent frame (the mesh's local transform with the object's scale applied): pymeshlab's
+        # result is sensitive to tiny differences in its input, so in the world frame it depended on the object's pose
         parent_scale_attr = self.prim.GetParent().GetAttribute("xformOp:scale")
         parent_scale = np.asarray(parent_scale_attr.Get() if parent_scale_attr else (1.0, 1.0, 1.0), dtype=np.float64)
         local = np.array(lazy.pxr.UsdGeom.Xformable(self.prim).GetLocalTransformation(), dtype=np.float64).T
@@ -192,8 +189,7 @@ class ClothPrim(GeomPrim):
             mesh_prim=self.prim, include_normals=True, include_texcoord=True, world_frame=False
         )
         tm.apply_transform(remesh_frame)
-        # Exported to its own temporary directory (with any material files the export writes next to it), which is
-        # removed once remeshing is done, or by its finalizer if remeshing fails
+        # Exported to its own temporary directory, removed once remeshing is done
         tmp_dir = tempfile.TemporaryDirectory()
         tmp_fpath = os.path.join(tmp_dir.name, "mesh.obj")
         tm.export(tmp_fpath)

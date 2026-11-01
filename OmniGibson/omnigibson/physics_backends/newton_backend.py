@@ -1405,12 +1405,8 @@ class NewtonBackend(PhysicsBackend):
 
     def _discard_live_state(self):
         """
-        Detaches every rigid body, articulation and cloth from the live model while stopped, as on PhysX, where poses
-        are read from (and written to) USD while stopped and the next play() starts from USD. Otherwise reads kept
-        returning the live state while writes went to USD: moving an object that had moved while playing failed
-        EntityPrim's entity-vs-root-link pose check, and the next play() restored the live state over a moved cloth.
-        Cloth particles are written back to the USD points, as PhysX does while simulating (updateParticlesToUsd), so a
-        cloth keeps its shape across stop. Fluid and macro particles keep their live state across stop, as before.
+        Detaches rigid bodies, articulations and cloth from the live model while stopped, so poses are read from and
+        written to USD as on PhysX. Cloth particles are written back to the USD points so a cloth keeps its shape.
         """
         if self._model is None:
             return
@@ -1433,12 +1429,8 @@ class NewtonBackend(PhysicsBackend):
     @staticmethod
     def _bake_nonuniform_mesh_scales(builder):
         """
-        Bake every non-uniform mesh / convex-mesh shape scale into a scaled copy of its mesh, leaving the shape at
-        unit scale. BEHAVIOR collision hulls are near-unit meshes under a very non-uniform xform scale (e.g. a
-        tabletop slab at (0.51, 1.21, 0.03)), and newton's particle-shape contacts (create_soft_contacts) and
-        overlap_sphere() find the closest point in the unscaled mesh, which isn't the closest point after a
-        non-uniform scale: a cloth particle 5 mm into that tabletop, 5 cm from its edge, gets a sideways normal and
-        a 5 cm penetration, so cloth landing near an edge gets shoved off.
+        Bake non-uniform mesh shape scales into scaled mesh copies. Newton's particle-shape contacts find the closest
+        point in the unscaled mesh, which shoves cloth off non-uniformly scaled hulls (e.g. tabletops) near their edges.
         """
         from newton import GeoType, Mesh
 
@@ -1607,8 +1599,7 @@ class NewtonBackend(PhysicsBackend):
                         self._apply_kinematic_moves((i + 1) / self._PARTICLE_SUBSTEPS)
                     self._state_0.clear_forces()
                     self._restore_applied_body_forces(applied_body_f)
-                    # Host-bound like the rigid path below, and more so (collision pipeline + both solvers per
-                    # substep), so replay the collision and solver step from a CUDA graph too when one is available
+                    # Host-bound like the rigid path, so replay the collision and solver step from a CUDA graph too
                     graph = self._step_graph(substep_dt, collide=True)
                     if graph is not None:
                         import warp as wp
@@ -1807,10 +1798,8 @@ class NewtonBackend(PhysicsBackend):
         return body_q[body_idx, :3].clone(), body_q[body_idx, 3:7].clone()
 
     def set_kinematic_world_pose(self, prim_path, position, orientation):
-        # A kinematic-only body is welded to the world by a FIXED joint (a MuJoCo mocap body), and its USD xform is only
-        # read at rebuild, so move it by rewriting that joint's parent frame. Like a PhysX kinematic target, the move is
-        # spread over the next physics step: on the XPBD path, a whole step's move in its first substep flings any cloth
-        # it touches (5 mm in one 0.26 ms substep is ~20 m/s).
+        # A kinematic-only body is welded to the world by a FIXED joint, so move it by rewriting that joint's parent
+        # frame. Like a PhysX kinematic target, the move is spread over the next step's XPBD substeps.
         if self._rebuilding or self._live_state_discarded or self._state_0 is None or self._solver is None:
             return
         body_idx = self._path_body_map.get(prim_path)
@@ -1836,8 +1825,7 @@ class NewtonBackend(PhysicsBackend):
         self._kinematic_moves[body_idx] = (joint_idx, start, target)
         # Readers see the target right away, as with PhysX
         body_q[body_idx] = target
-        # Teleport bodies placed before the first step since the last rebuild (e.g. just added at the origin): there
-        # is no motion to spread yet, and sweeping them in from where the rebuild put them would push whatever is there
+        # Teleport bodies placed before the first step after a rebuild (e.g. just added at the origin)
         if not self._substeps_particles() or not self._stepped_since_rebuild:
             self._apply_kinematic_moves(1.0)
             self._kinematic_moves = {}
@@ -2856,41 +2844,23 @@ class NewtonBackend(PhysicsBackend):
     _CLOTH_DEFAULT_TRI_KE = 1.0e2
     _CLOTH_DEFAULT_TRI_KA = 1.0e2
     _CLOTH_DEFAULT_TRI_KD = 1.0e-1
-    # SolverXPBD's bending constraint measures the dihedral angle with atan2, which wraps from +pi to -pi when a crease
-    # folds past flat, so the angle error jumps by ~2 pi and the constraint snaps the crease back open. At 1.0 that kept
-    # ~0.1% of the particles on folded cloth (curtain, sauna_suit) bouncing at 5-30 m/s after landing; 0.1 settles every
-    # tested asset. Only validated for stability (cloth dropped onto the ground), not for how stiff the cloth looks.
+    # XPBD's bending angle wraps at +-pi, so at 1.0 folded cloth kept bouncing after landing
     _CLOTH_DEFAULT_EDGE_KE = 0.1
     _CLOTH_DEFAULT_EDGE_KD = 1.0e-2
-    # At 1.0 hanging cloth stretched like dough (total spring length +28% on jeans, +14% on table_runner draped over a
-    # table): XPBD's compliance 1 / (ke * dt^2) dwarfed the particles' inverse masses, so each iteration barely corrected
-    # the springs (more iterations made it worse). 100 keeps that within 1% and every tested asset stable when dropped
-    # from 3 m; 1000 blew up dishtowel and rubber_glove.
+    # At 1.0 hanging cloth stretched up to 28%; 100 keeps it within 1% and stable (1000 blew up dishtowel, rubber_glove)
     _CLOTH_DEFAULT_SPRING_KE = 100.0
     _CLOTH_DEFAULT_SPRING_KD = 1.0e-2
-    # Upper bound for the cloth particle radius; the actual radius is derived per cloth mesh from its edge lengths
-    # (see _add_cloth_object). A fixed 0.01 equals ClothPrim._remesh's 1 cm target edge length, so neighboring
-    # particles started out overlapping and XPBD's particle-particle contacts blew the cloth apart on the first step.
+    # Upper bound for the cloth particle radius, which is derived per cloth mesh from its edge lengths
     _CLOTH_DEFAULT_PARTICLE_RADIUS = 0.01
-    # Cloth particle radius as a fraction of the mesh's median edge length (~1.6-2.6 mm for most remeshed cloth).
-    # Adaptive remeshing still leaves some edges shorter than 2 * radius, and separate layers of a garment can lie closer
-    # than 2 * radius, so _add_cloth_object also caps each particle's radius at half its nearest-particle distance.
+    # Cloth particle radius as a fraction of the mesh's median edge length (also capped per particle)
     _CLOTH_PARTICLE_RADIUS_EDGE_RATIO = 0.25
-    # Areal density (kg/m^2) the stiffness/damping defaults above were tuned at. _add_cloth_object gives each cloth the
-    # mass authored on its mesh instead, and scales those defaults by its areal density over this one: XPBD's cloth
-    # dynamics depend only on stiffness/damping relative to the particle masses (its contacts only on mass ratios), so
-    # the cloth moves as tuned while its momentum against rigid bodies matches the authored mass. Without the scaling, a
-    # real cloth (0.1-8 kg, 50-400x lighter than at this density) blew up from its spring damping on the first step.
+    # Areal density (kg/m^2) the stiffness defaults were tuned at. Each cloth uses its authored mass, with stiffness
+    # scaled by its density over this one, since XPBD's cloth dynamics depend only on stiffness relative to mass.
     _CLOTH_DEFAULT_DENSITY = 200.0
-    # Minimum cloth particle mass as a fraction of the cloth's median particle mass. add_cloth_mesh() gives each
-    # particle density * area / 3 of its triangles, so a particle on sliver triangles is nearly massless (1e-7 kg vs a
-    # 15 g median on rubber_glove/leuiso), and XPBD blows the cloth apart.
+    # Minimum cloth particle mass as a fraction of the median; near-massless particles on sliver triangles blow up XPBD
     _CLOTH_MIN_PARTICLE_MASS_RATIO = 0.01
     # Number of XPBD sub-steps per OmniGibson physics step (see step_physics_once()) -- matches
     # newton's own example_mujoco_xpbd_coupled_solver.py's substep count.
-    # XPBD derives each particle's velocity from its float32 position change per sub-step, so motion from rest smaller
-    # than half a float32 ulp is lost: at 32 sub-steps gravity's first sub-step (g * dt^2 = 6.6e-7 m) rounds to zero
-    # at |z| >= 16 m, and a cloth starting at rest there never falls (e.g. while parked far away, where it is harmless).
     _PARTICLE_SUBSTEPS = 32
 
     # Fluid (SolverImplicitMPM) defaults: water as in newton's example_mpm_water_dam_break.py -- frictionless, with
@@ -3009,9 +2979,9 @@ class NewtonBackend(PhysicsBackend):
             vertices=vertices,
             indices=indices,
             density=density,
-            tri_ke=self._CLOTH_DEFAULT_TRI_KE * k,
-            tri_ka=self._CLOTH_DEFAULT_TRI_KA * k,
-            tri_kd=self._CLOTH_DEFAULT_TRI_KD * k,
+            tri_ke=self._CLOTH_DEFAULT_TRI_KE,
+            tri_ka=self._CLOTH_DEFAULT_TRI_KA,
+            tri_kd=self._CLOTH_DEFAULT_TRI_KD,
             edge_ke=self._CLOTH_DEFAULT_EDGE_KE * k,
             edge_kd=self._CLOTH_DEFAULT_EDGE_KD * k,
             add_springs=True,
@@ -3024,8 +2994,7 @@ class NewtonBackend(PhysicsBackend):
         if len(masses) > 0:
             min_mass = self._CLOTH_MIN_PARTICLE_MASS_RATIO * masses.median().item()
             builder.particle_mass[particle_start:particle_end] = masses.clamp(min=min_mass).tolist()
-            # XPBD's particle-particle contacts push apart any pair (mesh neighbors included) closer than r_i + r_j, at
-            # penetration / substep dt (meters per second for millimeters of overlap), so no pair may start overlapping
+            # XPBD's particle-particle contacts violently push apart overlapping pairs, so none may start overlapping
             from scipy.spatial import cKDTree
 
             q = [tuple(p) for p in builder.particle_q[particle_start:particle_end]]
@@ -3181,8 +3150,7 @@ class NewtonBackend(PhysicsBackend):
         if prim_path not in self._path_cloth_particle_map:
             return self._fallback_cloth_particle_positions(prim_path, idxs=idxs)
         start, end = self._path_cloth_particle_map[prim_path]
-        # A copy, as on PhysX: callers keep these as snapshots (e.g. ClothPrim.generate_folded_configuration pins the
-        # unfolded part to them every step), which a view into the live state would silently update while stepping
+        # A copy, as on PhysX: callers keep these as snapshots that a view would silently update while stepping
         particle_q = _wp_to_torch(self._state_0.particle_q)[start:end, :3]
         return particle_q[th.as_tensor(idxs, device=particle_q.device)] if idxs is not None else particle_q.clone()
 
@@ -3228,10 +3196,7 @@ class NewtonBackend(PhysicsBackend):
         ).reshape(-1, 3)
 
     def get_cloth_stiffness(self, prim_path):
-        # The values SolverXPBD actually uses for this cloth (it ignores tri_ke/ka/kd): stretch and shear both come from
-        # the springs along mesh edges, so there is no separate shear stiffness. These are XPBD stiffnesses, not PhysX's
-        # spring parameters, so they aren't comparable to what PhysX reports. Before the cloth's first build, k is
-        # unknown and this reports the defaults at _CLOTH_DEFAULT_DENSITY.
+        # The XPBD stiffnesses this cloth uses (not comparable to PhysX's); its edge springs give both stretch and shear
         k = self._cloth_stiffness_scale.get(prim_path, 1.0)
         return {
             "bend": self._CLOTH_DEFAULT_EDGE_KE * k,
@@ -3241,8 +3206,7 @@ class NewtonBackend(PhysicsBackend):
         }
 
     def set_cloth_stiffness(self, prim_path, bend=None, damping=None, shear=None, stretch=None):
-        # PhysX's values don't map onto XPBD's (different units and constraints, and XPBD has no shear term), and
-        # nothing in OmniGibson sets them, so raise rather than silently keep the build-time defaults
+        # PhysX's values don't map onto XPBD's, so raise rather than silently keep the build-time defaults
         raise NotImplementedError(
             "Setting cloth stiffness isn't supported on the Newton backend: every cloth uses the build-time defaults "
             "(see NewtonBackend._add_cloth_object)."
