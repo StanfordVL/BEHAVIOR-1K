@@ -78,9 +78,9 @@ class MacroParticleSystem(BaseSystem):
 
         # Make sure there is no ambiguity about which mesh to use as the particle from this template
         assert len(particle_template.links) == 1, "MacroParticleSystem particle template has more than one link"
-        assert (
-            len(particle_template.root_link.visual_meshes) == 1
-        ), "MacroParticleSystem particle template has more than one visual mesh"
+        assert len(particle_template.root_link.visual_meshes) == 1, (
+            "MacroParticleSystem particle template has more than one visual mesh"
+        )
 
         self._particle_template = particle_template
 
@@ -233,9 +233,9 @@ class MacroParticleSystem(BaseSystem):
         # Generate the new particle
         name = self.particle_idn2name(idn=self.next_available_particle_idn if idn is None else idn)
         # Make sure name doesn't already exist
-        assert (
-            self.particles is None or name not in self.particles.keys()
-        ), f"Cannot create particle with name {name} because it already exists!"
+        assert self.particles is None or name not in self.particles.keys(), (
+            f"Cannot create particle with name {name} because it already exists!"
+        )
         new_particle = self._load_new_particle(relative_prim_path=f"{relative_prim_path}/{name}", name=name)
 
         # Set the scale and make sure the particle is visible
@@ -313,9 +313,9 @@ class MacroParticleSystem(BaseSystem):
         Returns:
             int: Unique ID assigned to the particle based on its name
         """
-        assert (
-            self.particle_name_prefix in name
-        ), f"Particle name should have '{self.particle_name_prefix}' in it when checking ID! Got: {name}"
+        assert self.particle_name_prefix in name, (
+            f"Particle name should have '{self.particle_name_prefix}' in it when checking ID! Got: {name}"
+        )
         return int(name.split(self.particle_name_prefix)[-1])
 
     def particle_idn2name(self, idn):
@@ -326,9 +326,9 @@ class MacroParticleSystem(BaseSystem):
         Returns:
             str: Particle name corresponding to its unique id number
         """
-        assert isinstance(
-            idn, int
-        ), f"Particle idn must be an integer when checking name! Got: {idn}. Type: {type(idn)}"
+        assert isinstance(idn, int), (
+            f"Particle idn must be an integer when checking name! Got: {idn}. Type: {type(idn)}"
+        )
         return f"{self.particle_name_prefix}{idn}"
 
     @property
@@ -524,9 +524,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         # (2) make sure object prim path exists at /World/<NAME> -- global pose inference assumes this is the case
         if is_cloth:
             assert link_prim_paths is None, "link_prim_paths should not be specified for cloth object group!"
-            assert (
-                obj.prim.GetParent().GetPath().pathString == "/World"
-            ), "cloth object should exist as direct child of /World prim!"
+            assert obj.prim.GetParent().GetPath().pathString == "/World", (
+                "cloth object should exist as direct child of /World prim!"
+            )
 
         n_particles = len(positions)
         if orientations is None:
@@ -573,9 +573,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
 
     def generate_group_particles_on_object(self, group, max_samples=None, min_samples_for_success=1):
         # This function does not support max_samples=None. Must be explicitly specified
-        assert (
-            max_samples is not None
-        ), f"max_samples must be specified for {self.name}'s generate_group_particles_on_object!"
+        assert max_samples is not None, (
+            f"max_samples must be specified for {self.name}'s generate_group_particles_on_object!"
+        )
         assert max_samples >= min_samples_for_success, "number of particles to sample should exceed the min for success"
 
         # Make sure the group exists
@@ -1313,9 +1313,9 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         return self.get_particles_position_orientation()
 
     def get_particle_position_orientation(self, idx):
-        assert (
-            idx <= self.n_particles
-        ), f"Got invalid idx for getting particle pose! N particles: {self.n_particles}, got idx: {idx}"
+        assert idx <= self.n_particles, (
+            f"Got invalid idx for getting particle pose! N particles: {self.n_particles}, got idx: {idx}"
+        )
         positions, orientations = self.get_particles_position_orientation()
         return (positions[idx], orientations[idx]) if self.n_particles > 0 else (positions, orientations)
 
@@ -1337,9 +1337,9 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         self.set_particles_position_orientation(positions=positions, orientations=orientations)
 
     def set_particle_position_orientation(self, idx, position=None, orientation=None):
-        assert (
-            idx <= self.n_particles
-        ), f"Got invalid idx for setting particle pose! N particles: {self.n_particles}, got idx: {idx}"
+        assert idx <= self.n_particles, (
+            f"Got invalid idx for setting particle pose! N particles: {self.n_particles}, got idx: {idx}"
+        )
         if position is None or orientation is None:
             pos, ori = self.get_particle_position_orientation(idx=idx)
             orientation = ori if orientation is None else orientation
@@ -1374,9 +1374,9 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
                 - 3-array: particle (x, y, z) linear velocity in the world frame
                 - 3-array: particle (ax, ay, az) angular velocity in the world frame
         """
-        assert (
-            idx <= self.n_particles
-        ), f"Got invalid idx for getting particle velocity! N particles: {self.n_particles}, got idx: {idx}"
+        assert idx <= self.n_particles, (
+            f"Got invalid idx for getting particle velocity! N particles: {self.n_particles}, got idx: {idx}"
+        )
         lin_vel, ang_vel = self.get_particles_velocities()
         return (lin_vel[idx], ang_vel[idx]) if self.n_particles > 0 else lin_vel, ang_vel
 
@@ -1391,9 +1391,9 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         self.particles_view.set_velocities(th.cat([lin_vels, ang_vels], dim=1), indices=th.arange(len(lin_vels)))
 
     def set_particle_velocities(self, idx, lin_vel=None, ang_vel=None):
-        assert (
-            idx <= self.n_particles
-        ), f"Got invalid idx for setting particle velocity! N particles: {self.n_particles}, got idx: {idx}"
+        assert idx <= self.n_particles, (
+            f"Got invalid idx for setting particle velocity! N particles: {self.n_particles}, got idx: {idx}"
+        )
         if lin_vel is None or ang_vel is None:
             l_vel, a_vel = self.get_particles_velocities()
             lin_vel = l_vel if lin_vel is None else lin_vel

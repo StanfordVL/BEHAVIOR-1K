@@ -111,16 +111,16 @@ def test_tiled_rendering_core():
         cam_name = _camera_sensor_name(env._scenes[0].robots[0])
 
         # --- Tiled sensor is active and covers the camera with the requested modalities ---
-        assert (
-            env._tiled_sensor is not None
-        ), "Tiled sensor should be created when num_envs > 1 and gm.ENABLE_TILED_RENDERING is True"
+        assert env._tiled_sensor is not None, (
+            "Tiled sensor should be created when num_envs > 1 and gm.ENABLE_TILED_RENDERING is True"
+        )
         assert cam_name in env._tiled_sensor.modalities
         assert {"rgb", "depth_linear"} == set(env._tiled_sensor.modalities[cam_name])
         for scene in env._scenes:
             camera = scene.robots[0].sensors[cam_name]
-            assert (
-                not camera.render_product.hydra_texture.updates_enabled
-            ), "Individual camera render products must be paused when tiled rendering supplies observations"
+            assert not camera.render_product.hydra_texture.updates_enabled, (
+                "Individual camera render products must be paused when tiled rendering supplies observations"
+            )
 
         # --- Knob plumbing: default number of re-renders on reset ---
         assert env._num_rerenders_on_reset == 3
@@ -151,9 +151,9 @@ def test_tiled_rendering_core():
             # The marker is pure red: red must dominate green/blue at the image center
             center_rgb = _center_patch(rgb).float()
             red, green, blue = center_rgb[..., 0].mean(), center_rgb[..., 1].mean(), center_rgb[..., 2].mean()
-            assert (
-                red > green + 20 and red > blue + 20
-            ), f"env {i}: expected red marker at center, got rgb=({red:.1f}, {green:.1f}, {blue:.1f})"
+            assert red > green + 20 and red > blue + 20, (
+                f"env {i}: expected red marker at center, got rgb=({red:.1f}, {green:.1f}, {blue:.1f})"
+            )
 
             # --- Proprio must be preserved in multi-env mode ---
             proprio = obs_list[i][robot_name]["proprio"]
