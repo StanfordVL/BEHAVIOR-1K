@@ -181,9 +181,9 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
             ignition_temperature if ignition_temperature is not None else m.DEFAULT_IGNITION_TEMPERATURE
         )
         if requires_on_fire:
-            assert (
-                self._temperature > self.ignition_temperature
-            ), "fire temperature should be higher than ignition temperature."
+            assert self._temperature > self.ignition_temperature, (
+                "fire temperature should be higher than ignition temperature."
+            )
 
     @classmethod
     def is_compatible(cls, obj, **kwargs):
@@ -272,9 +272,9 @@ class HeatSourceOrSink(TensorizedAbsoluteState, LinkBasedStateMixin):
             # imports this module).
             from omnigibson.object_states.on_fire import OnFire
 
-            assert (
-                OnFire in self.obj.states
-            ), f"{type(self).__name__} on {self.obj.name} has requires_on_fire but obj has no OnFire state!"
+            assert OnFire in self.obj.states, (
+                f"{type(self).__name__} on {self.obj.name} has requires_on_fire but obj has no OnFire state!"
+            )
 
     @classmethod
     def global_initialize(cls):

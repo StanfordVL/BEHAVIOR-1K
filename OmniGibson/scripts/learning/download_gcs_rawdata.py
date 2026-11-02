@@ -205,9 +205,7 @@ def main() -> None:
     parser.add_argument(
         "--source_template",
         default=DEFAULT_SOURCE_TEMPLATE,
-        help=(
-            "Python format template for source URI. Available fields: bucket_uri, " "task_id, instance_id, episode_id."
-        ),
+        help=("Python format template for source URI. Available fields: bucket_uri, task_id, instance_id, episode_id."),
     )
     parser.add_argument("--instance_ids", default="", help="Comma-separated instance ids.")
     parser.add_argument("--instance_ids_file", default="", help="One instance id per line, or CSV with id first.")
