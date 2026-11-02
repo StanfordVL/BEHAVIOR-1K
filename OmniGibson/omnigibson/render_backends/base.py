@@ -1,16 +1,8 @@
 """
 Abstract interface for a pluggable render backend.
 
-The Simulator constructs exactly one RenderBackend instance (exposed as ``og.sim.render_backend``),
-chosen via ``gm.RENDER_BACKEND``. This is the sibling abstraction to ``physics_backends.PhysicsBackend``
-(see that module's docstring) -- where PhysicsBackend owns everything about advancing physics state,
-RenderBackend owns everything about turning that state into pixels (or, in Phase 1, simply owns whether
-a live Kit/Omniverse application needs to exist at all).
-
-Physics and rendering are independent axes: ``gm.PHYSICS_BACKEND`` picks how physics is simulated,
-``gm.RENDER_BACKEND`` picks how (or whether) it gets rendered, and either backend may independently
-require a live Kit application -- which it expresses by returning one from ``create_app()`` rather
-than by advertising a flag for callers to branch on (see ``simulator.py::_launch_app()``).
+The Simulator constructs exactly one RenderBackend instance (exposed as og.sim.render_backend),
+chosen via gm.RENDER_BACKEND. This is the sibling abstraction to physics_backends.PhysicsBackend.
 
 The interface covers application and Simulator-setup lifecycle, the render-graph "tick" primitive,
 and camera/modality capture. Viewport/GUI management and material authoring are still only partly
@@ -33,16 +25,12 @@ class RenderBackend(ABC):
 
     def enable_extensions(self):
         """
-        One-time, process-level setup performed once before any Simulator/Kit app exists (called from
-        `Simulator._launch_app()` on a transient, sim-less backend instance, mirroring
-        `PhysicsBackend.enable_extensions()`). Default no-op.
+        One-time, process-level setup performed once before any Simulator/Kit app exists.
         """
 
     def before_play(self, sim):
         """
-        Hook called every time `Simulator.play()` transitions from stopped to playing (including the
-        one-off warmup play/stop cycle `Simulator.__init__` itself does before any objects exist),
-        mirroring `PhysicsBackend.before_play(sim)`. Default no-op.
+        Hook called every time `Simulator.play()` transitions from stopped to playing.
         """
 
     # ---- Simulator setup hooks ----
@@ -50,7 +38,6 @@ class RenderBackend(ABC):
     def apply_renderer_settings(self):
         """
         Applies this backend's renderer/lighting settings. Called once from `Simulator.__init__`.
-        Default no-op.
         """
 
     def create_fabric_hierarchy(self):
@@ -67,14 +54,9 @@ class RenderBackend(ABC):
     def setup_viewer_camera(self, viewer_width, viewer_height):
         """
         Creates the interactive viewer camera at the given resolution, if this backend has a viewport.
-        Called from `Simulator.__init__` when `gm.RENDER_VIEWER_CAMERA` is set. Default no-op.
         """
 
     # ---- Stage / application services ----
-    #
-    # A live rendering application brings its own versions of a handful of USD, bounds, semantics and
-    # logging utilities. They live on the render backend rather than the physics backend because what
-    # picks between implementations is which application is drawing, not which engine is simulating.
 
     @abstractmethod
     def create_default_pbr_material(self, scope_path, material_path, target_prim_path):
@@ -167,15 +149,9 @@ class RenderBackend(ABC):
         """
         Advance/tick the render graph by one frame (a Kit app-update + RTX draw, or equivalent). Does
         NOT itself return pixel data -- that is a later phase's `capture_modality()`-style method.
-        Called by `Simulator.render()`/`step()` whenever the physics backend does not already own the
-        Kit tick itself (e.g. PhysX's own `SimulationContext.render()` already does this, so this
-        method is only invoked in addition by a physics backend that does not own that tick).
         """
 
-    # ---- Camera capture pipeline (Phase 3) ----
-    #
-    # These back VisionSensor's capture pipeline (create a per-camera render resource, attach/detach
-    # per-modality annotators to it, pull each annotator's latest data). Callers must guard every call
+    # ---- Camera capture pipeline ----
 
     @abstractmethod
     def create_camera_resource(self, prim_path, resolution, force_new=False):

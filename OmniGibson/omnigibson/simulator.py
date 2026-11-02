@@ -194,13 +194,10 @@ def _launch_simulator(*args, **kwargs):
             self._usd_guard_enabled = False
             self._usd_guard_listener = None
 
-            # Create the render backend first: the physics backend's own create_physics_context()
-            # may need to consult it.
+            # Create the render backend first.
             physics_backend_cls = PHYSICS_BACKENDS[gm.PHYSICS_BACKEND]
             self._render_backend = RENDER_BACKENDS[gm.RENDER_BACKEND](self)
 
-            # Create the physics backend (defaults to PhysX/Isaac Sim), and have it construct the underlying
-            # physics context (composition instead of inheritance)
             self._physics_backend = physics_backend_cls(self)
             self._physics_backend.create_physics_context(
                 physics_dt=physics_dt,
@@ -249,9 +246,7 @@ def _launch_simulator(*args, **kwargs):
                 state for state in self.object_state_types if issubclass(state, JointBreakSubscribedStateMixin)
             }
 
-            # Create the Fabric Hierarchy, if the render backend has one. A backend with no Fabric
-            # mirror reports (None, None), and pose reads/writes then go through raw pxr / the physics
-            # backend's own state directly instead.
+            # Create the Fabric Hierarchy, if the render backend has one.
             self.usdrt_stage, self.fabric_hierarchy = self._render_backend.create_fabric_hierarchy()
 
             # Create world prim and set up initial USD state
@@ -869,10 +864,6 @@ def _launch_simulator(*args, **kwargs):
             self._check_usd_guard()
             self._in_sim_lifecycle += 1
             try:
-                # Ticking the renderer is the physics backend's own business: PhysX's
-                # SimulationContext.render() already performs the Kit app-update/RTX tick and keeps
-                # Fabric current, whereas a backend without either hands off to the render backend
-                # from inside its own render().
                 self._physics_backend.render()
             finally:
                 self._in_sim_lifecycle -= 1
@@ -1247,12 +1238,7 @@ def _launch_simulator(*args, **kwargs):
             finally:
                 self._in_sim_lifecycle -= 1
 
-            # Accumulate contact data from this physics step and then flush to cache, even if a
-            # post-step exception is about to be reported below -- step_physics()'s contract is
-            # "one physics substep, then drain RigidContactAPI's pending buffer," and skipping the
-            # drain here (e.g. because _report_step_exceptions() raises) leaves _PENDING_STEPS
-            # stuck above 0 for every subsequent call, eventually tripping its own overflow assert.
-            # dt=0: a bare physics step must not advance time-dependent states (matches legacy behavior).
+            # Accumulate contact data from this physics step and then flush to cache.
             try:
                 self._refresh_state_caches(dt=0.0)
             finally:
