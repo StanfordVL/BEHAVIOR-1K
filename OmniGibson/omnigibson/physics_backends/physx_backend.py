@@ -13,9 +13,7 @@ from omnigibson.physics_backends.base import PhysicsBackend
 from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.usd_utils import ensure_usd_api, triangularize_mesh
 
-# These classes subclass Isaac Core classes, which trigger eager loading of Omni modules (carb/omni/isaacsim)
-# that only exist on sys.path once the Kit app has been launched. So, like the rest of the codebase, we build
-# them lazily on first use instead of importing/subclassing at module load time.
+# Build lazily on first use instead of importing/subclassing at module load time.
 _PhysXArticulationViewCls = None
 
 
@@ -26,16 +24,14 @@ def _get_physx_articulation_view_cls():
 
         class PhysXArticulationView(_ArticulationView):
             """
-            Thin extension of the (already Isaac-bug-patched) Isaac Core ``Articulation`` view that exposes
-            its DOF-layout metadata (joint count/names/dof-counts/dof-offsets, and dof-path lookup) as public
-            methods, instead of requiring callers to reach into private ``_metadata``/``_dof_paths``
-            attributes.
+            Thin extension of the Isaac Core ``Articulation`` view that exposes its DOF-layout metadata (joint
+            count/names/dof-counts/dof-offsets, and dof-path lookup) as public methods, instead of requiring callers to
+            reach into private ``_metadata``/``_dof_paths`` attributes.
             """
 
             @property
             def has_dof_metadata(self):
-                # False until the view is initialized against a live physics scene, in which case the
-                # DOF-layout accessors below are unusable and callers must fall back to inspecting USD.
+                # False until the view is initialized against a live physics scene.
                 return self._metadata is not None
 
             @property
@@ -57,10 +53,7 @@ def _get_physx_articulation_view_cls():
             def get_dof_is_rotational(self):
                 """
                 Per-DOF rotational/translational classification -- True for rotational, False for
-                translational. Collapses PhysX's own `omni.physics.tensors.DofType` enum (which is
-                not importable at all without a live Kit application) so that it never escapes this
-                module; `get_dof_types()` itself keeps returning the raw enum, since the Isaac Core
-                base class consumes it internally.
+                translational.
                 """
                 return [x == lazy.omni.physics.tensors.DofType.Rotation for x in self.get_dof_types()]
 
@@ -94,15 +87,12 @@ class PhysXBackend(PhysicsBackend):
         ), "Stage should not exist when creating a new Simulator instance"
 
     def before_clear(self):
-        # Stop the viewport menubar USD watcher before teardown. This revokes the TfNotice listener so
-        # that prim deletions during _partial_clear() don't queue deferred callbacks that later fire on
-        # an invalid stage and corrupt CUDA/PhysX state.
+        # Stop the viewport menubar USD watcher before teardown.
         lazy.omni.kit.viewport.menubar.core.utils.usd_watch.stop()
 
     def after_clear(self):
         lazy.omni.kit.viewport.menubar.core.utils.usd_watch.start()
 
-        # Then close the stage, so a new one can be created for the replacement Simulator.
         assert lazy.isaacsim.core.utils.stage.close_stage()
 
     def finalize(self):
@@ -144,7 +134,6 @@ class PhysXBackend(PhysicsBackend):
 
     @staticmethod
     def _write_dof_targets(view, backend_fn, data, indices, cast, what):
-        # No casting results in better efficiency
         if cast:
             data = view._frontend.as_contiguous_float32(data)
             indices = view._frontend.as_contiguous_uint32(indices)
@@ -155,9 +144,6 @@ class PhysXBackend(PhysicsBackend):
             raise Exception(f"Failed to set DOF {what} in backend")
 
     # ---- Prim transform reads ----
-    #
-    # PhysX keeps Fabric current as a side effect of its own stepping, so Fabric is both cheaper and
-    # more up to date here than raw USD.
 
     def get_world_transform_with_scale(self, prim_path):
         # Check that no reads from Fabric are happening during a physics step.
@@ -175,8 +161,6 @@ class PhysXBackend(PhysicsBackend):
         return self.sim.fabric_hierarchy.get_local_xform(lazy.usdrt.Sdf.Path(prim_path))
 
     # ---- Engine-specific USD schema authoring ----
-    #
-    # `PhysxSchema` is a PhysX-specific USD schema extension, unavailable in a plain `pxr` install.
 
     def apply_rigid_body_schemas(self, prim):
         ensure_usd_api(prim, lazy.pxr.PhysxSchema.PhysxRigidBodyAPI)
@@ -459,12 +443,6 @@ class PhysXBackend(PhysicsBackend):
         return self._psqi.overlap_sphere_any(radius, pos)
 
     # ---- Cloth particle state I/O ----
-    # points/velocities are raw USD attrs on the cloth mesh prim -- PhysX's own particle-cloth solver
-    # keeps them in sync with its internal simulation state each step via Fabric/USD live-sync (Kit-only
-    # behavior; a backend without an equivalent has to instead read/
-    # write its own solver state directly). points are authored in the mesh's LOCAL frame; velocities
-    # are already world-frame (PhysX's own convention). This class exposes only the WORLD-frame contract
-    # documented in PhysicsBackend, so local<->world conversion happens here, not in ClothPrim.
 
     def _cloth_local_to_world_matrix(self, prim_path):
         prim = self.sim.stage.GetPrimAtPath(prim_path)
