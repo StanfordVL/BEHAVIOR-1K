@@ -100,7 +100,7 @@ class FoldedLevel(AbsoluteObjectState, ClothStateMixin):
             diagonal (float): diagonal of the convex hull of the projected points
         """
         cloth = self.obj.root_link
-        # scipy needs CPU data; particle positions live on the sim device (CUDA on the Newton backend)
+        # scipy needs CPU data
         points = cloth.keypoint_particle_positions[:, dims].cpu()
         try:
             hull = ConvexHull(points)

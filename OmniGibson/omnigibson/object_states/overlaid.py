@@ -55,7 +55,7 @@ class Overlaid(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
             return False
 
         # Compute the convex hull of the particles of the cloth object.
-        # scipy needs CPU data; particle positions and poses live on the sim device (CUDA on the Newton backend)
+        # scipy needs CPU data
         points = self.obj.root_link.keypoint_particle_positions[:, :2].cpu()
         cloth_hull = ConvexHull(points)
 

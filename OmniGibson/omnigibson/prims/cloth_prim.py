@@ -10,12 +10,13 @@
 import math
 from functools import cached_property
 import os
+from pathlib import Path
 import tempfile
 from typing import Literal
+import uuid
 
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.python_utils import multi_dim_linspace
-import numpy as np
 import torch as th
 from omnigibson.utils.ui_utils import create_module_logger
 import trimesh
@@ -117,12 +118,11 @@ class ClothPrim(GeomPrim):
             "remesh", True
         ) and self.get_available_configurations() == ["default"]
         if should_remesh_because_of_scale or should_remesh_because_legacy or force_remesh:
-            # A unit-scale load can use the remeshed mesh baked into the asset instead of remeshing at load time
-            if should_remesh_because_of_scale or force_remesh or not self._apply_baked_remesh():
-                log.warning(
-                    f"Remeshing cloth {self.name}. This happens when cloth is loaded with non-unit scale or forced using the forced_remesh argument. It invalidates precached info for settled, folded, and crumpled configurations."
-                )
-                self._remesh()
+            # Remesh the object if necessary
+            log.warning(
+                f"Remeshing cloth {self.name}. This happens when cloth is loaded with non-unit scale or forced using the forced_remesh argument. It invalidates precached info for settled, folded, and crumpled configurations."
+            )
+            self._remesh()
 
         # Set the mesh to use the desired configuration
         points_configuration = self._load_config.get("default_point_configuration", "default")
@@ -179,19 +179,16 @@ class ClothPrim(GeomPrim):
 
         # We will remesh in pymeshlab, but it doesn't allow programmatic construction of a mesh with texcoords so
         # we convert our mesh into a trimesh mesh, then export it to a temp file, then load it into pymeshlab
-        # Remesh in a pose-independent frame (the mesh's local transform with the object's scale applied): pymeshlab's
-        # result is sensitive to tiny differences in its input, so in the world frame it depended on the object's pose
-        parent_scale_attr = self.prim.GetParent().GetAttribute("xformOp:scale")
-        parent_scale = np.asarray(parent_scale_attr.Get() if parent_scale_attr else (1.0, 1.0, 1.0), dtype=np.float64)
-        local = np.array(lazy.pxr.UsdGeom.Xformable(self.prim).GetLocalTransformation(), dtype=np.float64).T
-        remesh_frame = np.diag([*parent_scale, 1.0]) @ local
+        scaled_world_transform = self.scaled_transform
+        # Convert to trimesh mesh (in world frame)
         tm = mesh_prim_to_trimesh_mesh(
-            mesh_prim=self.prim, include_normals=True, include_texcoord=True, world_frame=False
+            mesh_prim=self.prim, include_normals=True, include_texcoord=True, world_frame=True
         )
-        tm.apply_transform(remesh_frame)
-        # Exported to its own temporary directory, removed once remeshing is done
-        tmp_dir = tempfile.TemporaryDirectory()
-        tmp_fpath = os.path.join(tmp_dir.name, "mesh.obj")
+        # Tmp file written to: {tmp_dir}/{tmp_fname}/{tmp_fname}.obj
+        tmp_name = str(uuid.uuid4())
+        tmp_dir = os.path.join(tempfile.gettempdir(), tmp_name)
+        tmp_fpath = os.path.join(tmp_dir, f"{tmp_name}.obj")
+        Path(tmp_dir).mkdir(parents=True, exist_ok=True)
         tm.export(tmp_fpath)
 
         # Start with the default particle distance
@@ -257,7 +254,6 @@ class ClothPrim(GeomPrim):
                 break
         else:
             raise ValueError(f"Could not remesh with less than MAX_CLOTH_PARTICLES ({m.MAX_CLOTH_PARTICLES}) vertices!")
-        tmp_dir.cleanup()
 
         # Re-write data to @mesh_prim
         new_faces = cm.face_matrix()
@@ -269,54 +265,18 @@ class ClothPrim(GeomPrim):
             faces=new_faces,
             vertex_normals=new_normals,
         )
-        # Map the mesh back into its local frame
-        tm.apply_transform(np.linalg.inv(remesh_frame))
-        self._set_remeshed_mesh(tm.vertices, tm.faces, tm.vertex_normals, texcoord)
-
-    def _apply_baked_remesh(self):
-        """
-        Uses the unit-scale remeshed mesh baked into the asset (ig:clothRemesh:* attributes, mesh-local frame), if any,
-        in place of remeshing at load time.
-
-        Returns:
-            bool: Whether a baked remeshed mesh was found and applied
-        """
-        points_attr = self.prim.GetAttribute("ig:clothRemesh:points")
-        if not points_attr or not points_attr.HasAuthoredValue():
-            return False
-        texcoord_attr = self.prim.GetAttribute("ig:clothRemesh:st")
-        self._set_remeshed_mesh(
-            vertices=points_attr.Get(),
-            faces=self.prim.GetAttribute("ig:clothRemesh:faceVertexIndices").Get(),
-            normals=self.prim.GetAttribute("ig:clothRemesh:normals").Get(),
-            texcoord=texcoord_attr.Get() if texcoord_attr and texcoord_attr.HasAuthoredValue() else None,
-        )
-        return True
-
-    def _set_remeshed_mesh(self, vertices, faces, normals, texcoord):
-        """
-        Writes a remeshed triangle mesh (mesh-local frame) to this prim and makes it the default configuration.
-
-        Args:
-            vertices ((N, 3)-array): vertex positions
-            faces ((M, 3)-array or flat (3M,)-array): triangle vertex indices
-            normals ((N, 3)-array): per-vertex normals
-            texcoord (None or (3M, 2)-array): per-face-corner texture coordinates, if the mesh has a UV mapping
-        """
-        vertices = np.asarray(vertices, dtype=np.float32).reshape(-1, 3)
-        faces = np.asarray(faces, dtype=np.int32).reshape(-1, 3)
-        normals = np.asarray(normals, dtype=np.float32).reshape(-1, 3)
+        # Apply the inverse of the world transform to get the mesh back into its local frame (trimesh needs CPU data)
+        tm.apply_transform(th.linalg.inv_ex(scaled_world_transform).inverse.cpu())
 
         # Update the mesh prim to store the new information. First update the non-configuration-
         # dependent fields
         with og.sim.editing_usd():
-            self.prim.GetAttribute("faceVertexCounts").Set(np.full(len(faces), 3, dtype=np.int32))
-            self.prim.GetAttribute("faceVertexIndices").Set(faces.flatten())
-            self.prim.GetAttribute("normals").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(normals))
-            if texcoord is not None:
-                self.prim.GetAttribute("primvars:st").Set(
-                    lazy.pxr.Vt.Vec2fArray.FromNumpy(np.asarray(texcoord, dtype=np.float32).reshape(-1, 2))
-                )
+            face_vertex_counts = th.tensor([len(face) for face in tm.faces], dtype=int).cpu().numpy()
+            self.prim.GetAttribute("faceVertexCounts").Set(face_vertex_counts)
+            self.prim.GetAttribute("faceVertexIndices").Set(tm.faces.flatten())
+            self.prim.GetAttribute("normals").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm.vertex_normals))
+            if has_uv_mapping:
+                self.prim.GetAttribute("primvars:st").Set(lazy.pxr.Vt.Vec2fArray.FromNumpy(texcoord))
 
             # Remove the properties for all configurations
             for config in CLOTH_CONFIGURATIONS:
@@ -325,7 +285,7 @@ class ClothPrim(GeomPrim):
                     self.prim.RemoveProperty(attr_name)
 
         # Then update the configuration-dependent fields
-        self.save_configuration("default", th.tensor(vertices, dtype=th.float32))
+        self.save_configuration("default", th.tensor(tm.vertices, dtype=th.float32))
 
         # Then update the points to the default configuration
         self.reset_points_to_configuration("default")
