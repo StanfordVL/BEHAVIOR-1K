@@ -11,7 +11,7 @@ on:
 jobs:
   pull-sheets:
     name: Sync Google Sheets data
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
     - name: Checkout code
