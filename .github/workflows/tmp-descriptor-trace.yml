@@ -41,9 +41,12 @@ jobs:
           fi
 
       - name: Plugin identity
+        continue-on-error: true
+        env:
+          OMNI_KIT_ACCEPT_EULA: "YES"
         run: |
           nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv
-          find "$(conda run -n behavior python -c 'import isaacsim,os;print(os.path.dirname(isaacsim.__file__))')" \
+          find "$(conda run -n behavior python -c 'import importlib.util,os;print(os.path.dirname(importlib.util.find_spec("isaacsim").origin))')" \
             -name libgpu.foundation.plugin.so -exec sha256sum {} \;
           echo "local reference: 674d68c49b5e37ac53c69fd1536af821ae41f82db0089a05229441f271e6212b"
 
@@ -52,6 +55,7 @@ jobs:
         timeout-minutes: 45
         env:
           OMNIGIBSON_HEADLESS: "1"
+          OMNI_KIT_ACCEPT_EULA: "YES"
           DESC_GDB_LOG: ${{ github.workspace }}/OmniGibson/gdb_desc.log
         run: |
           PY=$(conda run -n behavior which python)
