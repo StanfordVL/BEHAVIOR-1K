@@ -198,9 +198,8 @@ class VisionSensor(BaseSensor):
         # Define a new camera prim at the current stage
         # Note that we can't use og.sim.stage here because the vision sensors get loaded first
         with og.sim.editing_usd():
-            return lazy.pxr.UsdGeom.Camera.Define(
-                lazy.isaacsim.core.utils.stage.get_current_stage(), self.prim_path
-            ).GetPrim()
+            stage = og.sim.render_backend.get_stage()
+            return lazy.pxr.UsdGeom.Camera.Define(stage, self.prim_path).GetPrim()
 
     def _post_load(self):
         # run super first
@@ -211,8 +210,9 @@ class VisionSensor(BaseSensor):
 
         resolution = (self._load_config["image_width"], self._load_config["image_height"])
         self._image_width, self._image_height = resolution
+
         with og.sim.editing_usd():
-            self._render_product = lazy.omni.replicator.core.create.render_product(self.prim_path, resolution)
+            self._render_product = og.sim.render_backend.create_camera_resource(self.prim_path, resolution)
 
         # Create a new viewport to link to this camera or link to a pre-existing one
         viewport_name = self._load_config["viewport_name"]
@@ -324,6 +324,8 @@ class VisionSensor(BaseSensor):
             reordered_modalities = self._modalities
 
         for modality in reordered_modalities:
+            raw_obs = og.sim.render_backend.get_modality_data(self._annotators[modality], device=og.sim.device)
+
             if modality == "pointcloud":
                 raw_obs = self._annotators[modality].get_data(device=og.sim.device)
                 # Pointcloud is a special case where we need to concatenate the point xyz coordinates with the rgb values
@@ -359,7 +361,7 @@ class VisionSensor(BaseSensor):
                 - dict or array: Raw annotator output, as returned by the annotator's get_data()
                 - th.Tensor or array: Device-preprocessed observation for this modality
         """
-        raw_obs = self._annotators[modality].get_data(device=og.sim.device)
+        raw_obs = og.sim.render_backend.get_modality_data(self._annotators[modality], device=og.sim.device)
         obs_value = raw_obs["data"] if isinstance(raw_obs, dict) else raw_obs
 
         # Right after the render product is destroyed and recreated (see _recreate_render_product), Replicator's
@@ -371,7 +373,7 @@ class VisionSensor(BaseSensor):
             if not self._is_stale_obs(modality, raw_obs, obs_value):
                 break
             og.sim.render()
-            raw_obs = self._annotators[modality].get_data(device=og.sim.device)
+            raw_obs = og.sim.render_backend.get_modality_data(self._annotators[modality], device=og.sim.device)
             obs_value = raw_obs["data"] if isinstance(raw_obs, dict) else raw_obs
 
         return raw_obs, self._preprocess_obs_for_device(obs_value, modality)
@@ -467,16 +469,16 @@ class VisionSensor(BaseSensor):
         with og.sim.editing_usd():
             for annotator in self._annotators.values():
                 if annotator is not None:
-                    annotator.detach([self._render_product.path])
+                    og.sim.render_backend.detach_modality(annotator, self._render_product)
 
-            self._render_product.destroy()
-            self._render_product = lazy.omni.replicator.core.create.render_product(
+            og.sim.render_backend.destroy_camera_resource(self._render_product)
+            self._render_product = og.sim.render_backend.create_camera_resource(
                 self.prim_path, (width, height), force_new=True
             )
 
             for annotator in self._annotators.values():
                 if annotator is not None:
-                    annotator.attach([self._render_product])
+                    og.sim.render_backend.attach_modality(annotator, self._render_product)
 
         # Requires several renders for the new render product's data to propagate
         for _ in range(4):
@@ -737,10 +739,8 @@ class VisionSensor(BaseSensor):
         """
         if self._annotators.get(modality, None) is None:
             with og.sim.editing_usd():
-                self._annotators[modality] = lazy.omni.replicator.core.AnnotatorRegistry.get_annotator(
-                    self.raw_sensor_types[modality]
-                )
-                self._annotators[modality].attach([self._render_product])
+                self._annotators[modality] = og.sim.render_backend.create_annotator(self.raw_sensor_types[modality])
+                og.sim.render_backend.attach_modality(self._annotators[modality], self._render_product)
 
     def _remove_modality_from_backend(self, modality):
         """
@@ -750,17 +750,8 @@ class VisionSensor(BaseSensor):
             modality (str): Name of the modality to remove from the Replicator backend
         """
         if self._annotators.get(modality, None) is not None:
-            # Passing an explicit list is bugged -- see omni source code
-            # So we only pass in the product directly, which gets post-processed correctly
             with og.sim.editing_usd():
-                try:
-                    self._annotators[modality].detach(self._render_product)
-                except TypeError:
-                    # omni.syntheticdata's node deactivation walk is fragile once a tiled render product
-                    # has existed in the session: cached graph node handles become invalid and detach raises
-                    # "Invalid NodeObj object". The annotator's nodes are already gone at that point, so we
-                    # just drop our reference (teardown-only; nothing further to clean up)
-                    log.warning(f"Failed to cleanly detach annotator for modality {modality}; skipping")
+                og.sim.render_backend.detach_modality(self._annotators[modality], self._render_product)
             self._annotators[modality] = None
 
     def remove(self):
@@ -772,8 +763,9 @@ class VisionSensor(BaseSensor):
             self.remove_modality(modality)
 
         # Destroy the render product
-        with og.sim.editing_usd():
-            self._render_product.destroy()
+        if self._render_product is not None:
+            with og.sim.editing_usd():
+                og.sim.render_backend.destroy_camera_resource(self._render_product)
 
         # Remove the viewport if it exists.
         if self._viewport is not None:
@@ -831,7 +823,7 @@ class VisionSensor(BaseSensor):
             for _ in range(4):
                 og.sim.render()
         # Grab and return the parameters
-        return self._annotators["camera_params"].get_data()
+        return og.sim.render_backend.get_modality_data(self._annotators["camera_params"])
 
     @property
     def viewer_visibility(self):
@@ -877,7 +869,6 @@ class VisionSensor(BaseSensor):
             width, _ = self._viewport.viewport_api.get_texture_resolution()
             self._viewport.viewport_api.set_texture_resolution((width, height))
 
-        # Also update render product and update all annotators
         self._recreate_render_product(width, height)
 
     @property
@@ -902,7 +893,6 @@ class VisionSensor(BaseSensor):
             _, height = self._viewport.viewport_api.get_texture_resolution()
             self._viewport.viewport_api.set_texture_resolution((width, height))
 
-        # Also update render product and update all annotators
         self._recreate_render_product(width, height)
 
     @property

@@ -11,7 +11,13 @@ from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.transform_utils import quat2euler
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import get_world_pose_with_scale, get_world_pose, get_local_pose, ensure_usd_api
+from omnigibson.utils.usd_utils import (
+    get_world_pose_with_scale,
+    get_world_pose,
+    get_local_pose,
+    ensure_usd_api,
+    is_prim_path_valid,
+)
 
 # Create module logger
 logger = create_module_logger(module_name=__name__)
@@ -169,7 +175,7 @@ class XFormPrim(BasePrim):
             bool: True if there is a visual material bound to this prim. False otherwise
         """
         material_path = self._binding_api.GetDirectBinding().GetMaterialPath().pathString
-        return material_path != "" and lazy.isaacsim.core.utils.prims.is_prim_path_valid(material_path)
+        return material_path != "" and is_prim_path_valid(material_path)
 
     def set_position_orientation(
         self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"
@@ -205,7 +211,7 @@ class XFormPrim(BasePrim):
         # If the current pose is not in parent frame, convert to parent frame since that's what we can set.
         if frame != "parent":
             world_transform = T.pose2mat((position, orientation))
-            parent_path = str(lazy.isaacsim.core.utils.prims.get_prim_parent(self._prim).GetPath())
+            parent_path = str(self._prim.GetParent().GetPath())
             parent_world_transform = get_world_pose_with_scale(parent_path)
 
             local_transform = th.linalg.inv_ex(parent_world_transform).inverse @ world_transform
@@ -244,7 +250,8 @@ class XFormPrim(BasePrim):
         with og.sim.editing_usd():
             xform_op.Set(rotq)
 
-        og.sim.fabric_hierarchy.update_world_xforms()
+        if og.sim.fabric_hierarchy is not None:
+            og.sim.fabric_hierarchy.update_world_xforms()
 
         # Tensorized state caches (AABB / Touching / Adjacency / ...) read from pose tensors
         # that are now one frame behind. Flag them as stale so the next state read forces a
@@ -372,7 +379,7 @@ class XFormPrim(BasePrim):
 
     @property
     def aabb(self):
-        aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(self.prim_path)
+        aabb_min, aabb_max = og.sim.render_backend.compute_world_aabb(self.prim_path)
         logger.warning(
             "Computing AABB of an XFormPrim using the USD context is slow and unreliable, especially when fabric is enabled. "
             "This is provided as a convenience for USD editing use cases and should generally not be used for physical objects."

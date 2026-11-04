@@ -4,7 +4,6 @@ import torch as th
 from PIL import Image, ImageDraw
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
-import omnigibson.lazy as lazy
 
 
 def add_semantic_label(prim, label, instance_name="class"):
@@ -18,8 +17,7 @@ def add_semantic_label(prim, label, instance_name="class"):
         instance_name (str): The instance name for the label. Defaults to "class"
     """
     with og.sim.editing_usd():
-        lazy.isaacsim.core.utils.semantics.upgrade_prim_semantics_to_labels(prim=prim)
-        lazy.isaacsim.core.utils.semantics.add_labels(prim=prim, labels=[label], instance_name=instance_name)
+        og.sim.render_backend.add_semantic_labels(prim, label, instance_name=instance_name)
 
     # Labels authored after a render product's annotators are attached do not get picked up by the
     # existing render products' instance mappings (Isaac Sim 6.0 regression), so flag the semantics

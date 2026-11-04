@@ -1,12 +1,12 @@
 import torch as th
 import warp as wp
 
-import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from omnigibson.object_states.tensorized_absolute_state import TensorizedAbsoluteState
 from omnigibson.object_states.temperature import Temperature
 from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.usd_utils import create_tensor_from_list
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -135,7 +135,6 @@ class OnFire(TensorizedAbsoluteState):
                     ignition_temperatures[obj_idx] = float(scene_row[obj_idx].states[cls].ignition_temperature)
                     break
 
-        create_tensor_from_list = lazy.isaacsim.core.utils.warp.tensor.create_tensor_from_list
         cls._ignition_temperatures = create_tensor_from_list(ignition_temperatures, "float32", device="cuda")
 
         # Temperature is a hard dependency, so every OnFire object has a Temperature entry.

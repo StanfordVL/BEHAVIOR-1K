@@ -35,6 +35,7 @@ from omnigibson.utils.usd_utils import (
     absolute_prim_path_to_scene_relative,
     create_primitive_mesh,
     delete_or_deactivate_prim,
+    get_prim_at_path,
 )
 
 # Create settings for this module
@@ -358,13 +359,13 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
 
             # See if the mesh exists at the latest dataset's target location
             mesh_prim_path = f"{self.link.prim_path}/visuals/mesh_0"
-            pre_existing_mesh = lazy.isaacsim.core.utils.prims.get_prim_at_path(mesh_prim_path)
+            pre_existing_mesh = get_prim_at_path(mesh_prim_path)
 
             # If not, see if it exists in the legacy format's location
             # TODO: Remove this after new dataset release
             if not pre_existing_mesh:
                 mesh_prim_path = f"{self.link.prim_path}/mesh_0"
-                pre_existing_mesh = lazy.isaacsim.core.utils.prims.get_prim_at_path(mesh_prim_path)
+                pre_existing_mesh = get_prim_at_path(mesh_prim_path)
 
             # Create a primitive mesh neither option exists
             if not pre_existing_mesh:
@@ -452,7 +453,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 valid_hit = False
                 # When fabric is on, overlap_shape doesn't work, so we use a more coarse approximation for this broadphase check
                 aabb = self.link.visual_aabb
-                og.sim.psqi.overlap_box(
+                og.sim.physics_backend.overlap_box(
                     halfExtent=((aabb[1] - aabb[0]) / 2.0).tolist(),
                     pos=((aabb[1] + aabb[0]) / 2.0).tolist(),
                     rot=[0, 0, 0, 1.0],
@@ -460,7 +461,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 )
 
                 # TODO(#2082): Investigate why overlap_shape doesn't work with fabric still. This is a poor approximation.
-                # og.sim.psqi.overlap_shape(*projection_mesh_ids, reportFn=overlap_callback)
+                # og.sim.physics_backend.overlap_shape(*projection_mesh_ids, reportFn=overlap_callback)
                 return valid_hit
 
             # Define direction indicator if requested
@@ -503,7 +504,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 nonlocal valid_hit
                 valid_hit = False
                 aabb = self.link.visual_aabb
-                og.sim.psqi.overlap_box(
+                og.sim.physics_backend.overlap_box(
                     halfExtent=((aabb[1] - aabb[0]) / 2.0 + m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN).tolist(),
                     pos=((aabb[1] + aabb[0]) / 2.0).tolist(),
                     rot=[0, 0, 0, 1.0],
