@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        copy: [1, 2, 3]
+        copy: [1, 2, 3, 4, 5, 6]
     defaults:
       run:
         working-directory: ${{ github.workspace }}/OmniGibson
@@ -57,6 +57,8 @@ jobs:
           OMNIGIBSON_HEADLESS: "1"
           OMNI_KIT_ACCEPT_EULA: "YES"
           DESC_GDB_LOG: ${{ github.workspace }}/OmniGibson/gdb_desc.log
+          DESCPROBE_OUT: ${{ github.workspace }}/OmniGibson/descprobe.jsonl
+          PYTHONPATH: ${{ github.workspace }}/OmniGibson/tests/tmp_descprobe
         run: |
           PY=$(conda run -n behavior which python)
           conda run -n behavior --no-capture-output "$GDB" -q -batch -nx \
@@ -65,7 +67,7 @@ jobs:
             -ex "handle SIGSEGV SIGBUS SIGPIPE SIGUSR1 SIGUSR2 SIG32 SIG33 SIG34 SIG35 SIG36 nostop noprint pass" \
             -ex "set auto-load safe-path /" -ex "set debuginfod enabled off" \
             -x tests/tmp_descprobe/gdb_desc.py -ex run \
-            --args "$PY" -m pytest -s -q tests/test_transition_rules.py
+            --args "$PY" -m pytest -p descprobe -s -q tests/test_transition_rules.py
 
       - name: Show trace
         if: always()
@@ -74,11 +76,14 @@ jobs:
           grep -E "bp set|MISMATCH|FAIL|no base" gdb_desc.log || true
           echo "--- head"; head -20 gdb_desc.log
           echo "--- tail"; tail -40 gdb_desc.log
+          echo "--- descprobe (first)"; head -1 descprobe.jsonl || true
 
       - name: Upload trace
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ${{ github.run_id }}-descriptor-trace-${{ matrix.copy }}
-          path: OmniGibson/gdb_desc.log
+          path: |
+            OmniGibson/gdb_desc.log
+            OmniGibson/descprobe.jsonl
           overwrite: true

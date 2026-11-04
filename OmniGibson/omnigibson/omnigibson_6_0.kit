@@ -31,6 +31,10 @@ enableDeveloperWarnings = false    # disable developer warnings to reduce log no
 # on an RTX 5090: 0.06-0.16 GB of VRAM.
 descriptorSets = 360000
 
+# TMP: test whether texture streaming churn fragments the RTX descriptor pool
+[settings.rtx-transient.resourcemanager.texturestreaming]
+enabled = false
+
 [settings.crashreporter]
 enabled = false           # disable Kit crash reporter
 gatherUserStory = false
