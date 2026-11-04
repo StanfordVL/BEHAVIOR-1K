@@ -92,9 +92,7 @@ def _launch_app():
     physics_backend_cls = PHYSICS_BACKENDS[gm.PHYSICS_BACKEND]
     render_backend_cls = RENDER_BACKENDS[gm.RENDER_BACKEND]
 
-    # One-time, process-level setup each backend needs before its own package is first imported (e.g.
-    # an env var that must be set before `pxr` is first imported). Must run for BOTH backends before
-    # anything below launches an application, since either of them may be the one that needs it.
+    # One-time, process-level setup each backend needs before its own package is first imported.
     physics_backend_cls().enable_extensions()
     render_backend_cls().enable_extensions()
 
@@ -833,10 +831,8 @@ def _launch_simulator(*args, **kwargs):
         def get_rendering_dt(self):
             return self._physics_backend.get_rendering_dt()
 
-        # Kept for vector's own remaining raw-PhysX call sites (RigidBodyViewAPI, ArticulatedObjectViewAPI,
+        # Kept for remaining raw-PhysX call sites (RigidBodyViewAPI, ArticulatedObjectViewAPI,
         # toggle.py's _check_overlap) that aren't behind the physics_backend abstraction yet.
-        # physics_sim_view is trivially equivalent to self._physics_backend.physics_sim_view for PhysX
-        # (PhysXBackend.physics_sim_view is exactly `self._sim_context.physics_sim_view`), so routing it
 
         @property
         def physics_sim_view(self):

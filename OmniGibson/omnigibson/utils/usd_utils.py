@@ -3444,18 +3444,18 @@ def is_prim_path_valid(prim_path):
 
 
 def get_prim_at_path(prim_path):
-    """Pure-pxr replacement for ``isaacsim.core.utils.prims.get_prim_at_path`` (see above)."""
+    """Pure-pxr replacement for ``isaacsim.core.utils.prims.get_prim_at_path``."""
     return og.sim.stage.GetPrimAtPath(prim_path)
 
 
 def get_prim_property(prim_path, property_name):
-    """Pure-pxr replacement for ``isaacsim.core.utils.prims.get_prim_property`` (see above)."""
+    """Pure-pxr replacement for ``isaacsim.core.utils.prims.get_prim_property``."""
     attr = og.sim.stage.GetPrimAtPath(prim_path).GetAttribute(property_name)
     return attr.Get() if attr.IsValid() else None
 
 
 def set_prim_property(prim_path, property_name, value):
-    """Pure-pxr replacement for ``isaacsim.core.utils.prims.set_prim_property`` (see above)."""
+    """Pure-pxr replacement for ``isaacsim.core.utils.prims.set_prim_property``."""
     prim = og.sim.stage.GetPrimAtPath(prim_path)
     attr = prim.GetAttribute(property_name)
     if not attr.IsValid():
@@ -3463,8 +3463,7 @@ def set_prim_property(prim_path, property_name, value):
     attr.Set(value)
 
 
-# String dtype -> wp dtype, matching isaacsim.core.utils.warp.tensor.get_type()'s own mapping exactly
-# (including bool -> uint8, not wp.bool -- Warp has historically used uint8 as its packed bool storage).
+# String dtype -> wp dtype, matching isaacsim.core.utils.warp.tensor.get_type()'s mapping
 _WARP_DTYPE_FROM_STRING = {
     "float32": wp.float32,
     "bool": wp.uint8,
@@ -3476,9 +3475,7 @@ _WARP_DTYPE_FROM_STRING = {
 
 
 def create_tensor_from_list(data, dtype, device=None):
-    """Pure-warp replacement for ``isaacsim.core.utils.warp.tensor.create_tensor_from_list`` -- that
-    function is itself just ``wp.array(data, device=device, dtype=get_type(dtype))`` under the hood
-    (confirmed from its own source), with no real Isaac dependency."""
+    """Pure-warp replacement for ``isaacsim.core.utils.warp.tensor.create_tensor_from_list``."""
     return wp.array(data, device=device, dtype=_WARP_DTYPE_FROM_STRING[dtype])
 
 
@@ -3487,8 +3484,7 @@ def get_world_prim():
     Returns:
         Usd.Prim: Active world prim in the current stage
     """
-    # get_prim_at_path() is a pure-pxr equivalent of the Isaac Core convenience function (see its
-    # own docstring), so this needs no per-backend dispatch.
+    # get_prim_at_path() is a pure-pxr equivalent of the Isaac Core convenience function.
     return get_prim_at_path("/World")
 
 
@@ -3582,9 +3578,6 @@ def delete_or_deactivate_prim(prim_path):
         if not is_prim_path_valid(prim_path):
             return False
         prim = get_prim_at_path(prim_path)
-        # is_prim_no_delete/get_prim_type_name are trivial pure-USD wrappers -- use pxr directly
-        # instead of the Isaac Core convenience versions, same as is_prim_path_valid/get_prim_at_path
-        # above, regardless of backend.
         if bool(prim.GetMetadata("no_delete")):
             return False
         if prim.GetTypeName() == "PhysicsScene":
@@ -3597,17 +3590,6 @@ def delete_or_deactivate_prim(prim_path):
         if prim_path.startswith("/Render"):
             return False
 
-        # "Ancestral" means THIS prim's own definition was introduced via a reference arc (e.g. a link
-        # inside a dataset object's referenced USD), as opposed to a prim authored directly on the
-        # live stage -- matches Isaac's own is_prim_ancestral() semantics exactly (its docstring:
-        # is_prim_ancestral("/World/panda") is False -- the reference arc is authored ON that prim,
-        # not one of its ancestors -- while is_prim_ancestral("/World/panda/panda_link0") is True).
-        # Checking THIS prim's own strongest PrimStack layer against the stage's root/session layers
-        # (rather than walking ancestors looking for *any* reference, which is true for -- and would
-        # misclassify -- every runtime-created child of any referenced object, e.g. AttachedTo's own
-        # attachment joints, which live under a dataset object's referenced link but are themselves
-        # freshly Define()'d on the live stage) correctly distinguishes "lives inside referenced
-        # content" from "authored directly on the live stage, regardless of parentage".
         ancestral = og.sim.render_backend.is_prim_ancestral(prim)
 
         # If the prim is not ancestral, we can delete it.
@@ -3629,14 +3611,7 @@ def delete_or_deactivate_prim(prim_path):
 
 class PhysicsMaterial:
     """
-    Pure-pxr equivalent of ``isaacsim.core.api.materials.PhysicsMaterial``. Used unconditionally
-    (regardless of backend) -- reading that class's own source shows it's already built entirely on
-    plain ``UsdShade``/``UsdPhysics`` pxr calls (``carb``/``omni.kit.app`` are only used for trivial
-    stage access and logging), so there's no real Kit dependency to gate here, unlike most other
-    ``lazy.isaacsim``/``lazy.omni`` call sites in this codebase. Exposes the same ``.material``/
-    ``.prim``/``.prim_path``/``.name`` surface real callers need (e.g. ``GeomPrim.
-    apply_physics_material()``'s ``physics_material.material``). Does not wrap USD edits in
-    ``og.sim.editing_usd()`` itself -- same convention as ``copy_mesh_prim_to_path()`` -- callers must.
+    Pure-pxr equivalent of ``isaacsim.core.api.materials.PhysicsMaterial``.
 
     Args:
         prim_path (str): path to define (or reuse, if a valid prim already exists there) the physics
