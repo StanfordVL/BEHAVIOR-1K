@@ -3147,6 +3147,69 @@ class NewtonBackend(PhysicsBackend):
             meshes[system_name] = None if vertices is None else (vertices, indices, normals)
         return meshes
 
+    @staticmethod
+    def _neighborhood_counts(points, queries, cell_size):
+        """Number of @points in the 3x3x3 block of @cell_size cells around each of @queries"""
+        cells = th.floor(th.cat([points, queries]) / cell_size).long()
+        cells -= cells.min(dim=0).values - 1
+        dims = cells.max(dim=0).values + 2
+        keys = (cells[:, 0] * dims[1] + cells[:, 1]) * dims[2] + cells[:, 2]
+        point_keys, query_keys = keys[: len(points)], keys[len(points) :]
+        unique_keys, counts = th.unique(point_keys, return_counts=True)
+        neighbors = th.zeros(len(query_keys), dtype=th.long, device=keys.device)
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for dz in (-1, 0, 1):
+                    query = query_keys + (dx * dims[1] + dy) * dims[2] + dz
+                    idx = th.searchsorted(unique_keys, query).clamp(max=len(unique_keys) - 1)
+                    neighbors += th.where(unique_keys[idx] == query, counts[idx], 0)
+        return neighbors
+
+    def get_fluid_render_particles(self, surfaces=None):
+        """
+        Particles get_fluid_surface_meshes() doesn't cover, for rendering as spheres: every particle of a system
+        without a surface, and a system's particles away from its surface and too sparse to get one (e.g. a thin
+        falling stream or droplets).
+
+        Args:
+            surfaces (None or dict): system_name -> surface vertex positions (warp vec3 array) of the systems that got
+                a surface, from get_fluid_surface_meshes()
+
+        Returns:
+            dict: system_name -> (positions, radii) warp arrays, for systems with any such particles
+        """
+        import warp as wp
+
+        if not self._mpm_in_place:
+            return {}
+        surfaces = surfaces or {}
+        positions_all = _wp_to_torch(self._state_0.particle_q)[:, :3]
+        radii_all = wp.to_torch(self._model.particle_radius)
+        particles = {}
+        for system_name, (start, end) in self._path_fluid_particle_map.items():
+            if end == start:
+                continue
+            positions, radii = positions_all[start:end], radii_all[start:end]
+            if system_name in surfaces:
+                # Near its surface, the surface draws it. Elsewhere, like the surface extraction, a particle whose
+                # neighborhood (a cube spanning the extraction kernel) holds less than the extraction's density
+                # threshold of a packed one gets no surface
+                kernel = self._FLUID_SURFACE_KWARGS["kernel_radius"]
+                vertices = wp.to_torch(surfaces[system_name]).reshape(-1, 3)
+                near_surface = self._neighborhood_counts(vertices, positions, 4.0 * radii.max().item()) > 0
+                packed = (2.0 * kernel / (2.0 * radii)) ** 3
+                sparse = self._neighborhood_counts(positions, positions, 2.0 * kernel / 3.0)
+                sparse = sparse < self._FLUID_SURFACE_KWARGS["threshold"] * packed
+                uncovered = sparse & ~near_surface
+                if not uncovered.any():
+                    continue
+                positions, radii = positions[uncovered], radii[uncovered]
+            particles[system_name] = (
+                wp.from_torch(positions.contiguous(), dtype=wp.vec3),
+                wp.from_torch(radii.contiguous()),
+            )
+        return particles
+
     def _sync_fk(self):
         import newton
 

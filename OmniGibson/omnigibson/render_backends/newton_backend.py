@@ -178,6 +178,7 @@ class NewtonRenderBackend(UsdStageServicesMixin, RenderBackend):
             # is closed, every ViewerGL built after it renders all-black frames, with no error.
             viewer.set_model(model)
             viewer._og_fluid_surfaces = {}  # set_model() destroyed the meshes log_fluid_surfaces() logged
+            viewer._og_fluid_points = set()
         if viewer is None:
             # cam_pos/look_at are throwaway placeholders -- _sync_camera() overwrites them from the
             # tracked prim's own live pose before every capture.

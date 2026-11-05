@@ -248,7 +248,11 @@ def log_fluid_surfaces(viewer, backend):
     MPM particles are ~2 cm beads at the default radius, so log_state()'s particle spheres read as a pile of marbles.
     """
     meshes = backend.get_fluid_surface_meshes()
-    viewer.show_particles = not meshes
+    particles = backend.get_fluid_render_particles(
+        surfaces={name: mesh[0] for name, mesh in meshes.items() if mesh is not None}
+    )
+    # log_state() would draw every model particle, including a fluid system's inactive particle slots
+    viewer.show_particles = not meshes and not particles
     # Last mesh logged per system, re-logged hidden when its surface goes away: the GL viewer can't take an empty mesh
     logged = getattr(viewer, "_og_fluid_surfaces", {})
     for system_name, last_mesh in logged.items():
@@ -270,14 +274,30 @@ def log_fluid_surfaces(viewer, backend):
         logged[system_name] = mesh
     viewer._og_fluid_surfaces = logged
 
+    # Particles without a surface (granular systems, and a liquid's thin streams and droplets) as spheres
+    if particles or getattr(viewer, "_og_fluid_points", None):
+        import warp as wp
+
+        drawn = getattr(viewer, "_og_fluid_points", set())
+        for system_name in drawn - set(particles):
+            viewer.log_points(f"/fluid_points/{system_name}", None, hidden=True)
+        for system_name, (positions, radii) in particles.items():
+            color, _ = _fluid_look(system_name)
+            colors = wp.full(positions.shape[0], wp.vec3(*color), dtype=wp.vec3, device=positions.device)
+            viewer.log_points(f"/fluid_points/{system_name}", positions, radii=radii, colors=colors)
+        viewer._og_fluid_points = set(particles)
+
 
 def _fluid_look(system_name):
-    """The fluid system's (color, opacity), or a translucent water blue if its material preset is unknown."""
+    """The particle system's (color, opacity), or a translucent water blue if it has no known color."""
     for scene in og.sim.scenes:
         if scene.is_system_active(system_name):
             system = scene.get_system(system_name, force_init=False)
             if getattr(system, "render_opacity", None) is not None:
                 return tuple(float(c) for c in system.color), system.render_opacity
+            if getattr(system, "color", None) is not None:
+                # e.g. a granular system, drawn as opaque particles
+                return tuple(float(c) for c in system.color), 1.0
     return (0.12, 0.42, 0.8), 0.6
 
 
