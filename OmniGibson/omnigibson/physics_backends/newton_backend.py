@@ -3113,7 +3113,10 @@ class NewtonBackend(PhysicsBackend):
 
         if not self._mpm_in_place:
             return {}
-        mpm = self._solver.solver("mpm") if hasattr(self._solver, "solver") else self._solver
+        from newton.solvers.experimental.coupled import SolverCoupledProxy
+
+        # SolverImplicitMPM has a `solver` attribute too, so check the type
+        mpm = self._solver.solver("mpm") if isinstance(self._solver, SolverCoupledProxy) else self._solver
         if self._fluid_surface_cache.get("solver") is not mpm:
             # Each rebuild makes a new solver (and particle layout), so the extraction contexts are per solver
             self._fluid_surface_cache = {"solver": mpm, "surfaces": {}, "flags": {}}
@@ -3126,8 +3129,8 @@ class NewtonBackend(PhysicsBackend):
                     voxel_size=self._FLUID_SURFACE_VOXEL_SIZE, **self._FLUID_SURFACE_KWARGS
                 )
                 flags = None
-                if len(systems) > 1:
-                    # Surface only this system's particles, so separate fluids don't merge into one mesh
+                if (start, end) != (0, self._model.particle_count):
+                    # Surface only this system's particles, so separate fluids (or cloth) don't merge into one mesh
                     flags = mpm._mpm_model.particle_flags.numpy().copy()
                     flags[:start] = 0
                     flags[end:] = 0
