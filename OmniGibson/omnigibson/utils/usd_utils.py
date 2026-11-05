@@ -3094,7 +3094,7 @@ def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=Non
         stage (None or Usd.Stage): If specified, stage on which the primitive mesh should be generated. If None, will
             use og.sim.stage
     """
-    assert primitive_type in PRIMITIVE_MESH_TYPES, "Invalid primitive mesh type: {primitive_type}"
+    assert primitive_type in PRIMITIVE_MESH_TYPES, f"Invalid primitive mesh type: {primitive_type}"
 
     with og.sim.editing_usd(stage=stage):
         MESH_PRIM_TYPE_TO_EVALUATOR_MAPPING = {

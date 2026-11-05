@@ -42,7 +42,7 @@ setup(
         "imageio-ffmpeg>=0.4.9",
         "termcolor>=2.4.0",
         "progressbar>=2.5",
-        "pymeshlab>=2022.2",
+        "pymeshlab>=2023.12",
         "click>=8.1.3",
         "aenum>=3.1.15",
         "rtree>=1.2.0",

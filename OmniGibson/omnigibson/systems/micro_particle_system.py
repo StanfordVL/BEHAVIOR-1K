@@ -480,8 +480,7 @@ class MicroParticleSystem(BaseSystem):
         self._customize_particle_material() if self._customize_particle_material is not None else None
 
     def _clear(self):
-        if self._material is not None:
-            self._material.remove_user(self)
+        self._material.remove_user(self)
 
         super()._clear()
 
