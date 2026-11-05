@@ -1212,6 +1212,9 @@ class NewtonBackend(PhysicsBackend):
     _FLOOR_CONTACT_FRICTION = 0.02
     # Generalized armature / dry-friction floors applied to every articulated robot joint at build time.
     _JOINT_ARMATURE_FLOOR = 1.0e-2
+    # Arm joints get more: against the implicit kd * dt damping of robots.robot's NEWTON_ARM_POSITION_KD, 1e-2 left a
+    # held parer 7 degrees off in the hand and the run ended in a NaN; 0.1 kept it within 3
+    _ARM_JOINT_ARMATURE_FLOOR = 1.0e-1
     _JOINT_FRICTION_FLOOR = 2.0e-1
     # Critically damped finger contacts, with MuJoCo's timestep safety clamp enabled. The
     # scene-wide soft contacts allow centimeter-scale penetration during gripper closure.
@@ -1961,6 +1964,7 @@ class NewtonBackend(PhysicsBackend):
         path_joint_map = {}
         path_cloth_particle_map = {}
         robot_joint_paths = set()
+        arm_joint_paths = set()
         low_friction_body_idx = set()
         finger_body_idx = set()
         # Macro-particle roots go last, so object body indices are unaffected by particle changes
@@ -2010,6 +2014,8 @@ class NewtonBackend(PhysicsBackend):
                             idx = info["path_body_map"].get(f"{obj.prim_path}/{name}")
                             if idx is not None:
                                 finger_body_idx.add(int(idx))
+                    arm_names = {name for names in obj.arm_joint_names.values() for name in names}
+                    arm_joint_paths.update(p for p in info["path_joint_map"] if p.rsplit("/", 1)[-1] in arm_names)
 
             # add_usd() only auto-wraps an object's joints into an articulation when the object's own
             # USD authors a UsdPhysics.ArticulationRootAPI marker -- true for robots and most fixed/floating-base
@@ -2183,6 +2189,7 @@ class NewtonBackend(PhysicsBackend):
         # Armature / dry-friction floors.
         if self._JOINT_ARMATURE_FLOOR or self._JOINT_FRICTION_FLOOR:
             robot_joint_idxs = {path_joint_map[p] for p in robot_joint_paths if p in path_joint_map}
+            arm_joint_idxs = {path_joint_map[p] for p in arm_joint_paths if p in path_joint_map}
             skipped = (int(newton.JointType.FIXED), int(newton.JointType.FREE))
             n_dofs = len(builder.joint_qd)
             for joint_idx, joint_type in enumerate(builder.joint_type):
@@ -2192,11 +2199,10 @@ class NewtonBackend(PhysicsBackend):
                 qd_stop = (
                     builder.joint_qd_start[joint_idx + 1] if joint_idx + 1 < len(builder.joint_qd_start) else n_dofs
                 )
+                armature = self._ARM_JOINT_ARMATURE_FLOOR if joint_idx in arm_joint_idxs else self._JOINT_ARMATURE_FLOOR
                 for dof_idx in range(qd_start, qd_stop):
                     if dof_idx < len(builder.joint_armature):
-                        builder.joint_armature[dof_idx] = max(
-                            float(builder.joint_armature[dof_idx]), self._JOINT_ARMATURE_FLOOR
-                        )
+                        builder.joint_armature[dof_idx] = max(float(builder.joint_armature[dof_idx]), armature)
                     if dof_idx < len(builder.joint_friction):
                         builder.joint_friction[dof_idx] = max(
                             float(builder.joint_friction[dof_idx]), self._JOINT_FRICTION_FLOOR

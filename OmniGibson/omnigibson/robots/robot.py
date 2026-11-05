@@ -96,6 +96,13 @@ m.NEWTON_TRUNK_POSITION_KD = 2000.0
 m.NEWTON_GRIPPER_POSITION_KP = 30.0
 m.NEWTON_GRIPPER_POSITION_KD = 3.0
 
+# Arms are softer than the generic 3000/300: the implicit integrator adds kd * dt (2.5 at 120 Hz) of damping to each
+# arm joint, which the assisted-grasp weld's solve does not see, so a held object lagged and turned up to 20 degrees
+# in the hand. At 650/100 (kd * dt 0.83), with the backend's arm armature (NewtonBackend._ARM_JOINT_ARMATURE_FLOOR),
+# a held parer stays within about 3mm / 3 degrees. 300/30 went NaN
+m.NEWTON_ARM_POSITION_KP = 650.0
+m.NEWTON_ARM_POSITION_KD = 100.0
+
 # Passive damping for a holonomic base's unactuated z/rx/ry virtual joints under Newton -- see
 # _newton_passive_base_dofs() for why these need anything at all. Damping is all they get now; the
 # leveling spring that used to sit alongside it is disabled just below, with the measurements.
@@ -687,6 +694,14 @@ class Robot(USDObject, GymObservable):
             ):
                 isaac_kp = th.full_like(isaac_kp, m.NEWTON_GRIPPER_POSITION_KP)
                 isaac_kd = th.full_like(isaac_kd, m.NEWTON_GRIPPER_POSITION_KD)
+            if (
+                name.startswith("arm_")
+                and gm.PHYSICS_BACKEND == "newton"
+                and control_type == ControlType.POSITION
+                and ControllerView.isaac_gains_are_default(group_key)
+            ):
+                isaac_kp = th.full_like(isaac_kp, m.NEWTON_ARM_POSITION_KP)
+                isaac_kd = th.full_like(isaac_kd, m.NEWTON_ARM_POSITION_KD)
             for i, dof in enumerate(ControllerView.get_dof_idx(group_key).tolist()):
                 # Make sure the DOF has not already been set yet, and remove it afterwards
                 assert dof in unused_dofs
