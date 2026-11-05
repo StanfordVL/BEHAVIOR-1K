@@ -1265,6 +1265,12 @@ class NewtonBackend(PhysicsBackend):
         # not just derived from a fixed USD mesh.
         self._fluid_systems = {}  # system_name -> {"pos": (N, 3) tensor, "vel": (N, 3) tensor}
         self._path_fluid_particle_map = {}  # system_name -> (particle_start, particle_end) in the CURRENT model
+        # system_name -> end of its preallocated particle slots in the CURRENT model (see generate_particles())
+        self._fluid_particle_capacity = {}
+        # MPM per-particle state of a freshly created particle (see generate_particles())
+        self._fluid_mpm_state_defaults = {}
+        # Active fluid particles' (lower, upper) bounds when the fixed MPM grid was last allocated
+        self._fluid_grid_bounds = None
         self._fluid_surface_cache = {}  # see get_fluid_surface_meshes()
         self._articulation_handles = {}
         self._rigid_body_handles = {}
@@ -1584,6 +1590,7 @@ class NewtonBackend(PhysicsBackend):
 
         if self._solver is not None:
             if self._mpm_in_place:
+                self._keep_fluid_grid_around_particles()
                 applied_body_f = self._applied_body_forces()
                 self._state_0.clear_forces()
                 self._restore_applied_body_forces(applied_body_f)
@@ -2244,19 +2251,27 @@ class NewtonBackend(PhysicsBackend):
         self._path_cloth_particle_map = path_cloth_particle_map
 
         path_fluid_particle_map = {}
+        self._fluid_particle_capacity = {}
         for system_name, particles in self._fluid_systems.items():
             particle_start = builder.particle_count
             pos = particles["pos"]
             vel = particles["vel"]
-            builder.add_particles(
-                pos=[wp.vec3(*p) for p in pos.tolist()],
-                vel=[wp.vec3(*v) for v in vel.tolist()],
-                mass=[self._FLUID_DEFAULT_PARTICLE_MASS] * len(pos),
-                radius=[self._FLUID_DEFAULT_PARTICLE_RADIUS] * len(pos),
-                custom_attributes=self._FLUID_MATERIAL_DEFAULTS,
-            )
-            path_fluid_particle_map[system_name] = (particle_start, builder.particle_count)
+            n_particles = len(pos)
+            if n_particles > 0:
+                # Preallocate inactive particle slots, so particles can be added later without rebuilding the model
+                n_free = max(n_particles, self._FLUID_MIN_FREE_PARTICLES)
+                builder.add_particles(
+                    pos=[wp.vec3(*p) for p in pos.tolist()] + [wp.vec3(*pos[0].tolist())] * n_free,
+                    vel=[wp.vec3(*v) for v in vel.tolist()] + [wp.vec3(0.0, 0.0, 0.0)] * n_free,
+                    mass=[self._FLUID_DEFAULT_PARTICLE_MASS] * (n_particles + n_free),
+                    radius=[self._FLUID_DEFAULT_PARTICLE_RADIUS] * (n_particles + n_free),
+                    flags=[int(newton.ParticleFlags.ACTIVE)] * n_particles + [0] * n_free,
+                    custom_attributes=self._FLUID_MATERIAL_DEFAULTS,
+                )
+            path_fluid_particle_map[system_name] = (particle_start, particle_start + n_particles)
+            self._fluid_particle_capacity[system_name] = builder.particle_count
         self._path_fluid_particle_map = path_fluid_particle_map
+        self._fluid_grid_bounds = None
 
         # Overwrite from the authored USD values directly instead of using add_usd() defaults.
         joint_qd_start = builder.joint_qd_start
@@ -2464,6 +2479,16 @@ class NewtonBackend(PhysicsBackend):
             self._model.request_state_attributes("mujoco:qfrc_actuator")
         self._state_0 = self._model.state()
         self._state_1 = self._model.state()
+        mpm_state = getattr(self._state_0, "mpm", None)
+        self._fluid_mpm_state_defaults = (
+            {}
+            if mpm_state is None or self._model.particle_count == 0
+            else {
+                name: wp.to_torch(arr)[0].clone()
+                for name, arr in vars(mpm_state).items()
+                if isinstance(arr, wp.array) and arr.shape[0] == self._model.particle_count
+            }
+        )
         self._control = self._model.control()
         self._model.rigid_contact_max = self._RIGID_CONTACT_MAX
         self._contacts = self._model.contacts()
@@ -2509,7 +2534,7 @@ class NewtonBackend(PhysicsBackend):
                 entries=[
                     SolverCoupledProxy.Entry(
                         name="mpm",
-                        solver=lambda v: SolverImplicitMPM(model=v, config=mpm_config),
+                        solver=lambda v: self._make_mpm_solver(v, mpm_config),
                         particles=list(range(self._model.particle_count)),
                         in_place=True,
                     ),
@@ -2542,7 +2567,7 @@ class NewtonBackend(PhysicsBackend):
         elif has_fluid:
             # Fluid but no rigid bodies.
             mpm_config = self._make_mpm_config()
-            self._solver = SolverImplicitMPM(model=self._model, config=mpm_config)
+            self._solver = self._make_mpm_solver(self._model, mpm_config)
             self._collision_pipeline = None
             self._mpm_in_place = True
         elif self._model.particle_count > 0 and has_rigid:
@@ -2672,7 +2697,14 @@ class NewtonBackend(PhysicsBackend):
         "mpm:tensile_yield_ratio": 1.0,
         "mpm:viscosity": 0.0,
     }
+    # Minimum number of inactive particle slots preallocated per particle system (see generate_particles())
+    _FLUID_MIN_FREE_PARTICLES = 1024
     _FLUID_VOXEL_SIZE = 0.05
+    # How close (m) the fluid particles may come to the edge of the fixed MPM grid before it is reallocated around them
+    _FLUID_GRID_EDGE_MARGIN = 0.5
+    # Minimum MPM collider thickness (m), see _make_mpm_solver(). 5 mm cut leaks through a stockpot's walls from 38 to
+    # 3 of 2160 particles; at 12.5 mm water clung to the walls and a towel could no longer absorb it
+    _FLUID_COLLIDER_THICKNESS = 0.005
 
     # Sized generously for a populated household scene, not tuned per-scene. Must match (or exceed)
     # every SolverMuJoCo construction's own nconmax below.
@@ -2703,6 +2735,23 @@ class NewtonBackend(PhysicsBackend):
             njmax=32_768,
             nconmax=self._RIGID_CONTACT_MAX,
         )
+
+    def _make_mpm_solver(self, model, config):
+        """
+        SolverImplicitMPM for @model. It takes its colliders' thickness from the shape margins, which are 0 here, so
+        water leaked through thin walls (e.g. a pot's): raise them to _FLUID_COLLIDER_THICKNESS while it reads them,
+        then restore them for the rigid contacts.
+        """
+        import warp as wp
+        from newton.solvers import SolverImplicitMPM
+
+        margin = wp.to_torch(model.shape_margin)
+        original = margin.clone()
+        margin.clamp_(min=self._FLUID_COLLIDER_THICKNESS)
+        try:
+            return SolverImplicitMPM(model=model, config=config)
+        finally:
+            margin.copy_(original)
 
     def _make_mpm_config(self):
         """SolverImplicitMPM.Config, validated standalone against a water-like blob (settles/spreads
@@ -3000,14 +3049,107 @@ class NewtonBackend(PhysicsBackend):
                 "vel": th.zeros((0, 3), device=self.sim.device),
             }
 
+    def _live_fluid_solver(self):
+        """
+        The live SolverImplicitMPM and the models and states holding copies of its particles, or None if particles
+        can't be added or removed in place (no live MPM solver, or one whose particle indices differ from the model's).
+        """
+        from newton.solvers.experimental.coupled import SolverCoupledProxy
+
+        if not self._mpm_in_place or self._solver is None or self._rebuilding or self._live_state_discarded:
+            return None
+        if not isinstance(self._solver, SolverCoupledProxy):
+            return self._solver, [self._model], [self._state_0, self._state_1]
+        # SolverCoupledProxy steps MPM on its own copies of the model's particle arrays and MPM state. Its "mpm" entry
+        # holds every particle in order (see _rebuild_impl()), so particle indices match the model's
+        if self._solver.view("mpm").particle_count != self._model.particle_count:
+            return None
+        mpm = self._solver.solver("mpm")
+        return mpm, [self._model, mpm.model], [self._state_0, self._state_1, self._solver.entry_state("mpm", "input")]
+
+    def _fluid_mpm_state_arrays(self, states):
+        """Torch views of the per-particle MPM state arrays (state.mpm.*) of every distinct state in @states"""
+        import warp as wp
+
+        arrays = []
+        for state in {id(state): state for state in states}.values():
+            mpm_state = getattr(state, "mpm", None)
+            for name in self._fluid_mpm_state_defaults:
+                arr = getattr(mpm_state, name, None)
+                if isinstance(arr, wp.array):
+                    arrays.append((name, wp.to_torch(arr)))
+        return arrays
+
+    def _set_fluid_particles_active(self, models, start, end, active):
+        """Sets or clears the ACTIVE flag of particles [@start, @end) in each of @models"""
+        import newton
+        import warp as wp
+
+        active_flag = int(newton.ParticleFlags.ACTIVE)
+        for model in models:
+            flags = wp.to_torch(model.particle_flags)[start:end]
+            flags.copy_(flags | active_flag if active else flags & ~active_flag)
+
+    def _keep_fluid_grid_around_particles(self):
+        """Reallocates the fixed MPM grid around the active fluid particles once they near its edge: particles that
+        leave it blow up"""
+        live = self._live_fluid_solver()
+        spans = [(start, end) for start, end in self._path_fluid_particle_map.values() if end > start]
+        if live is None or not spans:
+            return
+        mpm = live[0]
+        positions = _wp_to_torch(self._state_0.particle_q)[:, :3]
+        positions = th.cat([positions[start:end] for start, end in spans])
+        lower, upper = positions.min(dim=0).values, positions.max(dim=0).values
+        if mpm._scratchpad is None or self._fluid_grid_bounds is None:
+            # The grid gets allocated around the particles' current bounds on the next step
+            self._fluid_grid_bounds = (lower, upper)
+            return
+        grid_lower, grid_upper = self._fluid_grid_bounds
+        reach = mpm.grid_padding * mpm.voxel_size - self._FLUID_GRID_EDGE_MARGIN
+        if bool((lower < grid_lower - reach).any() or (upper > grid_upper + reach).any()):
+            mpm._scratchpad = None
+            self._fluid_grid_bounds = (lower, upper)
+
+    def _notify_fluid_particles_changed(self, mpm, grid_changed):
+        """Lets @mpm pick up changed particle flags; with @grid_changed, also reallocates its grid around them"""
+        import newton
+
+        mpm.notify_model_changed(newton.ModelFlags.MODEL_PROPERTIES)
+        if grid_changed:
+            # A "fixed" grid is allocated once around the active particles, so new particles may fall outside it
+            mpm._scratchpad = None
+            self._fluid_grid_bounds = None
+        self._fluid_surface_cache = {}
+
     def generate_particles(self, system_name, positions, velocities=None):
-        self._sync_fluid_system_from_model(system_name)
         positions = th.as_tensor(positions, dtype=th.float32, device=self.sim.device).reshape(-1, 3)
         velocities = (
             th.zeros_like(positions)
             if velocities is None
             else th.as_tensor(velocities, dtype=th.float32, device=self.sim.device).reshape(-1, 3)
         )
+        live = self._live_fluid_solver()
+        span = self._path_fluid_particle_map.get(system_name)
+        if (
+            live is not None
+            and span is not None
+            and span[1] + len(positions) <= self._fluid_particle_capacity[system_name]
+        ):
+            # Activate preallocated particle slots instead of rebuilding the model
+            mpm, models, states = live
+            start, end = span
+            new_end = end + len(positions)
+            _wp_to_torch(self._state_0.particle_q)[end:new_end, :3] = positions.to(self._model.device.alias)
+            _wp_to_torch(self._state_0.particle_qd)[end:new_end, :3] = velocities.to(self._model.device.alias)
+            for name, arr in self._fluid_mpm_state_arrays(states):
+                arr[end:new_end] = self._fluid_mpm_state_defaults[name]
+            self._set_fluid_particles_active(models, end, new_end, True)
+            self._path_fluid_particle_map[system_name] = (start, new_end)
+            self._notify_fluid_particles_changed(mpm, grid_changed=True)
+            return
+
+        self._sync_fluid_system_from_model(system_name)
         system = self._fluid_systems[system_name]
         system["pos"] = th.cat([system["pos"], positions])
         system["vel"] = th.cat([system["vel"], velocities])
@@ -3015,6 +3157,26 @@ class NewtonBackend(PhysicsBackend):
         self._rebuild()
 
     def remove_particles(self, system_name, idxs):
+        live = self._live_fluid_solver()
+        span = self._path_fluid_particle_map.get(system_name)
+        if live is not None and span is not None:
+            # Shift the remaining particles forward and deactivate the freed slots instead of rebuilding the model
+            mpm, models, states = live
+            start, end = span
+            keep = th.ones(end - start, dtype=th.bool, device=self._model.device.alias)
+            keep[th.as_tensor(idxs, dtype=th.long, device=keep.device)] = False
+            new_end = start + int(keep.sum().item())
+            arrays = [("", _wp_to_torch(self._state_0.particle_q)), ("", _wp_to_torch(self._state_0.particle_qd))]
+            for name, arr in arrays + self._fluid_mpm_state_arrays(states):
+                arr[start:new_end] = arr[start:end][keep].clone()
+            for name, arr in self._fluid_mpm_state_arrays(states):
+                arr[new_end:end] = self._fluid_mpm_state_defaults[name]
+            _wp_to_torch(self._state_0.particle_qd)[new_end:end] = 0.0
+            self._set_fluid_particles_active(models, new_end, end, False)
+            self._path_fluid_particle_map[system_name] = (start, new_end)
+            self._notify_fluid_particles_changed(mpm, grid_changed=False)
+            return
+
         self._sync_fluid_system_from_model(system_name)
         system = self._fluid_systems[system_name]
         keep = th.ones(len(system["pos"]), dtype=th.bool, device=system["pos"].device)
