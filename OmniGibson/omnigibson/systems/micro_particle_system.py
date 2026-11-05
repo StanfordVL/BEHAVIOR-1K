@@ -720,7 +720,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         # object_states (Filled/Covered/Contains/particle_modifier) and transition_rules all read this
         # to decide whether a system has any particles, so it must reflect the live backend state.
         if self.initialized and gm.PHYSICS_BACKEND != "physx":
-            og.sim.physics_backend.create_particle_system(self.name)
+            self._create_backend_particle_system()
             return len(og.sim.physics_backend.get_particle_positions(self.name))
         return sum([instancer.n_particles for instancer in self.particle_instancers.values()])
 
@@ -781,7 +781,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         if gm.PHYSICS_BACKEND != "physx":
             # Backend-side particles live directly in the model, not in a PhysxParticleInstancer, so
             # there's nothing in self.particle_instancers to clean up -- clear the backend's copy instead.
-            og.sim.physics_backend.create_particle_system(self.name)
+            self._create_backend_particle_system()
             n = len(og.sim.physics_backend.get_particle_positions(self.name))
             if n > 0:
                 og.sim.physics_backend.remove_particles(self.name, list(range(n)))
@@ -842,6 +842,15 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
     def particle_contact_radius(self):
         # This is simply the contact offset
         return self._particle_contact_offset
+
+    def _create_backend_particle_system(self):
+        """Registers this system with a non-PhysX physics backend, along with its particle properties"""
+        og.sim.physics_backend.create_particle_system(
+            self.name,
+            particle_radius=self.particle_radius,
+            particle_density=self.particle_density,
+            material="viscous" if self.is_fluid and self.is_viscous else "fluid" if self.is_fluid else "granular",
+        )
 
     @property
     def particle_density(self):
@@ -945,7 +954,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         # n_instancers == 0 assertion), so instancer_idn/particle_group/orientations/scales/
         # prototype_indices are ignored for this backend (no physical meaning for pointlike particles).
         if gm.PHYSICS_BACKEND != "physx":
-            og.sim.physics_backend.create_particle_system(self.name)
+            self._create_backend_particle_system()
             og.sim.physics_backend.generate_particles(self.name, positions, velocities=velocities)
             return None
 
@@ -1215,7 +1224,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         # report canonical orientation for every particle so shape-matched callers (e.g. ContactParticles'
         # AABB pre-filter, ParticleRemover's visual/cloth-path particle selection) don't break.
         if self.initialized and gm.PHYSICS_BACKEND != "physx":
-            og.sim.physics_backend.create_particle_system(self.name)
+            self._create_backend_particle_system()
             positions = og.sim.physics_backend.get_particle_positions(self.name)
             orientations = th.zeros((len(positions), 4))
             orientations[:, -1] = 1.0
@@ -1360,7 +1369,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         states stay interchangeable across backends.
         """
         backend = og.sim.physics_backend
-        backend.create_particle_system(self.name)
+        self._create_backend_particle_system()
         positions = backend.get_particle_positions(self.name)
         n_particles = len(positions)
         if n_particles == 0:
@@ -1408,7 +1417,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         velocities = th.cat([v.to(positions.device) for v in velocities]) if velocities else th.zeros((0, 3))
 
         backend = og.sim.physics_backend
-        backend.create_particle_system(self.name)
+        self._create_backend_particle_system()
         n_particles = len(backend.get_particle_positions(self.name))
         if n_particles != len(positions):
             # A count change is structural (a model rebuild); otherwise just overwrite the live state
@@ -1474,7 +1483,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         if gm.PHYSICS_BACKEND != "physx":
             # Backend-side particles live directly in the model, not in a PhysxParticleInstancer (which
             # stays empty under Newton) -- clear the backend's copy instead, matching _clear()'s gating.
-            og.sim.physics_backend.create_particle_system(self.name)
+            self._create_backend_particle_system()
             n = len(og.sim.physics_backend.get_particle_positions(self.name))
             if n > 0:
                 og.sim.physics_backend.remove_particles(self.name, list(range(n)))

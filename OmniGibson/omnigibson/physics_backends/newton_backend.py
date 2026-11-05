@@ -1267,6 +1267,8 @@ class NewtonBackend(PhysicsBackend):
         self._path_fluid_particle_map = {}  # system_name -> (particle_start, particle_end) in the CURRENT model
         # system_name -> end of its preallocated particle slots in the CURRENT model (see generate_particles())
         self._fluid_particle_capacity = {}
+        # system_name -> (particle radius, particle density, material), see create_particle_system()
+        self._fluid_system_props = {}
         # MPM per-particle state of a freshly created particle (see generate_particles())
         self._fluid_mpm_state_defaults = {}
         # Active fluid particles' (lower, upper) bounds when the fixed MPM grid was last allocated
@@ -2260,13 +2262,14 @@ class NewtonBackend(PhysicsBackend):
             if n_particles > 0:
                 # Preallocate inactive particle slots, so particles can be added later without rebuilding the model
                 n_free = max(n_particles, self._FLUID_MIN_FREE_PARTICLES)
+                radius, mass, material = self._fluid_particle_props(system_name)
                 builder.add_particles(
                     pos=[wp.vec3(*p) for p in pos.tolist()] + [wp.vec3(*pos[0].tolist())] * n_free,
                     vel=[wp.vec3(*v) for v in vel.tolist()] + [wp.vec3(0.0, 0.0, 0.0)] * n_free,
-                    mass=[self._FLUID_DEFAULT_PARTICLE_MASS] * (n_particles + n_free),
-                    radius=[self._FLUID_DEFAULT_PARTICLE_RADIUS] * (n_particles + n_free),
+                    mass=[mass] * (n_particles + n_free),
+                    radius=[radius] * (n_particles + n_free),
                     flags=[int(newton.ParticleFlags.ACTIVE)] * n_particles + [0] * n_free,
-                    custom_attributes=self._FLUID_MATERIAL_DEFAULTS,
+                    custom_attributes=material,
                 )
             path_fluid_particle_map[system_name] = (particle_start, particle_start + n_particles)
             self._fluid_particle_capacity[system_name] = builder.particle_count
@@ -2691,19 +2694,31 @@ class NewtonBackend(PhysicsBackend):
     # Fluid (SolverImplicitMPM) defaults: water as in newton's example_mpm_water_dam_break.py -- frictionless, with
     # newton's own (incompressible) yield defaults.
     _FLUID_DEFAULT_PARTICLE_RADIUS = 0.01
-    _FLUID_DEFAULT_PARTICLE_MASS = 1000.0 * (2 * _FLUID_DEFAULT_PARTICLE_RADIUS) ** 3
+    _FLUID_DEFAULT_PARTICLE_DENSITY = 1000.0
     _FLUID_MATERIAL_DEFAULTS = {
         "mpm:friction": 0.0,
         "mpm:tensile_yield_ratio": 1.0,
-        "mpm:viscosity": 0.0,
+        # MPM has no surface tension, so on the 2.5 cm grid inviscid water spilled on a floor kept spreading into a
+        # sheet of loose particles (2.9 L reached 3.7 m across); this stops it at ~1.1 m, about real water's puddle
+        "mpm:viscosity": 0.2,
+    }
+    # MPM materials by create_particle_system() material: viscous fluids (e.g. honey) as in newton's
+    # example_mpm_viscous.py, and frictional, cohesionless granular materials (e.g. salt) as in example_mpm_granular.py
+    _PARTICLE_MATERIALS = {
+        "fluid": _FLUID_MATERIAL_DEFAULTS,
+        "viscous": {**_FLUID_MATERIAL_DEFAULTS, "mpm:viscosity": 50.0},
+        "granular": {"mpm:friction": 0.68, "mpm:tensile_yield_ratio": 0.0, "mpm:viscosity": 0.0},
     }
     # Minimum number of inactive particle slots preallocated per particle system (see generate_particles())
     _FLUID_MIN_FREE_PARTICLES = 1024
-    _FLUID_VOXEL_SIZE = 0.05
-    # How close (m) the fluid particles may come to the edge of the fixed MPM grid before it is reallocated around them
+    # At 5 cm, water poured into a stockpot leaked through its walls and splashed over its rim
+    _FLUID_VOXEL_SIZE = 0.025
+    # Empty space (m) the fixed MPM grid keeps around the fluid particles, and how close (m) they may come to its edge
+    # before it is reallocated around them
+    _FLUID_GRID_PADDING = 2.5
     _FLUID_GRID_EDGE_MARGIN = 0.5
-    # Minimum MPM collider thickness (m), see _make_mpm_solver(). 5 mm cut leaks through a stockpot's walls from 38 to
-    # 3 of 2160 particles; at 12.5 mm water clung to the walls and a towel could no longer absorb it
+    # Minimum MPM collider thickness (m), see _make_mpm_solver(). With the "pic" collider basis, 5 mm keeps all the water
+    # in a stockpot; from ~7.5 mm up, the colliders kept pushing the water near the walls, so it never settled
     _FLUID_COLLIDER_THICKNESS = 0.005
 
     # Sized generously for a populated household scene, not tuned per-scene. Must match (or exceed)
@@ -2761,8 +2776,13 @@ class NewtonBackend(PhysicsBackend):
         config = SolverImplicitMPM.Config()
         config.voxel_size = self._FLUID_VOXEL_SIZE
         config.grid_type = "fixed"
-        config.grid_padding = 50
+        # Empty grid around the particles; particles that leave the fixed grid blow up (see
+        # _keep_fluid_grid_around_particles())
+        config.grid_padding = round(self._FLUID_GRID_PADDING / self._FLUID_VOXEL_SIZE)
         config.max_active_cell_count = 1 << 15
+        # Collide particles against colliders directly: with the grid-based "S2" default, water slowly seeped through
+        # a stockpot's walls (4% of a pour within 14 s, 34% with "Q1")
+        config.collider_basis = "pic"
         config.strain_basis = "P0"
         config.max_iterations = 50
         config.critical_fraction = 0.0
@@ -3042,12 +3062,32 @@ class NewtonBackend(PhysicsBackend):
             "vel": _wp_to_torch(self._state_0.particle_qd)[start:end, :3].clone(),
         }
 
-    def create_particle_system(self, system_name):
+    def create_particle_system(self, system_name, particle_radius=None, particle_density=None, material=None):
         if system_name not in self._fluid_systems:
             self._fluid_systems[system_name] = {
                 "pos": th.zeros((0, 3), device=self.sim.device),
                 "vel": th.zeros((0, 3), device=self.sim.device),
             }
+        radius, density, mat = self._fluid_system_props.get(system_name, (None, None, "fluid"))
+        self._fluid_system_props[system_name] = (
+            radius if particle_radius is None else float(particle_radius),
+            density if particle_density is None else float(particle_density),
+            mat if material is None else material,
+        )
+
+    def _fluid_particle_material(self, system_name):
+        """@system_name's create_particle_system() material: "fluid", "viscous" or "granular" """
+        return self._fluid_system_props.get(system_name, (None, None, "fluid"))[2]
+
+    def _fluid_particle_props(self, system_name):
+        """(particle radius, particle mass, MPM material attributes) of @system_name's particles"""
+        radius, density, _ = self._fluid_system_props.get(system_name, (None, None, "fluid"))
+        material = self._fluid_particle_material(system_name)
+        radius = self._FLUID_DEFAULT_PARTICLE_RADIUS if radius is None else radius
+        density = self._FLUID_DEFAULT_PARTICLE_DENSITY if density is None else density
+        # SolverImplicitMPM takes each particle's volume to be (2 * radius)^3, so this mass gives it @density
+        mass = density * (2.0 * radius) ** 3
+        return radius, mass, self._PARTICLE_MATERIALS[material]
 
     def _live_fluid_solver(self):
         """
@@ -3242,11 +3282,16 @@ class NewtonBackend(PhysicsBackend):
             else:
                 system["vel"] = velocities
 
-    # Surface reconstruction settings from newton's example_mpm_water_dam_break.py, with the voxel and kernel sized
-    # to _FLUID_VOXEL_SIZE and the 2 cm particle spacing
+    # Surface reconstruction settings from newton's example_mpm_water_dam_break.py, with the voxel sized to
+    # _FLUID_VOXEL_SIZE and the kernel to each system's particle radius (see _fluid_surface_kwargs())
     _FLUID_SURFACE_VOXEL_SIZE = 0.3 * _FLUID_VOXEL_SIZE
+    # Surface kernel radius in particle radii. Wider than the gap the collider thickness keeps (plus the wall), the
+    # surface reaches through thin container walls: 6 cm (6 of the former 1 cm radii) and 4 radii both did
+    _FLUID_SURFACE_KERNEL_RADII = 2.5
+    # How far (m) the surface extends into colliders so it meets them without a gap. Past the collider thickness, it
+    # pokes out the far side of thin walls
+    _FLUID_SURFACE_COLLIDER_DEPTH = 0.5 * _FLUID_COLLIDER_THICKNESS
     _FLUID_SURFACE_KWARGS = dict(
-        kernel_radius=max(6.0 * _FLUID_DEFAULT_PARTICLE_RADIUS, 1.5 * _FLUID_SURFACE_VOXEL_SIZE),
         threshold=0.25,
         smooth_lambda=0.0,
         anisotropic=True,
@@ -3263,9 +3308,18 @@ class NewtonBackend(PhysicsBackend):
         mesh_smooth_iterations=1,
     )
 
+    def _fluid_surface_kwargs(self, system_name):
+        """ParticleSurface settings for @system_name, with the kernel sized to its particles"""
+        radius = self._fluid_particle_props(system_name)[0]
+        return {
+            **self._FLUID_SURFACE_KWARGS,
+            "kernel_radius": max(self._FLUID_SURFACE_KERNEL_RADII * radius, 1.5 * self._FLUID_SURFACE_VOXEL_SIZE),
+        }
+
     def get_fluid_surface_meshes(self):
         """
         Surface meshes reconstructed from the live MPM particles, for rendering fluid as a liquid instead of beads.
+        Granular systems (e.g. salt) get no surface, see get_fluid_render_particles().
 
         Returns:
             dict: system_name -> (vertices, indices, normals) warp arrays, or None if the system has no surface
@@ -3283,12 +3337,16 @@ class NewtonBackend(PhysicsBackend):
             # Each rebuild makes a new solver (and particle layout), so the extraction contexts are per solver
             self._fluid_surface_cache = {"solver": mpm, "surfaces": {}, "flags": {}}
         cache = self._fluid_surface_cache
-        systems = {name: span for name, span in self._path_fluid_particle_map.items() if span[1] > span[0]}
+        systems = {
+            name: span
+            for name, span in self._path_fluid_particle_map.items()
+            if span[1] > span[0] and self._fluid_particle_material(name) != "granular"
+        }
         meshes = {}
         for system_name, (start, end) in systems.items():
             if system_name not in cache["surfaces"]:
                 cache["surfaces"][system_name] = mpm.create_particle_surface(
-                    voxel_size=self._FLUID_SURFACE_VOXEL_SIZE, **self._FLUID_SURFACE_KWARGS
+                    voxel_size=self._FLUID_SURFACE_VOXEL_SIZE, **self._fluid_surface_kwargs(system_name)
                 )
                 flags = None
                 if (start, end) != (0, self._model.particle_count):
@@ -3301,8 +3359,8 @@ class NewtonBackend(PhysicsBackend):
             mesh = mpm.extract_particle_surface(
                 self._state_0,
                 cache["surfaces"][system_name],
-                extrapolate_into_colliders=True,
-                collider_extrapolation_depth=2.0 * self._FLUID_SURFACE_VOXEL_SIZE,
+                extrapolate_into_colliders=self._FLUID_SURFACE_COLLIDER_DEPTH > 0,
+                collider_extrapolation_depth=self._FLUID_SURFACE_COLLIDER_DEPTH,
                 particle_flags=cache["flags"][system_name],
             )
             vertices, indices, normals = mesh.to_arrays()
@@ -3327,18 +3385,21 @@ class NewtonBackend(PhysicsBackend):
                     neighbors += th.where(unique_keys[idx] == query, counts[idx], 0)
         return neighbors
 
+    # Rendered droplet radius as a fraction of its particle radius (see get_fluid_render_particles())
+    _FLUID_DROPLET_RADIUS_SCALE = 0.5
+
     def get_fluid_render_particles(self, surfaces=None):
         """
-        Particles get_fluid_surface_meshes() doesn't cover, for rendering as spheres: every particle of a system
-        without a surface, and a system's particles away from its surface and too sparse to get one (e.g. a thin
-        falling stream or droplets).
+        Particles get_fluid_surface_meshes() doesn't cover, for rendering as spheres: every particle of a granular
+        system or of a liquid without a surface, and a liquid's particles away from its surface and too sparse to get
+        one (e.g. a thin falling stream or droplets).
 
         Args:
-            surfaces (None or dict): system_name -> surface vertex positions (warp vec3 array) of the systems that got
-                a surface, from get_fluid_surface_meshes()
+            surfaces (None or dict): system_name -> surface vertex positions (warp vec3 array) of the liquid systems
+                that got a surface, from get_fluid_surface_meshes()
 
         Returns:
-            dict: system_name -> (positions, radii) warp arrays, for systems with any such particles
+            dict: system_name -> (positions, render radii) warp arrays, for systems with any such particles
         """
         import warp as wp
 
@@ -3356,7 +3417,7 @@ class NewtonBackend(PhysicsBackend):
                 # Near its surface, the surface draws it. Elsewhere, like the surface extraction, a particle whose
                 # neighborhood (a cube spanning the extraction kernel) holds less than the extraction's density
                 # threshold of a packed one gets no surface
-                kernel = self._FLUID_SURFACE_KWARGS["kernel_radius"]
+                kernel = self._fluid_surface_kwargs(system_name)["kernel_radius"]
                 vertices = wp.to_torch(surfaces[system_name]).reshape(-1, 3)
                 near_surface = self._neighborhood_counts(vertices, positions, 4.0 * radii.max().item()) > 0
                 packed = (2.0 * kernel / (2.0 * radii)) ** 3
@@ -3365,7 +3426,8 @@ class NewtonBackend(PhysicsBackend):
                 uncovered = sparse & ~near_surface
                 if not uncovered.any():
                     continue
-                positions, radii = positions[uncovered], radii[uncovered]
+                # Drawn at full size, droplets read as opaque marbles
+                positions, radii = positions[uncovered], self._FLUID_DROPLET_RADIUS_SCALE * radii[uncovered]
             particles[system_name] = (
                 wp.from_torch(positions.contiguous(), dtype=wp.vec3),
                 wp.from_torch(radii.contiguous()),

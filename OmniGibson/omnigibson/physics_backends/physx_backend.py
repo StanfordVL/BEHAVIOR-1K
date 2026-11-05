@@ -542,7 +542,7 @@ class PhysXBackend(PhysicsBackend):
     # exist to satisfy the abstract interface but are not currently reachable from PhysX's own particle
     # code path.
 
-    def create_particle_system(self, system_name):
+    def create_particle_system(self, system_name, particle_radius=None, particle_density=None, material=None):
         raise NotImplementedError(
             "PhysX particle-system creation goes through MicroPhysicalParticleSystem/"
             "PhysxParticleInstancer directly, not this abstraction."

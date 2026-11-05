@@ -511,8 +511,12 @@ class PhysicsBackend(ABC):
     # ---- Fluid/granular particle-system state I/O ----
 
     @abstractmethod
-    def create_particle_system(self, system_name):
-        """Register a new, initially-empty named particle system."""
+    def create_particle_system(self, system_name, particle_radius=None, particle_density=None, material=None):
+        """
+        Register a new, initially-empty named particle system. Particle properties given here (None = unchanged, or the
+        backend's default) apply to the particles it simulates: @particle_radius (m), @particle_density (kg/m^3), and
+        @material, one of "fluid", "viscous" (a viscous fluid) or "granular".
+        """
 
     @abstractmethod
     def generate_particles(self, system_name, positions, velocities=None):
