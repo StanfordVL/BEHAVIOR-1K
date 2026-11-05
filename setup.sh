@@ -444,6 +444,11 @@ if [ "$OMNIGIBSON" = true ]; then
     # (needs websockets>=13 for websockets.asyncio.server). Re-upgrade them.
     python -m pip install --force-reinstall -U "coverage>=7.5" "llvmlite>=0.48" "websockets>=15.0.1"
 
+    # isaacsim-core 6.0.1 pins newton[sim]==1.2.1, too old for OmniGibson's Newton backend. Install the
+    # version from OmniGibson's "newton" extra over it (must run after Isaac Sim, which would downgrade it).
+    # Keep in sync with extras_require["newton"] in OmniGibson/setup.py.
+    python -m pip install "newton[sim]==1.7.0"
+
     echo "OmniGibson installation completed successfully!"
 fi
 

@@ -2097,7 +2097,7 @@ class NewtonBackend(PhysicsBackend):
             for _ in range(self._attachment_slot_count):
                 slot = builder.add_custom_values(
                     **{
-                        "mujoco:equality_constraint_type": int(newton.EqType.WELD),
+                        "mujoco:equality_constraint_type": int(newton.solvers.SolverMuJoCo.EqType.WELD),
                         "mujoco:equality_constraint_body1": -1,
                         "mujoco:equality_constraint_body2": 0,
                         "mujoco:equality_constraint_enabled": False,

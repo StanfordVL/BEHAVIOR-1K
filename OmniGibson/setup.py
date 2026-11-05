@@ -87,7 +87,12 @@ setup(
             "msgpack>=1.1.0",
             "gspread>=6.2.1",
             "open3d>=0.19.0",
-        ]
+        ],
+        # Standalone Newton physics backend. isaacsim-core pins newton[sim]==1.2.1, so setup.sh installs this
+        # after Isaac Sim to override that pin.
+        "newton": [
+            "newton[sim]==1.7.0",
+        ],
     },
     tests_require=[],
     python_requires=">=3",
