@@ -379,7 +379,7 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
         # First pad all state values to be the same max (uniform) size
         for step_data in traj_data:
             state = step_data["state"]
-            padded_state = th.zeros(self.max_state_size, dtype=th.float32)
+            padded_state = th.zeros(self.max_state_size, dtype=th.float32, device=og.sim.device)
             padded_state[: len(state)] = state
             step_data["state"] = padded_state
 
@@ -439,6 +439,7 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
         Args:
             viewport_camera_path (str): Prim path to the camera to use for the viewer for data collection
         """
+
         # Disable all render products to save on speed
         # See https://forums.developer.nvidia.com/t/speeding-up-simulation-2023-1-1/300072/6
         for sensor in VisionSensor.SENSORS.values():
@@ -555,7 +556,7 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
         # First pad all state values to be the same max (uniform) size
         for step_data in traj_data:
             state = step_data["state"]
-            padded_state = th.zeros(self.max_state_size, dtype=th.float32)
+            padded_state = th.zeros(self.max_state_size, dtype=th.float32, device=og.sim.device)
             padded_state[: len(state)] = state
             step_data["state"] = padded_state
 

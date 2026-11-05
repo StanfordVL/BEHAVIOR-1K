@@ -417,6 +417,8 @@ class PhysicsBackend(ABC):
         pass
 
     # ---- Cloth particle state I/O (backs ClothPrim) ----
+    # Positions/velocities are always in the WORLD frame -- each backend hides its own internal
+    # convention (e.g. a local-mesh-frame USD attribute vs. an already-world-space solver state array).
 
     @abstractmethod
     def get_cloth_particle_positions(self, prim_path, idxs=None):

@@ -88,9 +88,9 @@ class PointNavigationTask(BaseTask):
         # Store inputs
         self._robot_idn = robot_idn
         self._floor = floor
-        self._initial_pos_cfg = initial_pos if initial_pos is None else th.tensor(initial_pos)
-        self._initial_quat_cfg = initial_quat if initial_quat is None else th.tensor(initial_quat)
-        self._goal_pos_cfg = goal_pos if goal_pos is None else th.tensor(goal_pos)
+        self._initial_pos_cfg = initial_pos if initial_pos is None else th.tensor(initial_pos, device=og.sim.device)
+        self._initial_quat_cfg = initial_quat if initial_quat is None else th.tensor(initial_quat, device=og.sim.device)
+        self._goal_pos_cfg = goal_pos if goal_pos is None else th.tensor(goal_pos, device=og.sim.device)
         self._goal_tolerance = goal_tolerance
         self._goal_in_polar = goal_in_polar
         self._path_range = path_range
@@ -159,16 +159,16 @@ class PointNavigationTask(BaseTask):
         self._initial_pos = [None] * env.num_envs
         self._initial_quat = [None] * env.num_envs
         self._goal_pos = [None] * env.num_envs
-        self._path_length = th.zeros(env.num_envs, dtype=th.float32)
+        self._path_length = th.zeros(env.num_envs, dtype=th.float32, device=og.sim.device)
         self._current_robot_pos = [None] * env.num_envs
-        self._geodesic_dist = th.zeros(env.num_envs, dtype=th.float32)
+        self._geodesic_dist = th.zeros(env.num_envs, dtype=th.float32, device=og.sim.device)
 
         # Load visualization (only for first scene)
         self._load_visualization_markers(env=env)
 
         # Auto-initialize all markers
         og.sim.play()
-        self._reset_agent(env=env, env_indices=th.arange(env.num_envs))
+        self._reset_agent(env=env, env_indices=th.arange(env.num_envs, device=og.sim.device))
         for scene in env.scenes:
             scene.update_initial_file()
         og.sim.stop()
@@ -256,7 +256,7 @@ class PointNavigationTask(BaseTask):
         # Possibly sample initial ori
         quat_lo, quat_hi = 0, math.pi * 2
         initial_quat = (
-            T.euler2quat(th.tensor([0, 0, (th.rand(1) * (quat_hi - quat_lo) + quat_lo).item()]))
+            T.euler2quat(th.tensor([0, 0, (th.rand(1) * (quat_hi - quat_lo) + quat_lo).item()], device=og.sim.device))
             if self._randomize_initial_quat
             else self._initial_quat_cfg.clone()
         )
@@ -412,7 +412,7 @@ class PointNavigationTask(BaseTask):
         # Get relative position of goal with respect to the current agent position
         xy_pos_to_goal = self._global_pos_to_robot_frame(env, env_idx, self._goal_pos[env_idx])[:2]
         if self._goal_in_polar:
-            xy_pos_to_goal = th.tensor(T.cartesian_to_polar(*xy_pos_to_goal))
+            xy_pos_to_goal = th.tensor(T.cartesian_to_polar(*xy_pos_to_goal), device=og.sim.device)
 
         # linear velocity and angular velocity
         robot = env.scenes[env_idx].robots[self._robot_idn]

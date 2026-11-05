@@ -4,6 +4,7 @@ from collections.abc import Iterable
 import cv2
 import torch as th
 
+import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.sensors.sensor_base import BaseSensor
@@ -179,6 +180,7 @@ class ScanSensor(BaseSensor):
             -th.deg2rad(th.tensor([self.horizontal_fov / 2])).item(),
             th.deg2rad(th.tensor([self.horizontal_fov / 2])).item(),
             num_points,
+            device=og.sim.device,
         )
 
         # Convert into 3D unit vectors for each angle
@@ -196,7 +198,10 @@ class ScanSensor(BaseSensor):
         base_pos, base_ori = self.occupancy_grid_local_link.get_position_orientation()
         scan_local = (T.quat2mat(base_ori).T @ (scan_world - base_pos).T).T
         scan_local = scan_local[:, :2]
-        scan_local = th.cat([th.tensor([[0, 0]]), scan_local, th.tensor([[0, 0]])], dim=0)
+        scan_local = th.cat(
+            [th.tensor([[0, 0]], device=scan_local.device), scan_local, th.tensor([[0, 0]], device=scan_local.device)],
+            dim=0,
+        )
 
         # flip y axis
         scan_local[:, 1] *= -1
@@ -246,7 +251,7 @@ class ScanSensor(BaseSensor):
 
         # Add scan info (normalized to [0.0, 1.0])
         if "scan" in self._modalities:
-            raw_scan = th.tensor(self._rs.get_linear_depth_data(self.prim_path), dtype=th.float32)
+            raw_scan = th.tensor(self._rs.get_linear_depth_data(self.prim_path), dtype=th.float32, device=og.sim.device)
             # Sometimes get_linear_depth_data will return values that are slightly out of range, needs clipping
             raw_scan = th.clip(raw_scan, self.min_range, self.max_range)
             obs["scan"] = (raw_scan - self.min_range) / (self.max_range - self.min_range)

@@ -3,6 +3,7 @@ from copy import deepcopy
 
 import torch as th
 
+import omnigibson as og
 from omnigibson.utils.gym_utils import GymObservable
 from omnigibson.utils.numpy_utils import NumpyTypes
 from omnigibson.utils.python_utils import Registerable, classproperty
@@ -211,9 +212,9 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         """
         if self._reward is None:
             # First-time init
-            self._reward = th.zeros(self._num_envs, dtype=th.float32)
-            self._done = th.zeros(self._num_envs, dtype=th.bool)
-            self._success = th.zeros(self._num_envs, dtype=th.bool)
+            self._reward = th.zeros(self._num_envs, dtype=th.float32, device=og.sim.device)
+            self._done = th.zeros(self._num_envs, dtype=th.bool, device=og.sim.device)
+            self._success = th.zeros(self._num_envs, dtype=th.bool, device=og.sim.device)
         self._reward[env_indices] = 0.0
         self._done[env_indices] = False
         self._success[env_indices] = False
@@ -228,7 +229,7 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
             env_indices (None or th.Tensor): Indices of environments to reset. If None, resets all.
         """
         if env_indices is None:
-            env_indices = th.arange(self._num_envs)
+            env_indices = th.arange(self._num_envs, device=og.sim.device)
 
         # Reset the scene, agent, and variables
         self._reset_scene(env, env_indices)
@@ -263,8 +264,8 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
                     infos[i]["termination_conditions"] = dict()
         else:
             infos = [{"termination_conditions": dict()} for _ in range(self._num_envs)]
-        dones = th.zeros(self._num_envs, dtype=th.bool)
-        successes = th.zeros(self._num_envs, dtype=th.bool)
+        dones = th.zeros(self._num_envs, dtype=th.bool, device=og.sim.device)
+        successes = th.zeros(self._num_envs, dtype=th.bool, device=og.sim.device)
 
         for name, termination_condition in self._termination_conditions.items():
             d, s = termination_condition.step(self, env, action)
@@ -298,7 +299,7 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         """
         # Aggregate rewards over all reward functions
         infos = infos if infos is not None else [dict() for _ in range(self._num_envs)]
-        total_rewards = th.zeros(self._num_envs, dtype=th.float32)
+        total_rewards = th.zeros(self._num_envs, dtype=th.float32, device=og.sim.device)
 
         for reward_name, reward_function in self._reward_functions.items():
             rewards, reward_infos = reward_function.step(self, env, action)
@@ -339,7 +340,7 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
             n-array: 1D-numpy array of flattened low-dim observations
         """
         # By default, we simply concatenate all values in our obs dict
-        return th.cat([ob for ob in obs.values()]) if len(obs.values()) > 0 else th.empty(0)
+        return th.cat([ob for ob in obs.values()]) if len(obs.values()) > 0 else th.empty(0, device=og.sim.device)
 
     def get_obs(self, env, env_idx=None, flatten_low_dim=True):
         """
@@ -386,7 +387,7 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         # Update the internal state of this task
         self._reward = rewards
         self._done = dones
-        self._success = th.tensor([di["success"] for di in done_infos], dtype=th.bool)
+        self._success = th.tensor([di["success"] for di in done_infos], dtype=th.bool, device=og.sim.device)
         self._info = [{"reward": reward_infos[i], "done": done_infos[i]} for i in range(self._num_envs)]
 
         return self._reward, self._done, deepcopy(self._info)

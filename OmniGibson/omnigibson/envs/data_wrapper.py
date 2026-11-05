@@ -825,7 +825,8 @@ class DataPlaybackWrapper(DataWrapper):
                     # TODO: Implement keep_still for other systems
                     if isinstance(system, MacroPhysicalParticleSystem):
                         system.set_particles_velocities(
-                            lin_vels=th.zeros((system.n_particles, 3)), ang_vels=th.zeros((system.n_particles, 3))
+                            lin_vels=th.zeros((system.n_particles, 3), device=og.sim.device),
+                            ang_vels=th.zeros((system.n_particles, 3), device=og.sim.device),
                         )
             # Take a small step with the action to propagate physics after loading the state
             obs_list, _, _, _, infos = self.env.step(action=a, n_render_iterations=self.n_render_iterations)

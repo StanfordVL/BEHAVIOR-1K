@@ -1,8 +1,16 @@
 import numpy as np
 import torch as th
 
+import omnigibson as og
 import omnigibson.utils.transform_utils as TT
 import omnigibson.utils.transform_utils_np as NT
+
+
+def _to_numpy_compatible(x):
+    # og.sim.device can now be a non-CPU (e.g. CUDA) device under the Newton backend. np.array() on a
+    # CUDA torch.Tensor raises "can't convert cuda:0 device type tensor to numpy", so any torch tensor
+    # handed to the numpy compute backend must be explicitly moved to CPU first.
+    return x.detach().cpu().numpy() if isinstance(x, th.Tensor) else x
 
 
 # Global function for adding custom compute functions
@@ -93,14 +101,18 @@ class _ComputeBackend:
 
 
 class _ComputeTorchBackend(_ComputeBackend):
-    array = lambda *args: th.tensor(*args, dtype=th.float32)
-    int_array = lambda *args: th.tensor(*args, dtype=th.int32)
-    bool_array = lambda *args: th.tensor(*args, dtype=th.bool)
-    bool_zeros = lambda *args: th.zeros(*args, dtype=th.bool)
+    # Every factory below must land on og.sim.device explicitly: under a non-CPU physics backend
+    # (e.g. Newton on CUDA), a bare th.tensor/zeros/ones/full/eye/arange call defaults to CPU, and
+    # controllers immediately combine these with og.sim.device-resident joint/control state (via
+    # cat, in-place assignment, or arithmetic), which crashes with a device-mismatch error.
+    array = lambda *args: th.tensor(*args, dtype=th.float32, device=og.sim.device)
+    int_array = lambda *args: th.tensor(*args, dtype=th.int32, device=og.sim.device)
+    bool_array = lambda *args: th.tensor(*args, dtype=th.bool, device=og.sim.device)
+    bool_zeros = lambda *args: th.zeros(*args, dtype=th.bool, device=og.sim.device)
     prod = th.prod
     cat = th.cat
-    zeros = lambda *args: th.zeros(*args, dtype=th.float32)
-    ones = lambda *args: th.ones(*args, dtype=th.float32)
+    zeros = lambda *args: th.zeros(*args, dtype=th.float32, device=og.sim.device)
+    ones = lambda *args: th.ones(*args, dtype=th.float32, device=og.sim.device)
     to_numpy = lambda x: x.numpy()
     from_numpy = lambda x: th.from_numpy(x) if isinstance(x, np.ndarray) else th.as_tensor(x)
     to_torch = lambda x: x
@@ -111,7 +123,7 @@ class _ComputeTorchBackend(_ComputeBackend):
     as_float32 = lambda arr: arr.float()
     pinv = th.linalg.pinv
     meshgrid = lambda idx_a, idx_b: th.meshgrid(idx_a, idx_b, indexing="xy")
-    full = lambda shape, fill_value: th.full(shape, fill_value, dtype=th.float32)
+    full = lambda shape, fill_value: th.full(shape, fill_value, dtype=th.float32, device=og.sim.device)
     logical_or = th.logical_or
     all = th.all
     abs = th.abs
@@ -120,9 +132,9 @@ class _ComputeTorchBackend(_ComputeBackend):
     mean = lambda val, dim=None, keepdim=False: th.mean(val, dim=dim, keepdim=keepdim)
     sum = lambda val, dim=None, keepdim=False: th.sum(val, dim=dim, keepdim=keepdim)
     copy = lambda arr: arr.clone()
-    eye = th.eye
+    eye = lambda *args, **kwargs: th.eye(*args, **kwargs, device=og.sim.device)
     view = lambda arr, shape: arr.view(shape)
-    arange = th.arange
+    arange = lambda *args, **kwargs: th.arange(*args, **kwargs, device=og.sim.device)
     where = th.where
     squeeze = lambda arr, dim=None: arr.squeeze(dim=dim)
     T = TT
@@ -133,9 +145,12 @@ class _ComputeTorchBackend(_ComputeBackend):
 
 
 class _ComputeNumpyBackend(_ComputeBackend):
-    array = lambda *args: np.array(*args, dtype=np.float32)
-    int_array = lambda *args: np.array(*args, dtype=np.int32)
-    bool_array = lambda *args: np.array(*args, dtype=bool)
+    # array/int_array/bool_array are handed both raw python/numpy data and, at several call sites,
+    # already-device-tracked torch tensors (e.g. robot control limits, dof indices) -- route through
+    # _to_numpy_compatible so a CUDA tensor doesn't crash np.array().
+    array = lambda *args: np.array(*[_to_numpy_compatible(a) for a in args], dtype=np.float32)
+    int_array = lambda *args: np.array(*[_to_numpy_compatible(a) for a in args], dtype=np.int32)
+    bool_array = lambda *args: np.array(*[_to_numpy_compatible(a) for a in args], dtype=bool)
     bool_zeros = lambda *args: np.zeros(*args, dtype=bool)
     prod = np.prod
     cat = lambda tensors, dim=0: np.concatenate(tensors, axis=dim)
@@ -144,7 +159,9 @@ class _ComputeNumpyBackend(_ComputeBackend):
     to_numpy = lambda x: x
     from_numpy = lambda x: x
     to_torch = lambda x: th.from_numpy(x) if isinstance(x, np.ndarray) else th.as_tensor(x)
-    from_torch = lambda x: x.numpy()
+    # numpy has no GPU concept at all -- always move to CPU first regardless of the input tensor's
+    # own device (this backend is meant to run controller math on CPU/numpy unconditionally).
+    from_torch = lambda x: x.cpu().numpy()
     allclose = np.allclose
     arr_type = np.ndarray
     as_int = lambda arr: arr.astype(int)
