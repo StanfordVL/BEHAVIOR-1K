@@ -113,10 +113,6 @@ class EntityPrim(XFormPrim):
                 if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
                     assert old_link_prim is None, "Found multiple XForm links for a Cloth entity prim! Expected: 1"
                     old_link_prim = prim
-                    # The visual (non-collision) mesh is a descendant of the link, not necessarily a
-                    # direct child -- current dataset assets nest it under an intermediate "visuals"
-                    # Xform (the same convention used for rigid objects' visual/collision meshes), so
-                    # search recursively rather than assuming a fixed depth.
                     for descendant in lazy.pxr.Usd.PrimRange(prim):
                         if descendant.GetPrimTypeInfo().GetTypeName() == "Mesh" and not descendant.HasAPI(
                             lazy.pxr.UsdPhysics.CollisionAPI

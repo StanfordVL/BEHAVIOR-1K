@@ -394,8 +394,6 @@ def test_aabb(env, breakfast_table, dishtowel):
     # Need to take one sim step
     og.sim.step()
 
-    # states[AABB].get_value() reads from a deliberate CPU-mirror cache (VALUES_CPU) to avoid GPU
-    # stalls, while breakfast_table.aabb computes fresh on og.sim.device -- move to a common device.
     assert th.allclose(breakfast_table.states[AABB].get_value()[0], breakfast_table.aabb[0].cpu())
     assert th.allclose(breakfast_table.states[AABB].get_value()[1], breakfast_table.aabb[1].cpu())
     assert th.all(

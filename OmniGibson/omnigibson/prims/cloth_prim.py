@@ -906,9 +906,6 @@ class ClothPrim(GeomPrim):
         Returns:
             int: Particle group this instancer belongs to
         """
-        # Unauthored on backends that never call clothify_mesh_prim()'s PhysX-specific particle-cloth
-        # authoring (e.g. Newton, whose self-collision handling doesn't use this concept at all) --
-        # default to 0 rather than None so downstream state serialization doesn't break.
         group = self.get_attribute(attr="physxParticle:particleGroup")
         return 0 if group is None else group
 
