@@ -1,21 +1,6 @@
 """USD visual mesh import for the Newton physics backend.
 
-Ported from ``feat/newton``'s own ``omnigibson/newton/visuals.py`` (the reference Newton-native
-rewrite), adapted to bake visual-only shapes into the SAME already-open simulation stage/builder our
-``physics_backends.newton_backend.NewtonBackend`` already uses (feat/newton opens a fresh per-object
-USD file for this pass; we don't have per-object files, so this walks ``stage`` directly under
-``root_path`` instead).
-
-Newton's own standalone viewers (``ViewerGL``/``ViewerRTX`` -- see
-``omnigibson/utils/newton_viewer_recording.py``) render whatever the model carries, so visual shapes
-have to be baked into it.
-
-Critically, this is also what fixes real per-texel texturing: Newton's own ``viewer.log_state()``
-renders shapes baked into the model (via ``ModelBuilder.add_shape_mesh``) through a different internal
-path than the public ``viewer.log_mesh()``/``log_instances()`` API -- confirmed empirically that the
-latter renders textured meshes as a flat, untextured color (a minimal, OmniGibson-independent repro:
-a bare quad with a real texture image renders uniform gray, not the image, via ``log_mesh()``), while
-the former (this module's approach, matching feat/newton) renders correctly.
+Bake visual-only shapes into the simulation stage in ``physics_backends.newton_backend.NewtonBackend``.
 """
 
 import functools
