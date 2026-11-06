@@ -133,7 +133,8 @@ class RigidDynamicPrim(RigidPrim):
         position = current_position if position is None else position
         orientation = current_orientation if orientation is None else orientation
 
-        # Convert to th.Tensor if necessary.
+        # Convert to th.Tensor if necessary. Must land on og.sim.device explicitly -- see
+        # XFormPrim.set_position_orientation()'s equivalent comment for why.
         position = th.as_tensor(position, dtype=th.float32, device=og.sim.device)
         orientation = th.as_tensor(orientation, dtype=th.float32, device=og.sim.device)
 
@@ -373,8 +374,8 @@ class RigidDynamicPrim(RigidPrim):
         # Grab pose from super class
         state = super()._dump_state()
 
-        state["lin_vel"] = self.get_linear_velocity()
-        state["ang_vel"] = self.get_angular_velocity()
+        state["lin_vel"] = self.get_linear_velocity(clone=False)
+        state["ang_vel"] = self.get_angular_velocity(clone=False)
 
         return state
 

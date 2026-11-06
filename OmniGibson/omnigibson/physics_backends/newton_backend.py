@@ -611,7 +611,9 @@ class NewtonRigidBodyHandle:
         body_q = _wp_to_torch(self._backend._state_0.body_q)
         pos = body_q[self._body_idx, :3].unsqueeze(0)
         quat_wxyz = _xyzw_to_wxyz(body_q[self._body_idx, 3:7]).unsqueeze(0)
-        return (pos.clone(), quat_wxyz.clone()) if clone else (pos, quat_wxyz)
+        # Always copy, whatever `clone` says: an int index gives a live view of body_q, while PhysX's
+        # getters always return fresh tensors, and callers (e.g. _dump_state's clone=False) rely on that
+        return pos.clone(), quat_wxyz.clone()
 
     def set_world_poses(self, positions, orientations):
         if not self._valid:
@@ -634,8 +636,8 @@ class NewtonRigidBodyHandle:
     def get_linear_velocities(self, clone=True):
         if not self._valid:
             return th.zeros(1, 3, device=self._backend.sim.device)
-        vel = _wp_to_torch(self._backend._state_0.body_qd)[self._body_idx, :3].unsqueeze(0)
-        return vel.clone() if clone else vel
+        # Always copy (see get_world_poses)
+        return _wp_to_torch(self._backend._state_0.body_qd)[self._body_idx, :3].unsqueeze(0).clone()
 
     def _set_root_free_joint_qd(self, offset, values):
         if self._root_free_joint_qd_start is None:
@@ -655,8 +657,8 @@ class NewtonRigidBodyHandle:
     def get_angular_velocities(self, clone=True):
         if not self._valid:
             return th.zeros(1, 3, device=self._backend.sim.device)
-        vel = _wp_to_torch(self._backend._state_0.body_qd)[self._body_idx, 3:6].unsqueeze(0)
-        return vel.clone() if clone else vel
+        # Always copy (see get_world_poses)
+        return _wp_to_torch(self._backend._state_0.body_qd)[self._body_idx, 3:6].unsqueeze(0).clone()
 
     def set_angular_velocities(self, velocities):
         if not self._valid:
@@ -665,9 +667,8 @@ class NewtonRigidBodyHandle:
         self._set_root_free_joint_qd(3, velocities)
 
     def get_coms(self, clone=True):
-        com = _wp_to_torch(self._backend._model.body_com)[self._body_idx].reshape(1, 1, 3)
-        if clone:
-            com = com.clone()
+        # Always copy (see get_world_poses)
+        com = _wp_to_torch(self._backend._model.body_com)[self._body_idx].reshape(1, 1, 3).clone()
         return com, th.tensor([[[1.0, 0.0, 0.0, 0.0]]], device=com.device)
 
     def set_coms(self, positions):
