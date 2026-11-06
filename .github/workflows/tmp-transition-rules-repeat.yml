@@ -1,0 +1,107 @@
+# TEMPORARY (PR #2380): run each split transition-rules file 3 more times alongside the regular
+# Tests workflow, to check whether the split avoids the intermittent RTX "Out of resource descriptors!" fatal.
+# Delete before merging.
+name: TMP transition rules repeat
+
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  repeat:
+    name: Repeat (${{ matrix.test_file }}, ${{ matrix.copy }})
+    runs-on: [self-hosted, linux, gpu, dataset-enabled]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        test_file:
+          - test_transition_rules_basic
+          - test_transition_rules_cooking
+          - test_transition_rules_machines
+        copy: [2, 3, 4]
+
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}/OmniGibson
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Set up conda environment for this run
+        id: setup_env
+        working-directory: ${{ github.workspace }}
+        run: |
+          REQUIRED_PY=$(sed -n 's/.*conda create -n "\$NEW_ENV_NAME" python=\([0-9]*\.[0-9]*\).*/\1/p' setup.sh | head -1)
+          CURRENT_PY=$(python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+          if [[ "$CURRENT_PY" != "$REQUIRED_PY" ]]; then
+            ENV_NAME="ci-${{ github.run_id }}-${{ strategy.job-index }}"
+            echo "Python version mismatch (have $CURRENT_PY, need $REQUIRED_PY) -- creating a fresh conda env '$ENV_NAME'"
+            # --primitives (curobo) needs a CUDA toolkit + nvcc to compile from source, which is
+            # only present at Docker build time (see docker/Dockerfile) -- not in this ephemeral
+            # runner. Skip it: test_curobo/test_primitives are already disabled in run_test's matrix,
+            # so nothing actually exercises it.
+            ./setup.sh --new-env "$ENV_NAME" --omnigibson --bddl --joylo --eval --dev \
+              --accept-conda-tos --accept-nvidia-eula
+            echo "fresh_env=true" >> "$GITHUB_OUTPUT"
+          else
+            ENV_NAME="behavior"
+            echo "fresh_env=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "CONDA_ENV=$ENV_NAME" >> "$GITHUB_ENV"
+
+      - name: Install BDDL
+        if: steps.setup_env.outputs.fresh_env != 'true'
+        run: conda run -n "$CONDA_ENV" --no-capture-output pip install -e .
+        working-directory: ${{ github.workspace }}/bddl3
+
+      - name: Install OmniGibson
+        if: steps.setup_env.outputs.fresh_env != 'true'
+        run: conda run -n "$CONDA_ENV" --no-capture-output pip install -e .[dev,primitives,eval] --no-build-isolation
+
+      - name: Print env
+        run: printenv
+
+      - name: Run tests
+        run: >
+          conda run -n "$CONDA_ENV" --no-capture-output
+          pytest -s tests/${{ matrix.test_file }}.py
+          ${{ matrix.example && format('-k "{0}"', matrix.example) || '' }}
+          ${{ matrix.args && format('--test-args={0}', matrix.args) || '' }}
+          --junitxml=${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}.xml
+          -o junit_family=xunit1
+        continue-on-error: true
+        timeout-minutes: 30
+
+      - name: Check for failures, errors, or missing XML
+        if: always()
+        run: |
+          xml=${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}.xml
+          if [ ! -f "$xml" ]; then
+            cat > "$xml" << 'EOF'
+          <?xml version="1.0"?>
+          <testsuite name="${{ matrix.test_file }}" errors="1" failures="0" tests="1">
+            <testcase name="${{ matrix.test_file }}" classname="${{ matrix.test_file }}">
+              <error message="Test did not produce output, likely due to segfault or timeout"/>
+            </testcase>
+          </testsuite>
+          EOF
+            echo "Error: XML file not found, probably due to segfault or timeout"
+            exit 1
+          elif grep -Eq 'failures="[1-9][0-9]*"|errors="[1-9][0-9]*"' "$xml"; then
+            echo "Error: Test failures or errors found"
+            exit 1
+          else
+            echo "All tests passed successfully"
+          fi
+
+      - name: Remove scratch conda environment
+        if: always() && steps.setup_env.outputs.fresh_env == 'true'
+        working-directory: ${{ github.workspace }}
+        run: conda env remove -n "$CONDA_ENV" -y
