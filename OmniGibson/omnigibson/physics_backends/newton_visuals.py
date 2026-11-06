@@ -160,7 +160,7 @@ def _load_render_meshes(newton, prim, scale):
         faces,
         corner_indices,
         uvs,
-        _with_glass_opacity(usd_utils.resolve_material_properties_for_prim(prim), prim),
+        _with_mdl_material(usd_utils.resolve_material_properties_for_prim(prim), prim),
     )
     return (("", render_mesh),) if render_mesh is not None else ()
 
@@ -224,7 +224,7 @@ def _material_subsets(usd_utils, prim, face_count):
             _MaterialSubset(
                 name=child.GetName(),
                 face_indices=face_indices,
-                material_props=_with_glass_opacity(usd_utils.resolve_material_properties_for_prim(child), child),
+                material_props=_with_mdl_material(usd_utils.resolve_material_properties_for_prim(child), child),
             )
         )
     return tuple(subsets)
@@ -265,12 +265,99 @@ def _with_glass_opacity(props, prim):
     return props
 
 
+# OmniGibson's dataset assets mostly bind the MDL ``OmniGibsonVRayMtl``, which keeps a material's specular look
+# in separate reflection / glossiness maps. newton's resolver reads only its ``diffuse_texture``, and steel is
+# authored as a near-black diffuse under a bright reflection layer, so shelves, steel tables and racks render
+# almost black. Bake the reflection layer into the albedo, and derive the scalar metallic/roughness from the maps.
+_VRAY_MIN_REFLECTION = 0.05
+
+
+def _bound_vray_texture_paths(prim):
+    """{name: path} of the ``*_texture`` inputs of ``prim``'s bound OmniGibsonVRayMtl shader, or None."""
+    try:
+        material, _ = UsdShade.MaterialBindingAPI(prim).ComputeBoundMaterial()
+        if not material:
+            return None
+        for child in Usd.PrimRange(material.GetPrim()):
+            if not child.IsA(UsdShade.Shader):
+                continue
+            shader = UsdShade.Shader(child)
+            if "omnigibsonvraymtl" not in str(shader.GetSourceAssetSubIdentifier("mdl") or "").lower():
+                continue
+            paths = {}
+            for inp in shader.GetInputs():
+                name, value = inp.GetBaseName(), inp.Get()
+                if name.endswith("_texture") and value:
+                    paths[name[: -len("_texture")]] = value.resolvedPath or value.path
+            return paths
+    except Exception:
+        return None
+    return None
+
+
+def _load_texture_unit(path, size=None):
+    from PIL import Image
+
+    with Image.open(path) as image:
+        image = image.convert("RGBA")
+        if size is not None and image.size != size:
+            image = image.resize(size, Image.BILINEAR)
+        return np.asarray(image, dtype=np.float32) / 255.0
+
+
+@functools.lru_cache(maxsize=512)
+def _bake_vray_maps(diffuse_path, reflection_path, glossiness_path):
+    """(albedo uint8 RGBA, metallic, roughness) for a VRay material, or None if it has no real reflection layer."""
+    try:
+        diffuse = _load_texture_unit(diffuse_path)
+        size = (diffuse.shape[1], diffuse.shape[0])
+        reflection = _load_texture_unit(reflection_path, size)[..., :3]
+    except Exception:
+        return None
+    # Per-texel reflection strength, in the map's own (display) space like the albedo it is mixed into
+    weight = reflection @ np.array([0.2126, 0.7152, 0.0722], dtype=np.float32)
+    if float(weight.mean()) < _VRAY_MIN_REFLECTION:
+        return None
+    albedo = diffuse.copy()
+    albedo[..., :3] = diffuse[..., :3] * (1.0 - weight[..., None]) + reflection * weight[..., None]
+    roughness = None
+    if glossiness_path is not None:
+        try:
+            glossiness = _load_texture_unit(glossiness_path, size)[..., 0]
+            # Glossiness only matters where the surface reflects
+            roughness = float(((1.0 - glossiness) * weight).sum() / max(float(weight.sum()), 1e-6))
+        except Exception:
+            pass
+    albedo = np.clip(np.round(albedo * 255.0), 0, 255).astype(np.uint8)
+    return albedo, float(weight.mean()), roughness
+
+
+def _with_vray_reflection(props, prim):
+    if props is None or not isinstance(props.get("texture"), str) or props.get("metallic") is not None:
+        return props
+    paths = _bound_vray_texture_paths(prim)
+    if not paths or "reflection" not in paths:
+        return props
+    baked = _bake_vray_maps(props["texture"], paths["reflection"], paths.get("glossiness"))
+    if baked is None:
+        return props
+    props = dict(props)
+    props["texture"], props["metallic"], roughness = baked
+    if roughness is not None and props.get("roughness") is None:
+        props["roughness"] = roughness
+    return props
+
+
+def _with_mdl_material(props, prim):
+    return _with_vray_reflection(_with_glass_opacity(props, prim), prim)
+
+
 def _direct_material_properties(usd_utils, prim):
     resolver = getattr(usd_utils, "_resolve_prim_material_properties", None)
     if resolver is not None:
         props = resolver(prim)
         if props is not None:
-            return _with_glass_opacity(props, prim)
+            return _with_mdl_material(props, prim)
     empty = getattr(usd_utils, "_empty_material_properties", None)
     if empty is not None:
         return empty()
