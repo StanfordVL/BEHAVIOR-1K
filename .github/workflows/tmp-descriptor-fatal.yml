@@ -1,0 +1,83 @@
+# TEMPORARY: catch the RTX "Out of resource descriptors!" fatal under gdb (one breakpoint on the failure path,
+# no per-allocation overhead) and upload a state dump + all-thread backtraces. Delete with the branch.
+name: tmp descriptor fatal catch
+
+on:
+  push:
+    branches:
+      - tmp/descriptor-fatal
+
+jobs:
+  catch:
+    name: Catch (${{ matrix.test_file }}, ${{ matrix.copy }})
+    runs-on: [self-hosted, linux, gpu, dataset-enabled]
+    strategy:
+      fail-fast: false
+      matrix:
+        test_file:
+          - test_object_states
+          - test_transition_rules_cooking
+          - test_transition_rules_basic
+        copy: [1, 2, 3, 4, 5, 6, 7, 8]
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}/OmniGibson
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install BDDL
+        run: conda run -n behavior --no-capture-output pip install -e .
+        working-directory: ${{ github.workspace }}/bddl3
+
+      - name: Install OmniGibson
+        run: conda run -n behavior --no-capture-output pip install -e .[dev,primitives,eval] --no-build-isolation
+
+      - name: Get gdb
+        run: |
+          if command -v gdb >/dev/null; then
+            echo "GDB=$(command -v gdb)" >> "$GITHUB_ENV"
+          else
+            conda create -y -p "$RUNNER_TEMP/gdbenv" -c conda-forge gdb
+            echo "GDB=$RUNNER_TEMP/gdbenv/bin/gdb" >> "$GITHUB_ENV"
+          fi
+
+      - name: Run tests under gdb
+        continue-on-error: true
+        timeout-minutes: 40
+        env:
+          OMNIGIBSON_HEADLESS: "1"
+          OMNI_KIT_ACCEPT_EULA: "YES"
+          DESC_FATAL_DIR: ${{ github.workspace }}/OmniGibson/desc_fatal
+        run: |
+          nvidia-smi --query-gpu=name,pci.bus_id,memory.total --format=csv,noheader
+          PY=$(conda run -n behavior which python)
+          conda run -n behavior --no-capture-output "$GDB" -q -batch -nx \
+            -ex "set pagination off" -ex "set confirm off" \
+            -ex "set print thread-events off" -ex "set print inferior-events off" \
+            -ex "handle SIGSEGV SIGBUS SIGPIPE SIGUSR1 SIGUSR2 SIG32 SIG33 SIG34 SIG35 SIG36 nostop noprint pass" \
+            -ex "set auto-load safe-path /" -ex "set debuginfod enabled off" \
+            -x tests/tmp_descprobe/gdb_fatal.py -ex run -ex "python fatal_dump()" -ex kill \
+            --args "$PY" -m pytest -s -v tests/${{ matrix.test_file }}.py
+
+      - name: Report
+        if: always()
+        run: |
+          cat desc_fatal/summary.log || echo "no summary"
+          if grep -q " HIT " desc_fatal/summary.log 2>/dev/null; then
+            echo "::warning::Descriptor fatal caught in ${{ matrix.test_file }} copy ${{ matrix.copy }}"
+            head -60 desc_fatal/threads_bt.txt
+          fi
+
+      - name: Upload dump
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.run_id }}-desc-fatal-${{ matrix.test_file }}-${{ matrix.copy }}
+          path: OmniGibson/desc_fatal/
+          if-no-files-found: ignore
+          retention-days: 7
+          overwrite: true
