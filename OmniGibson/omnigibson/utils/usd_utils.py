@@ -3580,6 +3580,7 @@ def get_world_prim():
     Returns:
         Usd.Prim: Active world prim in the current stage
     """
+    # get_prim_at_path() is a pure-pxr equivalent of the Isaac Core convenience function.
     return get_prim_at_path("/World")
 
 

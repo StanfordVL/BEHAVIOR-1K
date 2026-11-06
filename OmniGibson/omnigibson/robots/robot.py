@@ -340,10 +340,6 @@ class Robot(USDObject, GymObservable):
         # Store control-related inputs
         self._control_freq = control_freq
         self._controller_config = controller_config
-        # Must land on og.sim.device explicitly -- a caller-supplied tensor (e.g. a static,
-        # CPU-authored config value like JoyLo's ROBOT_CONFIGS) is not guaranteed to already be on the
-        # right device, and this value gets combined with device-tracking robot state elsewhere (e.g.
-        # joint_lower_limits/joint_upper_limits, both explicitly og.sim.device-resident).
         if reset_joint_pos is None:
             self._reset_joint_pos = None
         elif isinstance(reset_joint_pos, th.Tensor):
@@ -3755,23 +3751,6 @@ class Robot(USDObject, GymObservable):
             ret.append(self._convert_to_math_pi(element))
         return th.tensor(ret, device=og.sim.device)
 
-    def _convert_mobile_manipulation_joint_pos_to_tensor(self, li):
-        # Values in tucked/untucked_default_joint_pos are authored positionally against a fixed joint
-        # order, but different physics backends can enumerate sibling joints (joints sharing a parent
-        # link, e.g. Fetch's head_tilt_joint / shoulder_pan_joint) in different orders. When the
-        # definition pins down that order via mobile_manipulation.joint_names, reorder by name into the
-        # live backend's own joint order (self.joints, already backend-ordered by this point) instead of
-        # applying positionally -- otherwise a value silently lands on the wrong joint.
-        tensor_val = self._convert_yaml_list_to_tensor(li)
-        canonical_names = self._definition.mobile_manipulation.joint_names
-        if canonical_names is None or len(canonical_names) != len(li):
-            return tensor_val
-        name_to_value = dict(zip(canonical_names, tensor_val))
-        live_names = list(self.joints.keys())
-        if set(live_names) != set(canonical_names):
-            return tensor_val
-        return th.stack([name_to_value[name] for name in live_names])
-
     def _get_teleop_rotation_offset(self, prop):
         dic = dict()
         for key, value in prop.items():
@@ -4119,16 +4098,12 @@ class Robot(USDObject, GymObservable):
     @property
     def tucked_default_joint_pos(self):
         assert self.is_mobile_manipulation
-        return self._convert_mobile_manipulation_joint_pos_to_tensor(
-            self._definition.mobile_manipulation.tucked_default_joint_pos
-        )
+        return self._convert_yaml_list_to_tensor(self._definition.mobile_manipulation.tucked_default_joint_pos)
 
     @property
     def untucked_default_joint_pos(self):
         assert self.is_mobile_manipulation
-        return self._convert_mobile_manipulation_joint_pos_to_tensor(
-            self._definition.mobile_manipulation.untucked_default_joint_pos
-        )
+        return self._convert_yaml_list_to_tensor(self._definition.mobile_manipulation.untucked_default_joint_pos)
 
     def tuck(self):
         """

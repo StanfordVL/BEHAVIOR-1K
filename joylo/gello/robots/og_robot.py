@@ -1029,7 +1029,7 @@ class OGRobotServer:
                 )
         self._button_toggled_state["b"] = button_b_state
 
-        # If A is toggled from OFF -> ON, toggle task-irrelevant object visibility.
+        # If A is toggled from OFF -> ON, toggle task-irrelevant object visibility
         button_a_state = self._joint_cmd["button_a"].item() != 0.0
         if button_a_state and not self._button_toggled_state["a"] and self._kit_ui:
             # TODO: implement beacon support in Newton UI?
@@ -1216,7 +1216,7 @@ class OGRobotServer:
             action[self.robot.arm_action_idx["left"]] = left_act
             action[self.robot.arm_action_idx["right"]] = right_act
 
-           # Apply base action
+            # Apply base action
             action[self.robot.base_action_idx] = self._joint_cmd["base"].clone()
 
             # Apply gripper action

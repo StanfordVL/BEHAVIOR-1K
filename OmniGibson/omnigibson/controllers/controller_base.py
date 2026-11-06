@@ -12,7 +12,7 @@ from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-# Set default isaac kp / kd for controllers.
+# Set default isaac kp / kd for controllers
 m.DEFAULT_ISAAC_KP = 1e7
 m.DEFAULT_ISAAC_KD = 1e5
 
