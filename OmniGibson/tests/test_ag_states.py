@@ -48,7 +48,6 @@ _AG_BLOCK_LEN = 2 + _AG_STATE_SIZE
 def _force_ag_grasp(robot, arm, target_obj, frame_params):
     """Create an AG joint on `arm` with deterministic hand-crafted params."""
     target_link_name = sorted(target_obj.links.keys())[0]
-    # Real grasps compute these frames on og.sim.device, which is also where load_state() restores them
     frame_params = {k: v.to(og.sim.device) if isinstance(v, th.Tensor) else v for k, v in frame_params.items()}
     constraint_params = {
         "target_obj": target_obj,
@@ -262,12 +261,10 @@ def test_ag_serialized_block_both_arms_layout(env, assisted_robot, apple, bowl):
 
 def _run_ag_roundtrip(robot_model):
     """Spin up a fresh env with the given robot and verify dict+tensor roundtrip."""
-    # Nothing to clear (and og.clear() requires a live sim) when this is the first test in the process
     if og.sim is not None:
         og.clear()
 
     config = {
-        # og.clear() relaunches on the previous sim's device, so the new env must ask for that same one
         "env": {"device": og.sim.device if og.sim is not None else None},
         "scene": {"type": "Scene"},
         "robots": [

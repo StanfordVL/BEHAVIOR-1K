@@ -1287,7 +1287,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             # scenes at once does not pile them all onto the recorded spot and let their
             # objects collide.
             cur_pos, cur_ori = self.get_position_orientation()
-            # The state may have been saved on another device (e.g. by another physics backend)
             rec_pos = th.as_tensor(state["pos"], dtype=th.float32, device=cur_pos.device).reshape(3)
             rec_ori = th.as_tensor(state["ori"], dtype=th.float32, device=cur_ori.device).reshape(4)
             registry_state = state["registry"]

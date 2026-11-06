@@ -1279,7 +1279,6 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             particle_offset *= ratio
             particle_radius = m.MIN_PARTICLE_RADIUS
 
-        # Combined with live particle transforms, which live on og.sim.device
         self._particle_offset = particle_offset.to(og.sim.device)
         self._particle_radius = particle_radius
 

@@ -1447,8 +1447,7 @@ def test_kinematic_only_contact_no_error():
         ],
     }
     # try/finally so a failed assertion below still runs the test_clear_sim() cleanup at the end --
-    # otherwise og.sim is left "playing" for whatever test runs next in file order, cascading into
-    # unrelated "Simulator must be stopped" errors across the rest of the file.
+    # otherwise og.sim is left "playing" for whatever test runs next in file order.
     try:
         env = og.Environment(configs=cfg)
 
