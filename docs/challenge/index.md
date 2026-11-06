@@ -180,6 +180,9 @@ We gratefully acknowledge the support of our sponsors who make this challenge po
   <a href="https://www.linkedin.com/company/simovationinc/" title="Simovation" style="display: flex; align-items: center; justify-content: center; width: 170px; height: 100px;">
     <img src="../assets/challenge_2025/simovation_logo.png" alt="Simovation" style="max-height: 100%; max-width: 100%; width: auto; height: auto; object-fit: contain;" />
   </a>
+  <a href="https://www.physicl.ai/" title="Physicl" style="display: flex; align-items: center; justify-content: center; width: 170px; height: 100px;">
+    <img src="../assets/challenge_2025/physicl_logo.svg" alt="Physicl" style="max-height: 100%; max-width: 100%; width: auto; height: auto; object-fit: contain;" />
+  </a>
   <a href="https://www.imda.gov.sg/" title="IMDA" style="display: flex; align-items: center; justify-content: center; width: 170px; height: 100px;">
     <img src="../assets/challenge_2025/imda_logo.png" alt="IMDA" style="max-height: 100%; max-width: 100%; width: auto; height: auto; object-fit: contain;" />
   </a>
