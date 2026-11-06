@@ -19,6 +19,8 @@ jobs:
           - test_transition_rules_cooking
           - test_transition_rules_basic
         copy: [1, 2, 3, 4, 5, 6, 7, 8]
+        include:
+          - {test_file: test_sensors, copy: 1}
     defaults:
       run:
         working-directory: ${{ github.workspace }}/OmniGibson
