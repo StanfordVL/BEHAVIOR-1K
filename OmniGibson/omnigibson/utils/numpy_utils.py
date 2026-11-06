@@ -1,6 +1,5 @@
 import numpy as np
 import torch as th
-import omnigibson.lazy as lazy
 
 
 class NumpyTypes:
@@ -25,7 +24,8 @@ def vtarray_to_torch(vtarray, dtype=th.float32, device="cpu"):
 
 
 def gf_quat_to_torch(gf_quat, dtype=th.float32, device="cpu"):
-    np_array = lazy.isaacsim.core.utils.rotations.gf_quat_to_np_array(gf_quat)[[1, 2, 3, 0]]
+    # Read the Gf quat directly (xyzw) rather than via isaacsim, which is unavailable without Kit
+    np_array = np.array([*gf_quat.GetImaginary(), gf_quat.GetReal()])
     return numpy_to_torch(np_array, dtype=dtype, device=device)
 
 

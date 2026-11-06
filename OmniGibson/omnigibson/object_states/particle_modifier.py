@@ -451,6 +451,9 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             def check_overlap():
                 nonlocal valid_hit
                 valid_hit = False
+                if not og.sim.physics_backend.supports_scene_queries:
+                    # No scene-query interface on this backend; report no overlap rather than crashing.
+                    return valid_hit
                 # When fabric is on, overlap_shape doesn't work, so we use a more coarse approximation for this broadphase check
                 aabb = self.link.visual_aabb
                 og.sim.physics_backend.overlap_box(
@@ -503,6 +506,9 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             def check_overlap():
                 nonlocal valid_hit
                 valid_hit = False
+                if not og.sim.physics_backend.supports_scene_queries:
+                    # No scene-query interface on this backend; report no overlap rather than crashing.
+                    return valid_hit
                 aabb = self.link.visual_aabb
                 og.sim.physics_backend.overlap_box(
                     halfExtent=((aabb[1] - aabb[0]) / 2.0 + m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN).tolist(),

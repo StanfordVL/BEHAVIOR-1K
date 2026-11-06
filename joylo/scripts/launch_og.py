@@ -1,6 +1,5 @@
 import tyro
 from dataclasses import dataclass
-from gello.robots.og_robot import OGRobotServer
 from typing import Optional
 
 
@@ -15,9 +14,28 @@ class Args:
     instance_id: Optional[int] = None
     ghosting: Optional[bool] = True
     attachment_joint_visuals: Optional[bool] = None
+    # "physx" or "newton"
+    physics_backend: str = "physx"
+    # Render backend when --physics-backend newton: "newton" or "none" (no camera capture at all).
+    # Ignored for physx.
+    renderer: Optional[str] = None
+    # Renderer for the live, on-screen Newton viewer window: "gl" or "rtx"
+    viewer_renderer: str = "gl"
+    # Show the secondary cameras in NewtonGL
+    viewer_panels: bool = True
 
 
 def launch_robot_server(args: Args):
+    assert args.physics_backend in ("physx", "newton"), f"Invalid physics backend: {args.physics_backend}"
+    assert args.viewer_renderer in ("gl", "rtx"), f"Invalid viewer renderer: {args.viewer_renderer}"
+    if args.physics_backend == "newton":
+        from omnigibson.macros import gm
+
+        gm.PHYSICS_BACKEND = "newton"
+        gm.RENDER_BACKEND = args.renderer if args.renderer is not None else "newton"
+
+    from gello.robots.og_robot import OGRobotServer
+
     server = OGRobotServer(
         robot=args.robot,
         port=args.robot_port,
@@ -28,6 +46,8 @@ def launch_robot_server(args: Args):
         instance_id=args.instance_id,
         ghosting=args.ghosting,
         attachment_joint_visuals=args.attachment_joint_visuals,
+        viewer_renderer=args.viewer_renderer,
+        viewer_panels=args.viewer_panels,
     )
     server.serve()
 

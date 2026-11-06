@@ -128,7 +128,14 @@ class AttachedTo(
 
         self.attachment_joint_visuals = defaultdict(list)
         if m.ENABLE_ATTACHMENT_JOINT_VISUALS:
-            self._create_attachment_joint_visuals()
+            # TODO: support attachment visuals in Newton
+            if og.sim.render_backend.supports_materials:
+                self._create_attachment_joint_visuals()
+            else:
+                log.warning(
+                    "ENABLE_ATTACHMENT_JOINT_VISUALS is set, but attachment joint visuals need material "
+                    f"support, which {type(og.sim.render_backend).__name__} lacks; skipping them."
+                )
 
         # Reference to the parent object (DatasetObject)
         self.parent = None

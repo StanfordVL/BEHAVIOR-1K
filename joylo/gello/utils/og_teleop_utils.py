@@ -370,6 +370,169 @@ def setup_cameras(robot, external_sensors, resolution, config):
     return camera_paths, viewports
 
 
+def _viewpoint_camera_orientation(position, look_at, up):
+    """
+    Orientation that aims a USD camera prim at a point, expressed in the camera's parent frame.
+    Args:
+        position (th.tensor): (3,) camera position in the parent frame
+        look_at (th.tensor): (3,) point in the parent frame the camera should face
+        up (th.tensor): (3,) rough up direction in the parent frame
+
+    Returns:
+        th.tensor: (4,) quaternion (x,y,z,w) orientation in the parent frame
+    """
+    z_axis = position - look_at  # camera looks down -z, so +z points back at the camera
+    z_axis = z_axis / th.norm(z_axis)
+    x_axis = th.linalg.cross(up, z_axis)
+    if th.norm(x_axis) < 1e-6:
+        # Degenerate: `up` is (anti)parallel to the view direction, so it cannot define a roll.
+        fallback = th.tensor(
+            [1.0, 0.0, 0.0] if abs(z_axis[0]) < abs(z_axis[1]) else [0.0, 1.0, 0.0], device=z_axis.device
+        )
+        x_axis = th.linalg.cross(fallback, z_axis)
+    x_axis = x_axis / th.norm(x_axis)
+    y_axis = th.linalg.cross(z_axis, x_axis)
+    return T.mat2quat(th.stack([x_axis, y_axis, z_axis], dim=-1))
+
+
+def _gripper_mount_link(robot, arm):
+    """
+    The gripper body of an arm, i.e. the link its fingers hang off.
+
+    Args:
+        robot: The robot object
+        arm (str): Arm name to look up
+
+    Returns:
+        RigidPrim: Link to mount an arm's gripper-relative camera on -- the eef link itself if the
+            fingers' parent cannot be identified
+    """
+    finger_prim_paths = {link.prim_path for link in robot.finger_links[arm]}
+    for joint in robot.joints.values():
+        if joint.body1 in finger_prim_paths:
+            for link in robot.links.values():
+                if link.prim_path == joint.body0:
+                    return link
+    return robot.eef_links[arm]
+
+
+def create_extra_viewpoint_cameras(robot):
+    """
+    Create the EXTRA_VIEWPOINT_CAMERA_CONFIGS camera prims on a robot for the Newton GL viewer.
+    These are plain USD camera prims, not VisionSensors: the Newton render backend only needs a camera
+    prim whose live world pose and intrinsics it can read.
+
+    Args:
+        robot: The robot object to mount the cameras on
+
+    Returns:
+        dict: Mapping from panel label to the created camera prim path
+    """
+    camera_paths = {}
+
+    with og.sim.editing_usd():
+        for label, spec in EXTRA_VIEWPOINT_CAMERA_CONFIGS.items():
+            assert ("arm" in spec) != (
+                "link" in spec
+            ), f"Extra viewpoint camera {label} must specify exactly one of 'arm' or 'link'"
+            key = spec["arm"] if "arm" in spec else spec["link"]
+            if key not in (robot.arm_names if "arm" in spec else robot.links):
+                print(f"Skipping extra viewpoint camera {label}: robot {robot.model} has no {key!r}")
+                continue
+
+            position = th.tensor(spec["position"], dtype=th.float32, device=og.sim.device)
+            look_at = th.tensor(spec["look_at"], dtype=th.float32, device=og.sim.device)
+            up = th.tensor(spec.get("up", VIEWPOINT_CAMERA_UP), dtype=th.float32, device=og.sim.device)
+
+            if "arm" in spec:
+                # The camera is mounted on the gripper and posed in the arm's GRASP frame.
+                link = _gripper_mount_link(robot, spec["arm"])
+                grasp_pos, grasp_quat = T.relative_pose_transform(
+                    *robot.eef_links[spec["arm"]].get_position_orientation(), *link.get_position_orientation()
+                )
+                position, look_at = (grasp_pos + T.quat_apply(grasp_quat, p) for p in (position, look_at))
+                up = T.quat_apply(grasp_quat, up)
+            else:
+                link = robot.links[spec["link"]]
+
+            orientation = _viewpoint_camera_orientation(position, look_at, up)
+
+            prim_path = f"{link.prim_path}/{label}_viewpoint_camera"
+            camera = lazy.pxr.UsdGeom.Camera.Define(og.sim.stage, prim_path)
+            camera.AddTranslateOp(lazy.pxr.UsdGeom.XformOp.PrecisionDouble).Set(lazy.pxr.Gf.Vec3d(*position.tolist()))
+            camera.AddOrientOp(lazy.pxr.UsdGeom.XformOp.PrecisionDouble).Set(
+                lazy.pxr.Gf.Quatd(*orientation[[3, 0, 1, 2]].tolist())
+            )
+            camera.CreateFocalLengthAttr(spec.get("focal_length", VIEWPOINT_CAMERA_FOCAL_LENGTH))
+            camera.CreateHorizontalApertureAttr(spec.get("horizontal_aperture", VIEWPOINT_CAMERA_HORIZONTAL_APERTURE))
+            # Near plane well inside the ~10 cm mount offsets these cameras use
+            camera.CreateClippingRangeAttr(lazy.pxr.Gf.Vec2f(0.001, 1000000.0))
+
+            camera_paths[label] = prim_path
+
+    return camera_paths
+
+
+def setup_cameras_standalone(robot, external_sensors, config):
+    """
+    Kit-free counterpart to setup_cameras(), used when there is no Kit UI (Newton backend).
+
+    Args:
+        robot: The robot object
+        external_sensors: External camera sensors
+        config (RobotTeleopConfig): Robot-specific teleop configuration
+
+    Returns:
+        2-tuple:
+            - list of str: Main camera prim paths, head camera first (button B toggles between them)
+            - dict: Camera prim paths for the docked image panels inside the Newton GL viewer window
+    """
+    head_link = config.head_camera_link or f"{robot.arm_names[0]}_head_link"
+    eyes_cam_prim_path = f"{robot.links[head_link].prim_path}/Camera"
+    camera_paths = [eyes_cam_prim_path, external_sensors["external_sensor0"].prim_path]
+
+    left_wrist_link = config.wrist_camera_link.get("left", f"{robot.arm_names[0]}_eef_link")
+    right_wrist_link = config.wrist_camera_link.get("right", f"{robot.arm_names[1]}_eef_link")
+    panel_camera_paths = (
+        {
+            "left_shoulder": external_sensors["external_sensor1"].prim_path,
+            "left_wrist": f"{robot.links[left_wrist_link].prim_path}/Camera",
+            "right_shoulder": external_sensors["external_sensor2"].prim_path,
+            "right_wrist": f"{robot.links[right_wrist_link].prim_path}/Camera",
+        }
+        if VIEWING_MODE == ViewingMode.MULTI_VIEW_1
+        else {}
+    )
+
+    panel_camera_paths.update(create_extra_viewpoint_cameras(robot))
+
+    with og.sim.editing_usd():
+        offsets = [(eyes_cam_prim_path, config.head_camera_pos, config.head_camera_ori)]
+        if config.wrist_camera_pos is not None or config.wrist_camera_ori is not None:
+            for wrist_link in (left_wrist_link, right_wrist_link):
+                offsets.append(
+                    (
+                        f"{robot.links[wrist_link].prim_path}/Camera",
+                        config.wrist_camera_pos,
+                        config.wrist_camera_ori,
+                    )
+                )
+
+        for cam_path, pos, ori in offsets:
+            cam_prim = og.sim.stage.GetPrimAtPath(cam_path)
+            if pos is not None:
+                cam_prim.GetAttribute("xformOp:translate").Set(lazy.pxr.Gf.Vec3d(*pos.tolist()))
+            if ori is not None:
+                cam_prim.GetAttribute("xformOp:orient").Set(
+                    lazy.pxr.Gf.Quatd(*ori[[3, 0, 1, 2]].tolist())
+                )
+
+        for cam_path in camera_paths:
+            og.sim.stage.GetPrimAtPath(cam_path).GetAttribute("horizontalAperture").Set(40.0)
+
+    return camera_paths, panel_camera_paths
+
+
 def setup_camera_blinking_visualizers(camera_paths, scene):
     """
     Set up blinking visualizers for cameras
