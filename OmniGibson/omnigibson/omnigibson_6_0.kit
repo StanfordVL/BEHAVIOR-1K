@@ -31,6 +31,12 @@ enableDeveloperWarnings = false    # disable developer warnings to reduce log no
 # on an RTX 5090: 0.06-0.16 GB of VRAM.
 descriptorSets = 360000
 
+[settings.rtx.hydra]
+# isaacsim.exp.base enables multi-tick-rate rendering, which registers every new RTX view as a scheduled sensor.
+# NVIDIA traced intermittent main-thread hangs on new views to that path (isaac-sim/IsaacSim#920); on CI the hang
+# shows up as a multi-minute stall followed by "[Fatal] [omni.rtx] Out of resource descriptors!".
+supportMultiTickRate = false
+
 [settings.crashreporter]
 enabled = false           # disable Kit crash reporter
 gatherUserStory = false
