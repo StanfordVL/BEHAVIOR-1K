@@ -374,8 +374,8 @@ class RigidDynamicPrim(RigidPrim):
         # Grab pose from super class
         state = super()._dump_state()
 
-        state["lin_vel"] = self.get_linear_velocity(clone=False)
-        state["ang_vel"] = self.get_angular_velocity(clone=False)
+        state["lin_vel"] = self.get_linear_velocity()
+        state["ang_vel"] = self.get_angular_velocity()
 
         return state
 
