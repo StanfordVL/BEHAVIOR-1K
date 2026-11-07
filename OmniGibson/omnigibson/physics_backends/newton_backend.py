@@ -1536,7 +1536,6 @@ class NewtonBackend(PhysicsBackend):
         return cross_joints
 
     def _read_joint_local_frames(self, prim, wp):
-
         def read_xform(pos_attr, rot_attr):
             pos = prim.GetAttribute(pos_attr).Get()
             rot = prim.GetAttribute(rot_attr).Get()
