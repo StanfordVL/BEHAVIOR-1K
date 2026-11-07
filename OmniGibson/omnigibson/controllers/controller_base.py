@@ -204,6 +204,8 @@ class BaseController(Serializable, Registerable, Recreatable):
         )
 
         # Set gains
+        self._isaac_kp_is_default = isaac_kp is None
+        self._isaac_kd_is_default = isaac_kd is None
         default_kp = m.DEFAULT_NEWTON_KP if gm.PHYSICS_BACKEND == "newton" else m.DEFAULT_ISAAC_KP
         default_kd = m.DEFAULT_NEWTON_KD if gm.PHYSICS_BACKEND == "newton" else m.DEFAULT_ISAAC_KD
         if self.control_type == ControlType.POSITION:
@@ -741,6 +743,22 @@ class BaseController(Serializable, Registerable, Recreatable):
                 None if not specified.
         """
         return self._isaac_kd
+
+    @property
+    def isaac_kp_is_default(self):
+        """
+        Returns:
+            bool: Whether isaac_kp was filled in from the backend default rather than explicitly specified
+        """
+        return self._isaac_kp_is_default
+
+    @property
+    def isaac_kd_is_default(self):
+        """
+        Returns:
+            bool: Whether isaac_kd was filled in from the backend default rather than explicitly specified
+        """
+        return self._isaac_kd_is_default
 
     @property
     def command_input_limits(self):
