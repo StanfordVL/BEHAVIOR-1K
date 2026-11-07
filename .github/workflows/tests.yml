@@ -118,7 +118,9 @@ jobs:
           - test_systems
           - test_transform_utils
           - test_snapshots
-          - test_transition_rules
+          - test_transition_rules_basic
+          - test_transition_rules_cooking
+          - test_transition_rules_machines
         include:
         # The three BehaviorTask multi-env suites share one env (see the `behavior_env` fixture in
         # tests/conftest.py), so running them in a single job loads house_double_floor_lower once
