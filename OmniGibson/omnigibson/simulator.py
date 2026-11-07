@@ -83,6 +83,14 @@ def with_profiler(name):
     return decorator
 
 
+class _StandaloneApp:
+    def shutdown(self):
+        pass
+
+    def close(self):
+        pass
+
+
 def _launch_app():
     log.setLevel(logging.DEBUG if gm.DEBUG else logging.INFO)
 

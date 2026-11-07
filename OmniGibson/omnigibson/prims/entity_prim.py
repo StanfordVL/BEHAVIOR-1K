@@ -170,14 +170,15 @@ class EntityPrim(XFormPrim):
         # Cache material information
         materials = set()
         material_paths = set()
-        for link in self._links.values():
-            xforms = [link] + list(link.visual_meshes.values()) if self.prim_type == PrimType.RIGID else [link]
-            for xform in xforms:
-                if xform.has_material():
-                    mat_path = xform.material.prim_path
-                    if mat_path not in material_paths:
-                        materials.add(xform.material)
-                        material_paths.add(mat_path)
+        if og.sim.render_backend.supports_materials:
+            for link in self._links.values():
+                xforms = [link] + list(link.visual_meshes.values()) if self.prim_type == PrimType.RIGID else [link]
+                for xform in xforms:
+                    if xform.has_material():
+                        mat_path = xform.material.prim_path
+                        if mat_path not in material_paths:
+                            materials.add(xform.material)
+                            material_paths.add(mat_path)
 
         self._materials = materials
 
