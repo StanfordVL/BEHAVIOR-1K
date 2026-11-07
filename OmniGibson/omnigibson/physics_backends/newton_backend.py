@@ -3081,8 +3081,7 @@ class NewtonBackend(PhysicsBackend):
 
     def _fluid_particle_props(self, system_name):
         """(particle radius, particle mass, MPM material attributes) of @system_name's particles"""
-        radius, density, _ = self._fluid_system_props.get(system_name, (None, None, "fluid"))
-        material = self._fluid_particle_material(system_name)
+        radius, density, material = self._fluid_system_props.get(system_name, (None, None, "fluid"))
         radius = self._FLUID_DEFAULT_PARTICLE_RADIUS if radius is None else radius
         density = self._FLUID_DEFAULT_PARTICLE_DENSITY if density is None else density
         # SolverImplicitMPM takes each particle's volume to be (2 * radius)^3, so this mass gives it @density
@@ -3206,10 +3205,10 @@ class NewtonBackend(PhysicsBackend):
             keep = th.ones(end - start, dtype=th.bool, device=self._model.device.alias)
             keep[th.as_tensor(idxs, dtype=th.long, device=keep.device)] = False
             new_end = start + int(keep.sum().item())
-            arrays = [("", _wp_to_torch(self._state_0.particle_q)), ("", _wp_to_torch(self._state_0.particle_qd))]
-            for name, arr in arrays + self._fluid_mpm_state_arrays(states):
+            for arr in [_wp_to_torch(self._state_0.particle_q), _wp_to_torch(self._state_0.particle_qd)]:
                 arr[start:new_end] = arr[start:end][keep].clone()
             for name, arr in self._fluid_mpm_state_arrays(states):
+                arr[start:new_end] = arr[start:end][keep].clone()
                 arr[new_end:end] = self._fluid_mpm_state_defaults[name]
             _wp_to_torch(self._state_0.particle_qd)[new_end:end] = 0.0
             self._set_fluid_particles_active(models, new_end, end, False)
@@ -3359,7 +3358,7 @@ class NewtonBackend(PhysicsBackend):
             mesh = mpm.extract_particle_surface(
                 self._state_0,
                 cache["surfaces"][system_name],
-                extrapolate_into_colliders=self._FLUID_SURFACE_COLLIDER_DEPTH > 0,
+                extrapolate_into_colliders=True,
                 collider_extrapolation_depth=self._FLUID_SURFACE_COLLIDER_DEPTH,
                 particle_flags=cache["flags"][system_name],
             )
