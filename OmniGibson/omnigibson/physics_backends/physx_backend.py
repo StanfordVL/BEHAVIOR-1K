@@ -68,6 +68,8 @@ def _get_physx_articulation_view_cls():
 
 
 class PhysXBackend(PhysicsBackend):
+    supports_contact_reporting = True
+
     def __init__(self, sim=None):
         super().__init__(sim)
         self._sim_context = None

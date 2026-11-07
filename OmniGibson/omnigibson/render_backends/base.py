@@ -18,6 +18,10 @@ class RenderBackend(ABC):
     Abstract base class for a render backend.
     """
 
+    supports_camera_capture = False
+    supports_viewport = False
+    supports_materials = False
+
     def __init__(self, sim=None):
         self.sim = sim
 

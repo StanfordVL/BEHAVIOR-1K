@@ -15,6 +15,8 @@ class PhysicsBackend(ABC):
     Abstract base class for a physics engine backend.
     """
 
+    supports_contact_reporting = False
+
     def __init__(self, sim=None):
         self.sim = sim
 
@@ -323,6 +325,10 @@ class PhysicsBackend(ABC):
                 Default False.
         """
         return False
+
+    def get_live_world_pose(self, prim_path):
+        """Return the live (position, xyzw orientation) world pose of a tracked rigid body, or None if untracked."""
+        return None
 
     # ---- Per-prim articulation view I/O (backs EntityPrim / JointPrim) ----
 

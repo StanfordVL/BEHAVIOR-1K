@@ -9,6 +9,8 @@ Covers:
   - expected-value check: AG block in serialized tensor matches known hand-crafted params
 """
 
+import os
+
 import pytest
 import torch as th
 
@@ -265,7 +267,7 @@ def _run_ag_roundtrip(robot_model):
         og.clear()
 
     config = {
-        "env": {"device": og.sim.device if og.sim is not None else None},
+        "env": {"device": og.sim.device if og.sim is not None else os.environ.get("OMNIGIBSON_DEVICE")},
         "scene": {"type": "Scene"},
         "robots": [
             {
