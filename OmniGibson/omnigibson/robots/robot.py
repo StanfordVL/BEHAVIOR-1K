@@ -3657,7 +3657,7 @@ class Robot(USDObject, GymObservable):
         ret = []
         for element in li:
             ret.append(self._convert_to_math_pi(element))
-        return th.tensor(ret)
+        return th.tensor(ret, device=og.sim.device)
 
     def _get_teleop_rotation_offset(self, prop):
         dic = dict()
