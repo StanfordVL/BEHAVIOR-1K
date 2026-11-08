@@ -49,9 +49,9 @@ document.querySelectorAll(".challenge-teaser-player").forEach((player) => {
   <section class="challenge-action-card challenge-action-card--venue">
     <h2>Event Details</h2>
     <ul class="challenge-action-list">
-      <li><strong>Event:</strong> <span>To be announced</span></li>
-      <li><strong>Time:</strong> <span>To be announced</span></li>
-      <li><strong>Location:</strong> <span>To be announced</span></li>
+      <li><strong>Event:</strong> <span>CoRL 2026</span></li>
+      <li><strong>Time:</strong> <span>November 9-12, 2026</span></li>
+      <li><strong>Location:</strong> <span>Austin, Texas, US</span></li>
     </ul>
     <div class="challenge-action-links">
       <a href="https://huggingface.co/spaces/behavior-1k/2026-challenge-leaderboard">Leaderboard</a>
@@ -179,6 +179,9 @@ We gratefully acknowledge the support of our sponsors who make this challenge po
 <div style="display: flex; flex-wrap: nowrap; gap: 1.5rem; justify-content: center; align-items: center; margin: 1rem 0;">
   <a href="https://www.linkedin.com/company/simovationinc/" title="Simovation" style="display: flex; align-items: center; justify-content: center; width: 170px; height: 100px;">
     <img src="../assets/challenge_2025/simovation_logo.png" alt="Simovation" style="max-height: 100%; max-width: 100%; width: auto; height: auto; object-fit: contain;" />
+  </a>
+  <a href="https://www.physicl.ai/" title="Physicl" style="display: flex; align-items: center; justify-content: center; width: 170px; height: 100px;">
+    <img src="../assets/challenge_2025/physicl_logo.svg" alt="Physicl" style="max-height: 100%; max-width: 100%; width: auto; height: auto; object-fit: contain;" />
   </a>
   <a href="https://www.imda.gov.sg/" title="IMDA" style="display: flex; align-items: center; justify-content: center; width: 170px; height: 100px;">
     <img src="../assets/challenge_2025/imda_logo.png" alt="IMDA" style="max-height: 100%; max-width: 100%; width: auto; height: auto; object-fit: contain;" />

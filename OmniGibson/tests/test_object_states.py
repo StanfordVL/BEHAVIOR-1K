@@ -2,6 +2,7 @@ import math
 
 import pytest
 import torch as th
+import warp as wp
 from utils import SYSTEM_EXAMPLES, get_random_pose, place_obj_on_floor_plane, place_objA_on_objB_bbox
 
 import omnigibson as og
@@ -12,6 +13,7 @@ from omnigibson.object_states import (
     AttachedTo,
     Burnt,
     ContactParticles,
+    Adjacency,
     Contains,
     Cooked,
     Covered,
@@ -21,7 +23,6 @@ from omnigibson.object_states import (
     Frozen,
     Heated,
     HeatSourceOrSink,
-    HorizontalAdjacency,
     Inside,
     Joint,
     MaxTemperature,
@@ -41,8 +42,8 @@ from omnigibson.object_states import (
     Touching,
     Under,
     Unfolded,
-    VerticalAdjacency,
 )
+from omnigibson.object_states.slicer_active import SlicerActive
 from omnigibson.systems import VisualParticleSystem
 from omnigibson.utils.physx_utils import apply_force_at_pos
 from omnigibson.utils.usd_utils import RigidContactAPI
@@ -250,6 +251,65 @@ def test_rigid_contact_bodies(env, breakfast_table, bowl):
     )
 
 
+def test_multi_object_contact_broadcast(env, breakfast_table, bowl):
+    """
+    Test contact-detection for ToggledOn and SlicerActive when there are multiple toggle/slicer objects.
+    """
+    place_obj_on_floor_plane(breakfast_table)
+    place_objA_on_objB_bbox(bowl, breakfast_table)
+    for _ in range(5):
+        og.sim.step()
+
+    s = env.scene.idx
+    assert RigidContactAPI.is_in_contact(
+        scene_idx=s, query_set=[bowl], with_set=[breakfast_table], ignore_set=None, current_only=False
+    ), "Precondition failed: bowl should be resting in contact with the table"
+
+    row_bowl = RigidContactAPI.get_contact_row_mask(s, [bowl])  # (R,) bool
+    col_table = RigidContactAPI.get_contact_col_mask(s, [breakfast_table])  # (C,) bool
+    R, C = row_bowl.shape[0], col_table.shape[0]
+
+    def run_warp(query_u8, filter_u8, n_out):
+        q_wp = wp.from_torch(query_u8.cuda().contiguous(), dtype=wp.uint8)
+        w_wp = wp.from_torch(filter_u8.cuda().contiguous(), dtype=wp.uint8)
+        out_wp = wp.zeros(n_out, dtype=wp.int32, device="cuda")
+        RigidContactAPI.is_in_contact_batch_warp(
+            scene_idx=s,
+            query_masks_wp=q_wp,
+            with_masks_wp=w_wp,
+            ignore_masks_wp=None,
+            current_only=False,
+            out_wp=out_wp,
+        )
+        return wp.to_torch(out_wp).cpu().tolist()
+
+    # ToggledOn-style: query=(1, R) broadcast across with=(2, C); the contacting object (table) is at row 1.
+    query1 = row_bowl.unsqueeze(0).to(th.uint8)  # (1, R)
+    with2 = th.stack([th.zeros(C, dtype=th.bool), col_table]).to(th.uint8)  # (2, C): row0 empty, row1 table
+    ref1 = RigidContactAPI.is_in_contact_batch(
+        scene_idx=s,
+        query_masks=query1.bool().cuda(),
+        with_masks=with2.bool().cuda(),
+        ignore_masks=None,
+        current_only=False,
+    )
+    assert ref1.cpu().tolist() == [False, True]
+    assert run_warp(query1, with2, 2) == [0, 1], "query-broadcast: object at with-mask row 1 was not evaluated"
+
+    # SlicerActive-style: query=(2, R) vs with=(1, C) broadcast; the contacting query (bowl) is at row 1.
+    query2 = th.stack([th.zeros(R, dtype=th.bool), row_bowl]).to(th.uint8)  # (2, R): row0 empty, row1 bowl
+    with1 = col_table.unsqueeze(0).to(th.uint8)  # (1, C)
+    ref2 = RigidContactAPI.is_in_contact_batch(
+        scene_idx=s,
+        query_masks=query2.bool().cuda(),
+        with_masks=with1.bool().cuda(),
+        ignore_masks=None,
+        current_only=False,
+    )
+    assert ref2.cpu().tolist() == [False, True]
+    assert run_warp(query2, with1, 2) == [0, 1], "filter-broadcast: query at row 1 was not evaluated"
+
+
 def test_next_to(env, bottom_cabinet, bowl, dishtowel):
     place_obj_on_floor_plane(bottom_cabinet)
     for i, (axis, obj) in enumerate(zip(("x", "y"), (bowl, dishtowel))):
@@ -355,45 +415,62 @@ def test_aabb(env, breakfast_table, dishtowel):
 
 
 def test_adjacency(env, bottom_cabinet, bowl, dishtowel):
+    """Verifies the unified Adjacency state's per-axis behavior on stacked and side-by-side fixtures.
+
+    Axis layout for Adjacency.get_value(other) (shape (22,)):
+      k=0  : +Z (other above self)
+      k=1  : -Z (other below self)
+      k=2..11  : +dir of horizontal axes 0..9
+      k=12..21 : -dir of horizontal axes 0..9
+    """
     place_obj_on_floor_plane(bottom_cabinet)
-    for i, (axis, obj) in enumerate(zip(("x", "y"), (bowl, dishtowel))):
-        place_obj_on_floor_plane(obj, **{f"{axis}_offset": 0.4})
-        og.sim.step()
-
-        assert bottom_cabinet in set.union(
-            *(
-                axis.positive_neighbors | axis.negative_neighbors
-                for coordinate in obj.states[HorizontalAdjacency].get_value()
-                for axis in coordinate
-            )
-        )
-
-    bowl.set_position_orientation(position=[0.0, 0.0, 1.0])
-    dishtowel.set_position_orientation(position=[0.0, 0.0, 2.0])
-
-    # Need to take one sim step
+    place_obj_on_floor_plane(bowl, x_offset=0.4)
+    place_obj_on_floor_plane(dishtowel, y_offset=0.4)
     og.sim.step()
 
-    assert bowl in bottom_cabinet.states[VerticalAdjacency].get_value().positive_neighbors
-    # TODO: adjacency relies on raytest, which doesn't take particle systems into account
-    # assert dishtowel in bottom_cabinet.states[VerticalAdjacency].get_value().positive_neighbors
-    assert bottom_cabinet in bowl.states[VerticalAdjacency].get_value().negative_neighbors
-    # TODO: adjacency relies on raytest, which doesn't take particle systems into account
-    # assert dishtowel in bowl.states[VerticalAdjacency].get_value().positive_neighbors
-    assert bottom_cabinet in dishtowel.states[VerticalAdjacency].get_value().negative_neighbors
-    assert bowl in dishtowel.states[VerticalAdjacency].get_value().negative_neighbors
+    # Vertical: stack bowl above bottom_cabinet, dishtowel above both
+    bowl.set_position_orientation(position=[0.0, 0.0, 1.0])
+    dishtowel.set_position_orientation(position=[0.0, 0.0, 2.0])
+    og.sim.step()
 
+    # Self-pair is always False
+    self_adj = bottom_cabinet.states[Adjacency].get_value(bottom_cabinet)
+    assert not bool(self_adj.any()), "diagonal must be all False"
+
+    # bowl above bottom_cabinet: bottom_cabinet's +Z (k=0) cell for bowl is True
+    bc_to_bowl = bottom_cabinet.states[Adjacency].get_value(bowl)
+    bowl_to_bc = bowl.states[Adjacency].get_value(bottom_cabinet)
+    assert bool(bc_to_bowl[0]), "bowl should be above bottom_cabinet (k=0)"
+    assert bool(bowl_to_bc[1]), "bottom_cabinet should be below bowl (k=1)"
+
+    # dishtowel above both
+    bc_to_dt = bottom_cabinet.states[Adjacency].get_value(dishtowel)
+    dt_to_bc = dishtowel.states[Adjacency].get_value(bottom_cabinet)
+    assert bool(bc_to_dt[0]), "dishtowel should be above bottom_cabinet (k=0)"
+    assert bool(dt_to_bc[1]), "bottom_cabinet should be below dishtowel (k=1)"
+
+    # Horizontal: place objects side-by-side. The small object's side fires a horizontal axis
+    # because its AABB center is at the right height to ray onto the larger object's mesh.
+    place_obj_on_floor_plane(bottom_cabinet)
+    place_obj_on_floor_plane(bowl, x_offset=0.4)
+    og.sim.step()
+
+    bowl_to_bc_h = bowl.states[Adjacency].get_value(bottom_cabinet)
+    assert bool(
+        bowl_to_bc_h[2:].any()
+    ), "bowl placed beside bottom_cabinet should fire at least one horizontal axis from bowl's side"
+
+    # _set_value must raise on Adjacency
     with pytest.raises(NotImplementedError):
-        bottom_cabinet.states[HorizontalAdjacency].set_value(None)
-        bottom_cabinet.states[VerticalAdjacency].set_value(None)
+        bottom_cabinet.states[Adjacency].set_value(bowl, None)
 
 
 def test_temperature_marks_changed_objects(env, stove, bagel, cookable_dishtowel):
     """Regression test: objects whose temperature changes must be individually flagged as
     state-updated.
 
-    TensorizedValueState stores all objects' scalar values in a 1-D tensor (shape (N,)), and
-    global_update() is responsible for calling state_updated() on each object whose value
+    TensorizedAbsoluteState stores all objects' scalar values in a per-scene tensor, and
+    post_update() is responsible for calling state_updated() on each object whose value
     changed so it stays "active" for that step. A previous implementation collapsed the object
     axis when detecting changes, so only the first tracked object (index 0) was ever flagged.
     This caused heated-but-asleep objects (e.g. food cooking in a closed oven) to be excluded
@@ -741,6 +818,7 @@ def test_heated(env, bagel, cookable_dishtowel):
 
 
 def test_on_fire(env, plywood):
+    assert plywood.states[OnFire].temperature == m.object_states.heat_source_or_sink.DEFAULT_FIRE_TEMPERATURE
     assert not plywood.states[OnFire].get_value()
 
     plywood.states[Temperature].set_value(plywood.states[OnFire].ignition_temperature + 1)
@@ -762,9 +840,6 @@ def test_on_fire(env, plywood):
     assert plywood.states[Temperature].get_value() == plywood.states[OnFire].temperature
 
 
-@pytest.mark.skip(
-    reason="investigate why extra steps are needed for the contact to be registered beyond CAN_TOGGLE_STEPS"
-)
 def test_toggled_on(env, stove, robot):
     stove.set_position_orientation([1.487, 0.3, 0.443], T.euler2quat(th.tensor([0, 0, math.pi], dtype=th.float32)))
     robot.set_position_orientation(position=[0.0, 0.38, 0.0], orientation=[0, 0, 0, 1])
@@ -788,7 +863,7 @@ def test_toggled_on(env, stove, robot):
     q[jnt_idxs["r_gripper_finger_joint"]] = 0.0
     robot.set_joint_positions(q, drive=False)
 
-    steps = m.object_states.toggle.CAN_TOGGLE_STEPS
+    steps = math.ceil(m.object_states.toggle.CAN_TOGGLE_SECONDS / og.sim.get_sim_step_dt())
     for _ in range(steps):
         og.sim.step()
 
@@ -820,6 +895,106 @@ def test_toggled_on(env, stove, robot):
     # Setter should work
     assert stove.states[ToggledOn].set_value(False)
     assert not stove.states[ToggledOn].get_value()
+
+
+def test_toggled_on_requires_closed(env, microwave):
+    """
+    Test when an object's ToggledOn has requires_closed=True and
+    its Open state is True, both:
+      (a) `_set_value` should refuse to flip on, and
+      (b) the `_check_requires_closed_kernel` should force VALUES=0 and steps=0
+          even if those were poked True/non-zero outside the kernel.
+    """
+    microwave = env.scene.object_registry("name", "microwave")
+    if not microwave.states[ToggledOn].requires_closed:
+        pytest.skip("Microwave asset does not have requires_closed=True; nothing to test.")
+
+    # Open the microwave door.
+    microwave.states[Open].set_value(True)
+    for _ in range(3):
+        og.sim.step()
+    assert microwave.states[Open].get_value(), "Failed to open microwave door"
+
+    # (a) Python short-circuit: set_value(True) returns False, value stays False.
+    assert not microwave.states[ToggledOn].set_value(True)
+    assert not microwave.states[ToggledOn].get_value()
+
+    # (b) Kernel knockdown: bypass set_value, force VALUES and the seconds counter directly,
+    # then step the sim once. The requires_closed kernel should zero both because Open is True.
+    s = microwave.scene.idx
+    obj_idx = ToggledOn.OBJ_IDXS[microwave.relative_prim_path]
+    ToggledOn.VALUES[s, obj_idx] = 1
+    # _robots_can_toggle_time is a wp.array — wp.to_torch gives a zero-copy view we can poke.
+    wp.to_torch(ToggledOn._robots_can_toggle_time)[s, obj_idx] = 100.0
+    og.sim.step()
+    assert not microwave.states[
+        ToggledOn
+    ].get_value(), "requires_closed kernel should knock VALUES back to 0 while Open is True"
+    assert (
+        wp.to_torch(ToggledOn._robots_can_toggle_time)[s, obj_idx].item() == 0.0
+    ), "requires_closed kernel should reset the seconds counter to 0"
+
+    # Close the door — set_value should now succeed.
+    microwave.states[Open].set_value(False)
+    for _ in range(3):
+        og.sim.step()
+    assert not microwave.states[Open].get_value()
+    assert microwave.states[ToggledOn].set_value(True)
+    assert microwave.states[ToggledOn].get_value()
+
+
+def test_zero_dt_refresh_does_not_advance_time_dependent_states(env, microwave, table_knife):
+    """
+    Time-dependent tensorized states are driven by Δt computed from og.sim.current_time. When
+    _refresh_state_caches() is called without any physics elapsing between the previous
+    update and this one, Δt is 0 and any pure-dt accumulation is a no-op.
+
+    Load-bearing case: lazy reads triggered between real sim steps (e.g. get_value() called
+    during sample_kinematics() / settling) must not artificially tick task-relevant timers.
+
+    We assert this only for Temperature and for the slicer in its default active state —
+    those are the cases where the kernel's behavior reduces to "multiply by Δt". The toggle
+    kernel (and the slicer's cooldown branch) also resets the counter unconditionally when
+    eligibility/contact breaks; that reset path is correct and runs regardless of Δt, so it
+    isn't meaningful to assert "counter frozen" without engineering real contact.
+    """
+    microwave = env.scene.object_registry("name", "microwave")
+    table_knife = env.scene.object_registry("name", "table_knife")
+
+    # One real step so all tensorized state views are fully initialized.
+    og.sim.step()
+
+    s_mw = microwave.scene.idx
+    temp_idx = Temperature.OBJ_IDXS[microwave.relative_prim_path]
+    s_knife = table_knife.scene.idx
+    slicer_idx = SlicerActive.OBJ_IDXS[table_knife.relative_prim_path]
+
+    # Seed non-default values so any spurious tick would be visible.
+    Temperature.VALUES[s_mw, temp_idx] = 100.0
+    # Slicer starts active by default; in the active branch the kernel leaves DELAY_COUNTER alone,
+    # so seeding it lets us verify the kernel truly takes the no-op path under Δt=0.
+    wp.to_torch(SlicerActive.DELAY_COUNTER)[s_knife, slicer_idx] = 7.0
+
+    snap_temp = Temperature.VALUES[s_mw, temp_idx].clone()
+    snap_slicer = wp.to_torch(SlicerActive.DELAY_COUNTER)[s_knife, slicer_idx].clone()
+
+    # Five back-to-back refreshes with no physics in between — Δt = 0 each time.
+    for _ in range(5):
+        og.sim._refresh_state_caches()
+
+    assert th.equal(Temperature.VALUES[s_mw, temp_idx], snap_temp), (
+        f"Temperature drifted on Δt=0 refresh: " f"{snap_temp.item()} -> {Temperature.VALUES[s_mw, temp_idx].item()}"
+    )
+    slicer_after = wp.to_torch(SlicerActive.DELAY_COUNTER)[s_knife, slicer_idx]
+    assert th.equal(
+        slicer_after, snap_slicer
+    ), f"SlicerActive counter drifted on Δt=0 refresh: {snap_slicer.item()} -> {slicer_after.item()}"
+
+    # A real og.sim.step() advances time by sim_step_dt — Temperature should decay.
+    og.sim.step()
+    assert (
+        Temperature.VALUES[s_mw, temp_idx].item() < 100.0
+    ), "Temperature should decay toward DEFAULT_TEMPERATURE after a real step"
 
 
 def test_particle_source(env, furniture_sink):

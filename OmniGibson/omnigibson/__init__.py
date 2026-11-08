@@ -6,7 +6,7 @@ import signal
 import tempfile
 
 from omnigibson.controllers import REGISTERED_CONTROLLERS
-from omnigibson.envs import Environment, VectorEnvironment
+from omnigibson.envs import Environment
 from omnigibson.macros import gm
 from omnigibson.objects import REGISTERED_OBJECTS
 from omnigibson.robots import REGISTERED_ROBOTS
@@ -52,7 +52,7 @@ builtins.ISAAC_LAUNCHED_FROM_JUPYTER = (
     os.getenv("ISAAC_JUPYTER_KERNEL") is not None
 )  # We set this in the kernel.json file
 
-__version__ = "3.9.2"
+__version__ = "3.9.3"
 
 root_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -103,8 +103,6 @@ def clear(
     """
     global sim
 
-    import omnigibson.lazy as lazy
-
     # First save important simulator settings
     init_kwargs = dict(
         gravity=sim.gravity if gravity is None else gravity,
@@ -116,21 +114,19 @@ def clear(
         device=sim.device if device is None else device,
     )
 
-    # Stop the viewport menubar USD watcher before teardown. This revokes the TfNotice
-    # listener so that prim deletions during _partial_clear() don't queue deferred
-    # callbacks that later fire on an invalid stage and corrupt CUDA/PhysX state.
-    usd_watcher = lazy.omni.kit.viewport.menubar.core.utils.usd_watch
-    usd_watcher.stop()
+    # Held across the teardown below, since it outlives the Simulator here
+    physics_backend = sim.physics_backend
+
+    physics_backend.before_clear()
 
     # First let the simulator clear everything it owns.
     sim._partial_clear()
 
-    usd_watcher.start()
-
-    # Then close the stage and remove pointers to the simulator object.
-    assert lazy.isaacsim.core.utils.stage.close_stage()
+    physics_backend.after_clear()
     sim = None
-    lazy.isaacsim.core.api.SimulationContext.clear_instance()
+
+    # Must come after og.sim is dropped -- this tears down engine-global state
+    physics_backend.finalize()
 
     # Then relaunch the simulator.
     launch(**init_kwargs)
@@ -196,5 +192,4 @@ __all__ = [
     "shutdown",
     "sim",
     "tempdir",
-    "VectorEnvironment",
 ]

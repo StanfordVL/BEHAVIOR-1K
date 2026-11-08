@@ -329,6 +329,20 @@ class TestAxisAngleConversions:
 
         assert_close(axisangle, th.from_numpy(scipy_axisangle))
 
+    def test_vecs2axisangle_non_orthogonal(self):
+        # test_vecs2axisangle above uses vectors 90 degrees apart, where the un-normalized cross
+        # product happens to have unit length. At any other angle it is scaled by sin(angle),
+        # so the returned rotation vector must still have magnitude equal to the angle.
+        angle = math.radians(30)
+        vec1 = th.tensor([1.0, 0.0, 0.0])
+        vec2 = th.tensor([math.cos(angle), math.sin(angle), 0.0])
+        axisangle = vecs2axisangle(vec1, vec2)
+
+        scipy_R = R.align_vectors(vec2.unsqueeze(0).cpu().numpy(), vec1.unsqueeze(0).cpu().numpy())[0]
+        scipy_axisangle = scipy_R.as_rotvec().astype(NumpyTypes.FLOAT32)
+
+        assert_close(axisangle, th.from_numpy(scipy_axisangle))
+
     def test_vecs2quat(self):
         vec1 = th.tensor([1.0, 0.0, 0.0])
         vec2 = th.tensor([0.0, 1.0, 0.0])

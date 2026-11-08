@@ -97,9 +97,6 @@ class CuRoboMotionGenerator:
                 Increasing this value will make the motion planner more conservative in its planning with respect
                 to the underlying sphere representation of the robot. Note that this does not affect self-collisions detection.
         """
-        # Only support one scene for now -- verify that this is the case
-        assert len(og.sim.scenes) == 1
-
         # Store internal variables
         self._tensor_args = lazy.curobo.types.base.TensorDeviceType(device=th.device(device))
         self.debug = debug
@@ -119,7 +116,7 @@ class CuRoboMotionGenerator:
         # TODO [Wensi]: Check whether this is still true for future releases.
         print(
             """
-            NOTE: Currently (v3.9.2), for cuda architecture 12.0 (e.g. RTX 50-series), using Default embodiment for Tiago or non-DEFAULT embodiment for R1Pro
+            NOTE: Currently (v3.9.3), for cuda architecture 12.0 (e.g. RTX 50-series), using Default embodiment for Tiago or non-DEFAULT embodiment for R1Pro
                 will raise CUDA illegal memory access error during mg.warmup() due to cuRobo compatibility issues. 
                 Therefore, we automatically exclude these incompatible embodiments when we detect such GPU is being used. 
             """
@@ -635,7 +632,7 @@ class CuRoboMotionGenerator:
                 # For holonomic robots (e.g. Tiago, R1), it is @robot.root_link ("base_footprint_x"), not @robot.base_footprint_link_name ("base_link")
                 curobo_base_link_name = self.base_link[emb_sel]
                 robot_pos, robot_quat = self.robot.links[curobo_base_link_name].get_position_orientation()
-                target_pose = th.zeros((target_pos_link.shape[0], 4, 4))
+                target_pose = th.zeros((target_pos_link.shape[0], 4, 4), device=target_pos_link.device)
                 target_pose[:, 3, 3] = 1.0
                 target_pose[:, :3, :3] = T.quat2mat(target_quat_link)
                 target_pose[:, :3, 3] = target_pos_link

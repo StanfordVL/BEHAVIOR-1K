@@ -15,6 +15,11 @@ setup(
     zip_safe=False,
     packages=find_packages(),
     install_requires=["pytest", "numpy", "networkx", "jupytext", "future", "nltk~=3.7"],
+    extras_require={
+        "dev": [
+            "pyright>=1.1.390",
+        ],
+    },
     package_data={},
     include_package_data=True,
 )

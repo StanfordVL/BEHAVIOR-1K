@@ -13,7 +13,7 @@ long_description = "".join(lines)
 
 setup(
     name="omnigibson",
-    version="3.9.2",
+    version="3.9.3",
     author="Stanford University",
     long_description_content_type="text/markdown",
     long_description=long_description,
@@ -23,7 +23,7 @@ setup(
     install_requires=[
         "huggingface-hub[cli]>=0.34.4",
         "gymnasium>=0.28.1",
-        "numpy<2.0.0,>=1.23.5",
+        "numpy>=2.0.0",
         "scipy>=1.10.1",
         "GitPython>=3.1.40",
         "transforms3d>=0.4.1",
@@ -42,8 +42,7 @@ setup(
         "imageio-ffmpeg>=0.4.9",
         "termcolor>=2.4.0",
         "progressbar>=2.5",
-        "pymeshlab~=2022.2; platform_machine!='aarch64'",
-        "pymeshlab>=2022.2; platform_machine=='aarch64'",
+        "pymeshlab>=2023.12",
         "click>=8.1.3",
         "aenum>=3.1.15",
         "rtree>=1.2.0",
@@ -52,16 +51,18 @@ setup(
         "lxml>=5.2.2",
         "numba>=0.59.1",
         "cffi==1.17.1",
-        "pillow~=11.0.0",
+        "pillow>=11.0.0",
         "websockets>=15.0.1",
         "omegaconf>=2.3.0",
-        "lerobot[dataset] @ git+https://github.com/wensi-ai/lerobot@release/b1k",
+        # release/b1k: Python 3.12 / NumPy 2.x compatible Isaac Sim 6 release.
+        "lerobot[dataset] @ git+https://github.com/wensi-ai/lerobot@bcbfa2e33eba607279ebdf472c4181a2123bed34",
     ],
     extras_require={
         "dev": [
             "pytest>=6.2.3",
             "pytest-cov>=3.0.0",
             "pytest_rerunfailures",
+            "pyright>=1.1.390",
             "mkdocs",
             "mkdocs-autorefs",
             "mkdocs-gen-files",
@@ -77,7 +78,7 @@ setup(
         ],
         "primitives": [
             "ninja~=1.13.0",
-            "warp-lang>=0.9.0,<1.13",
+            "warp-lang==1.12.0",
             "nvidia-curobo @ git+https://github.com/StanfordVL/curobo@78612f45cef52c3fa0298de243a54cd7ca614414",
         ],
         "eval": [

@@ -294,7 +294,7 @@ def _force_asset_pipeline_materials(obj_prim, obj_category, obj_model, usd_path,
             mtl_name="OmniGibsonVRayMtl",
             mtl_created_list=mtl_created_list,
         )
-        vray_mat = lazy.omni.isaac.core.utils.prims.get_prim_at_path(mtl_created_list[0])
+        vray_mat = lazy.isaacsim.core.utils.prims.get_prim_at_path(mtl_created_list[0])
 
         # Apply all rendering channels for this material
         for mat_type, mat_file in mtl_info.items():

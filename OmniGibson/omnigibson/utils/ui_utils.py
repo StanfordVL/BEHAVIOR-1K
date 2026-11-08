@@ -179,37 +179,17 @@ def suppress_omni_log(channels):
     Args:
         channels (None or list of str): Logging channel(s) to suppress. If None, will globally disable logger
     """
-    # Record the state to restore to after the context exists
-    log = lazy.omni.log.get_log()
-
-    if gm.DEBUG:
-        # Do nothing
-        pass
-    elif channels is None:
-        # Globally disable log
-        log.enabled = False
+    # Whether there is an application log to suppress at all is the render backend's business. Before
+    # og.sim exists this is only ever reached from the Kit launch sequence itself (which is, by
+    # construction, launching Kit), so go straight to Kit's own implementation there.
+    if og.sim is not None:
+        ctx = og.sim.render_backend.suppress_log(channels)
     else:
-        # For some reason, all enabled states always return False even if the logging is clearly enabled for the
-        # given channel, so we assume all channels are enabled
-        # We do, however, check what behavior was assigned to this channel, since we force an override during this context
-        channel_behavior = {channel: log.get_channel_enabled(channel)[2] for channel in channels}
+        from omnigibson.render_backends.kit_backend import suppress_kit_log
 
-        # Suppress the channels
-        for channel in channels:
-            log.set_channel_enabled(channel, False, lazy.omni.log.SettingBehavior.OVERRIDE)
-
-    yield
-
-    if gm.DEBUG:
-        # Do nothing
-        pass
-    elif channels is None:
-        # Globally re-enable log
-        log.enabled = True
-    else:
-        # Unsuppress the channels
-        for channel in channels:
-            log.set_channel_enabled(channel, True, channel_behavior[channel])
+        ctx = suppress_kit_log(channels)
+    with ctx:
+        yield
 
 
 @contextlib.contextmanager
@@ -362,7 +342,9 @@ class CameraMover:
         self.set_lights(self.light_val)
 
     def set_lights(self, intensity):
-        world = lazy.isaacsim.core.utils.prims.get_prim_at_path("/World")
+        from omnigibson.utils.usd_utils import get_prim_at_path
+
+        world = get_prim_at_path("/World")
         for prim in world.GetChildren():
             for prim_child in prim.GetChildren():
                 for prim_child_child in prim_child.GetChildren():
@@ -552,12 +534,12 @@ class CameraMover:
             dict: Mapping from relevant keypresses to corresponding delta command to apply to the camera pose
         """
         return {
-            lazy.carb.input.KeyboardInput.D: th.tensor([self.delta, 0, 0]),
-            lazy.carb.input.KeyboardInput.A: th.tensor([-self.delta, 0, 0]),
-            lazy.carb.input.KeyboardInput.W: th.tensor([0, 0, -self.delta]),
-            lazy.carb.input.KeyboardInput.S: th.tensor([0, 0, self.delta]),
-            lazy.carb.input.KeyboardInput.T: th.tensor([0, self.delta, 0]),
-            lazy.carb.input.KeyboardInput.G: th.tensor([0, -self.delta, 0]),
+            lazy.carb.input.KeyboardInput.D: th.tensor([self.delta, 0, 0], device=og.sim.device),
+            lazy.carb.input.KeyboardInput.A: th.tensor([-self.delta, 0, 0], device=og.sim.device),
+            lazy.carb.input.KeyboardInput.W: th.tensor([0, 0, -self.delta], device=og.sim.device),
+            lazy.carb.input.KeyboardInput.S: th.tensor([0, 0, self.delta], device=og.sim.device),
+            lazy.carb.input.KeyboardInput.T: th.tensor([0, self.delta, 0], device=og.sim.device),
+            lazy.carb.input.KeyboardInput.G: th.tensor([0, -self.delta, 0], device=og.sim.device),
         }
 
     def _sub_keyboard_event(self, event, *args, **kwargs):
@@ -863,14 +845,14 @@ class KeyboardRobotController:
             n-array: Generated random action vector (normalized)
         """
         action_lo, action_hi = -1, 1
-        return th.rand(self.action_dim) * (action_hi - action_lo) + action_lo
+        return th.rand(self.action_dim, device=og.sim.device) * (action_hi - action_lo) + action_lo
 
     def get_teleop_action(self):
         """
         Returns:
             n-array: Generated action vector based on received user inputs from the keyboard
         """
-        action = th.zeros(self.action_dim)
+        action = th.zeros(self.action_dim, device=og.sim.device)
 
         # Handle the action if any key is actively being pressed
         if self.active_action is not None:

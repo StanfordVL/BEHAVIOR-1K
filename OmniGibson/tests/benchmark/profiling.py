@@ -179,12 +179,14 @@ def main():
     og.sim._post_physics_step_profiler.reset()
     og.sim._non_physics_step_profiler.reset()
 
+    # Get robots from scene 0 (profiling always uses single scene)
+    scene_robots = env.robots[0]
     for i in range(300):
         if args.robot:
             action_lo, action_hi = -0.3, 0.3
             env.step(
                 th.stack(
-                    [th.rand(env.robots[i].action_dim) * (action_hi - action_lo) + action_lo for i in range(args.robot)]
+                    [th.rand(robot.action_dim) * (action_hi - action_lo) + action_lo for robot in scene_robots]
                 ).flatten()
             )
         else:

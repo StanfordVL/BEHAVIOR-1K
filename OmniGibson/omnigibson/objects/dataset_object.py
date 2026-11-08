@@ -35,6 +35,131 @@ log = create_module_logger(module_name=__name__)
 m = create_module_macros(module_path=__file__)
 
 
+def _get_meta_link_prim(default_prim, meta_link_type, meta_link_id, sub_id):
+    """
+    Finds the meta link prim of @default_prim matching the given type / id / sub id.
+
+    Args:
+        default_prim (Usd.Prim): Default prim of an object's USD stage
+        meta_link_type (str): Meta link type to match, e.g. "attachment"
+        meta_link_id (str): Meta link ID to match, e.g. "displaywallM"
+        sub_id (int): Meta link sub ID to match
+
+    Returns:
+        None or Usd.Prim: The matching meta link prim, if it exists
+    """
+    for child in default_prim.GetChildren():
+        attrs = {attr.GetName(): attr for attr in child.GetAttributes()}
+        if not attrs.get("ig:isMetaLink", None) or not attrs["ig:isMetaLink"].Get():
+            continue
+        if (
+            attrs["ig:metaLinkType"].Get() == meta_link_type
+            and attrs["ig:metaLinkId"].Get() == meta_link_id
+            and attrs["ig:metaLinkSubId"].Get() == sub_id
+        ):
+            return child
+    return None
+
+
+def _add_mirrored_attachment_meta_link(stage, default_prim, meta_link_id, src_sub_id=0, new_sub_id=1):
+    """
+    Duplicates the attachment meta link (@meta_link_id, @src_sub_id) of @default_prim onto the opposite face of the
+    object, mirrored across the midplane of the object's shortest bounding box dimension, and registers it under
+    @new_sub_id.
+
+    The mirroring is realized as a 180 degree rotation about the object's longest bounding box axis (passing through
+    the bounding box center) rather than as a true reflection, which would produce a left-handed frame. Since
+    AttachedTo aligns the child's male meta link frame with the parent's female meta link frame exactly, attaching
+    through the duplicated link puts the object in the same place as the original link would, but spun around so that
+    its other face points outwards. The 15 degree orientation tolerance in AttachedTo._find_attachment_links means only
+    the link matching the object's current facing can trigger, so either face can be attached.
+
+    Args:
+        stage (Usd.Stage): The object's USD stage
+        default_prim (Usd.Prim): Default prim of @stage
+        meta_link_id (str): Attachment meta link ID to mirror, e.g. "displaywallM"
+        src_sub_id (int): Sub ID of the meta link to mirror
+        new_sub_id (int): Sub ID to assign to the mirrored meta link
+    """
+    src_link = _get_meta_link_prim(default_prim, "attachment", meta_link_id, src_sub_id)
+    assert src_link is not None, f"Could not find attachment meta link {meta_link_id}_{src_sub_id} to mirror!"
+    assert (
+        _get_meta_link_prim(default_prim, "attachment", meta_link_id, new_sub_id) is None
+    ), f"Attachment meta link {meta_link_id}_{new_sub_id} already exists; the mirroring hotfix should be removed!"
+
+    # Find the fixed joint anchoring the source meta link to its parent link
+    src_joint = None
+    for joint in find_joint_prims(default_prim):
+        body1_rel = joint.GetRelationship("physics:body1")
+        if body1_rel and body1_rel.GetTargets() == [src_link.GetPath()]:
+            src_joint = joint
+            break
+    assert src_joint is not None, f"Could not find the joint anchoring attachment meta link {meta_link_id}!"
+
+    # Mirror across the shortest bbox dimension's midplane by spinning 180 degrees about the longest bbox axis
+    native_bb = list(default_prim.GetAttribute("ig:nativeBB").Get())
+    center = lazy.pxr.Gf.Vec3d(default_prim.GetAttribute("ig:offsetBaseLink").Get())
+    long_axis = lazy.pxr.Gf.Vec3d(0.0, 0.0, 0.0)
+    long_axis[max(range(3), key=lambda i: native_bb[i])] = 1.0
+    rot = lazy.pxr.Gf.Rotation(long_axis, 180.0)
+
+    src_pos = lazy.pxr.Gf.Vec3d(src_link.GetAttribute("xformOp:translate").Get())
+    src_quat = lazy.pxr.Gf.Quatd(src_link.GetAttribute("xformOp:orient").Get())
+    new_pos = center + rot.TransformDir(src_pos - center)
+    new_quat = (rot.GetQuat() * src_quat).GetNormalized()
+
+    # Copy both the link and its joint verbatim (mass, inertia, break force, etc.), then patch the identifying
+    # attributes and the pose. The USD is a single flat layer, so a plain CopySpec is sufficient.
+    def _sub_id_swapped_path(prim, suffix):
+        name = prim.GetName()
+        prefix = name[: -len(f"_{src_sub_id}_{suffix}")]
+        assert name.endswith(f"_{src_sub_id}_{suffix}"), f"Unexpected meta link {suffix} prim name {name}!"
+        return prim.GetParent().GetPath().AppendChild(f"{prefix}_{new_sub_id}_{suffix}")
+
+    layer = stage.GetRootLayer()
+    new_link_path = _sub_id_swapped_path(src_link, "link")
+    new_joint_path = _sub_id_swapped_path(src_joint, "joint")
+    assert lazy.pxr.Sdf.CopySpec(layer, src_link.GetPath(), layer, new_link_path)
+    assert lazy.pxr.Sdf.CopySpec(layer, src_joint.GetPath(), layer, new_joint_path)
+
+    new_link = stage.GetPrimAtPath(new_link_path)
+    new_link.GetAttribute("ig:metaLinkSubId").Set(new_sub_id)
+    _set_pose_attributes(new_link, "xformOp:translate", "xformOp:orient", new_pos, new_quat)
+
+    new_joint = stage.GetPrimAtPath(new_joint_path)
+    new_joint.GetRelationship("physics:body1").SetTargets([new_link_path])
+    _set_pose_attributes(new_joint, "physics:localPos0", "physics:localRot0", new_pos, new_quat)
+
+
+def _set_pose_attributes(prim, pos_attr_name, quat_attr_name, pos, quat):
+    """
+    Writes @pos / @quat into the given attributes of @prim, preserving each attribute's existing value type (the link
+    and joint pose attributes differ in float vs. double precision).
+
+    Args:
+        prim (Usd.Prim): Prim whose attributes should be written
+        pos_attr_name (str): Name of the (Vec3f or Vec3d) position attribute
+        quat_attr_name (str): Name of the (Quatf or Quatd) orientation attribute
+        pos (Gf.Vec3d): Position to write
+        quat (Gf.Quatd): Orientation to write
+    """
+    for attr_name, value in ((pos_attr_name, pos), (quat_attr_name, quat)):
+        attr = prim.GetAttribute(attr_name)
+        current = attr.Get()
+        assert current is not None, f"Prim {prim.GetPath()} has no authored {attr_name} attribute!"
+        attr.Set(type(current)(value))
+
+
+# Per-model USD hotfixes, applied to a copy of the asset at load time. Each entry maps a model ID to a callable taking
+# (stage, default_prim) and mutating the stage in place. These patch annotation bugs in the shipped dataset that we
+# cannot currently re-export the assets for, and each should be deleted once its asset is fixed upstream.
+MODEL_USD_HOTFIXES = {
+    # This poster is printed on both sides, but only has a single attachment point, on one face. Mirror it onto the
+    # other face so the poster can be hung either way round (needed by e.g. the hanging_pictures task).
+    "dsrcyt": lambda stage, default_prim: _add_mirrored_attachment_meta_link(stage, default_prim, "displaywallM"),
+}
+
+
 class DatasetObject(USDObject):
     """
     DatasetObjects are instantiated from a USD file. It is an object that is assumed to come from an iG-supported
@@ -197,12 +322,12 @@ class DatasetObject(USDObject):
             raise ValueError("No orientation probabilities set")
         if len(self.orientations) == 0:
             # Set default value
-            chosen_orientation = th.tensor([0, 0, 0, 1.0])
+            chosen_orientation = th.tensor([0, 0, 0, 1.0], device=og.sim.device)
         else:
             probabilities = [o["prob"] for o in self.orientations.values()]
             probabilities = th.tensor(probabilities, dtype=th.float32) / th.sum(probabilities)
             option = th.multinomial(probabilities, 1).item()
-            chosen_orientation = th.tensor(list(self.orientations.values())[option]["rotation"])
+            chosen_orientation = th.tensor(list(self.orientations.values())[option]["rotation"], device=og.sim.device)
 
         # Randomize yaw from -pi to pi
         rot_lo, rot_hi = -1, 1
@@ -212,7 +337,8 @@ class DatasetObject(USDObject):
                 [math.cos(math.pi * rot_num), -math.sin(math.pi * rot_num), 0.0],
                 [math.sin(math.pi * rot_num), math.cos(math.pi * rot_num), 0.0],
                 [0.0, 0.0, 1.0],
-            ]
+            ],
+            device=og.sim.device,
         )
         rotated_quat = T.mat2quat(rot_matrix @ T.quat2mat(chosen_orientation))
         return rotated_quat
@@ -242,6 +368,15 @@ class DatasetObject(USDObject):
             elif joint.joint_type == JointType.JOINT_REVOLUTE:
                 joint.friction = DEFAULT_REVOLUTE_JOINT_FRICTION
 
+    def _apply_usd_hotfixes(self, stage, default_prim):
+        super()._apply_usd_hotfixes(stage, default_prim)
+
+        # Apply this model's hotfix, if it has one
+        hotfix = MODEL_USD_HOTFIXES.get(self.model, None)
+        if hotfix is not None:
+            log.info(f"Applying USD hotfix for {self.category}/{self.model}")
+            hotfix(stage, default_prim)
+
     def _get_preapply_scale(self, default_prim):
         # If bounding_box is set, scale hasn't been computed yet (that happens in _post_load).
         # Derive it here from ig:nativeBB so kinematic_only is computed correctly and
@@ -250,9 +385,9 @@ class DatasetObject(USDObject):
         if bounding_box is not None and self._load_config.get("scale", None) is None:
             native_bb_attr = default_prim.GetAttribute("ig:nativeBB")
             if native_bb_attr.IsValid():
-                native_bb = th.tensor(list(native_bb_attr.Get()))
-                bb = th.as_tensor(bounding_box, dtype=th.float32)
-                scale = th.ones(3)
+                native_bb = th.tensor(list(native_bb_attr.Get()), device=og.sim.device)
+                bb = th.as_tensor(bounding_box, dtype=th.float32, device=og.sim.device)
+                scale = th.ones(3, device=og.sim.device)
                 valid_idxes = native_bb > 1e-4
                 scale[valid_idxes] = bb[valid_idxes] / native_bb[valid_idxes]
                 return scale
@@ -262,7 +397,7 @@ class DatasetObject(USDObject):
         # Scale was already computed from bounding_box / ig:nativeBB in _preapply_articulation_root.
         # If neither was provided, default to ones(3) (no scaling).
         if self._load_config.get("scale", None) is None:
-            self._load_config["scale"] = th.ones(3)
+            self._load_config["scale"] = th.ones(3, device=og.sim.device)
         assert th.all(
             th.abs(self._load_config["scale"]) > 1e-4
         ), f"Scale of {self.name} is too small: {self._load_config['scale']}"
@@ -301,7 +436,9 @@ class DatasetObject(USDObject):
 
             # If there exists a center of mass annotation, apply it now
             if self.prim.HasAttribute("ig:centerOfMass"):
-                center_of_mass_in_object_frame = th.tensor(self.get_attribute(attr="ig:centerOfMass"))
+                center_of_mass_in_object_frame = th.tensor(
+                    self.get_attribute(attr="ig:centerOfMass"), device=og.sim.device
+                )
 
                 # Here we assume that the local frame of the object is the same as the local frame of the root link. We also do NOT need to apply a scale
                 # since the center of mass is already in the local frame of the object and thus the unscaled local frame of the root link.
@@ -348,10 +485,10 @@ class DatasetObject(USDObject):
             orientation = self.get_position_orientation()[1]
         if position is not None:
             rotated_offset = T.pose_transform(
-                th.tensor([0, 0, 0], dtype=th.float32),
+                th.tensor([0, 0, 0], dtype=th.float32, device=orientation.device),
                 orientation,
                 self.scaled_bbox_center_in_base_frame,
-                th.tensor([0, 0, 0, 1], dtype=th.float32),
+                th.tensor([0, 0, 0, 1], dtype=th.float32, device=orientation.device),
             )[0]
             position = position + rotated_offset
         self.set_position_orientation(position=position, orientation=orientation)
@@ -395,7 +532,7 @@ class DatasetObject(USDObject):
         assert (
             "ig:nativeBB" in self.property_names
         ), f"This dataset object '{self.name}' is expected to have native_bbox specified, but found none!"
-        return th.tensor(self.get_attribute(attr="ig:nativeBB"))
+        return th.tensor(self.get_attribute(attr="ig:nativeBB"), device=og.sim.device)
 
     @property
     def base_link_offset(self):
@@ -405,7 +542,7 @@ class DatasetObject(USDObject):
         Returns:
             3-array: (x,y,z) base link offset if it exists
         """
-        return th.tensor(self.get_attribute(attr="ig:offsetBaseLink"))
+        return th.tensor(self.get_attribute(attr="ig:offsetBaseLink"), device=og.sim.device)
 
     @property
     def metadata(self):
@@ -492,7 +629,7 @@ class DatasetObject(USDObject):
                         quaternion1=T.quat_inverse(th.from_numpy(quat1)), quaternion0=th.from_numpy(quat0)
                     )
                     jnt_frame_rot = T.quat2mat(local_ori)
-                    scale_in_child_lf = th.abs(jnt_frame_rot.T @ th.tensor(scale_in_parent_lf))
+                    scale_in_child_lf = th.abs(jnt_frame_rot.to(scale_in_parent_lf.device).T @ scale_in_parent_lf)
                     scales[child_name] = scale_in_child_lf
                     progress = True
 

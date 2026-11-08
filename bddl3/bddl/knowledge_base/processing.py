@@ -2,20 +2,16 @@ import csv
 from collections import defaultdict, Counter
 import logging
 import json
-import glob
-import pathlib
 import bddl
 from bddl.object_taxonomy import ObjectTaxonomy
 from bddl.activity import Conditions, get_all_activities, get_instance_count
-from bddl.config import get_definition_filename
+from bddl.config import GENERATED_DATA_DIR, get_definition_resource
 import tqdm
 from bddl.knowledge_base.models import *
 from bddl.knowledge_base.knowledgebase import KnowledgeBase
 from bddl.knowledge_base.utils import *
 
 
-BDDL_DIR = pathlib.Path(__file__).parent.parent
-GENERATED_DATA_DIR = BDDL_DIR / "generated_data"
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +55,7 @@ def preparation(verbose, load_wordnet=False):
 
     # sanity check room types are up to date
     room_types_from_model = set([room_type for _, room_type in ROOM_TYPE_CHOICES])
-    with open(GENERATED_DATA_DIR / "allowed_room_types.csv", newline="") as csvfile:
+    with (GENERATED_DATA_DIR / "allowed_room_types.csv").open(newline="") as csvfile:
         reader = csv.reader(csvfile, delimiter=",")
         room_types_from_csv = set([row[0] for row in reader][1:])
     assert (
@@ -69,7 +65,7 @@ def preparation(verbose, load_wordnet=False):
     # get object rename mapping
     object_rename_mapping = {}
     obj_rename_mapping_duplicate_set = set()
-    with open(GENERATED_DATA_DIR / "object_renames.csv", newline="") as csvfile:
+    with (GENERATED_DATA_DIR / "object_renames.csv").open(newline="") as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
             new_cat = row["New Category"].strip()
@@ -183,12 +179,12 @@ def create_objects(kb, object_rename_mapping, verbose):
     logger.debug("Creating objects...")
     # first get Deletion Queue
     deletion_queue = set()
-    with open(GENERATED_DATA_DIR / "deletion_queue.csv", newline="") as csvfile:
+    with (GENERATED_DATA_DIR / "deletion_queue.csv").open(newline="") as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
             deletion_queue.add(row["Object"].strip().split("-")[1])
     # then create objects
-    with open(GENERATED_DATA_DIR / "object_inventory.json", "r") as f:
+    with (GENERATED_DATA_DIR / "object_inventory.json").open("r") as f:
         inventory = json.load(f)
         for orig_name, provider in tqdm_iter(inventory["providers"].items(), verbose):
             object_name = orig_name
@@ -275,7 +271,7 @@ def create_objects(kb, object_rename_mapping, verbose):
     return deletion_queue
 
 def add_particle_system_parameters(kb):
-    with open(GENERATED_DATA_DIR / "substance_hyperparams.csv") as csvfile:
+    with (GENERATED_DATA_DIR / "substance_hyperparams.csv").open() as csvfile:
         reader = csv.DictReader(csvfile, delimiter=",", quotechar='"')
         for row in reader:
             # Skip the row if it is marked for pruning
@@ -306,7 +302,7 @@ def create_scenes(kb, object_rename_mapping, deletion_queue, verbose):
     scene matching to tasks will be generated later when creating task objects
     """
     logger.debug("Creating scenes...")
-    with open(GENERATED_DATA_DIR / "combined_room_object_list.json", "r") as f:
+    with (GENERATED_DATA_DIR / "combined_room_object_list.json").open("r") as f:
         planned_scene_dict = json.load(f)["scenes"]
         for scene_name in tqdm_iter(planned_scene_dict, verbose):
             scene, _ = get_or_add(kb.get_scene, kb.add_scene, scene_name)
@@ -345,7 +341,6 @@ def create_tasks(kb, verbose, load_wordnet=False):
     create tasks and map to synsets
     """
     logger.debug("Creating tasks...")
-    tasks = glob.glob(str(BDDL_DIR / "activity_definitions/*"))
     tasks = [
         (act, inst)
         for act in get_all_activities()
@@ -358,7 +353,7 @@ def create_tasks(kb, verbose, load_wordnet=False):
             synset for synset in conds.parsed_objects if synset != "agent.n.01"
         )
         canonicalized_synsets = set(canonicalize(synset) for synset in synsets) if load_wordnet else synsets
-        with open(get_definition_filename(act, inst), "r") as f:
+        with get_definition_resource(act, inst).open("r") as f:
             raw_task_definition = "".join(f.readlines())
 
         initial_conds, goal_conds = get_initial_and_goal_conditions(conds)
@@ -482,15 +477,20 @@ def create_transitions(kb, verbose):
     )
 
     # Load the transition data from JSON
-    json_paths = glob.glob(
-        str(GENERATED_DATA_DIR / "transition_map/tm_jsons/*.json")
+    json_paths = sorted(
+        (
+            p
+            for p in (GENERATED_DATA_DIR / "transition_map" / "tm_jsons").iterdir()
+            if p.is_file() and p.name.endswith(".json")
+        ),
+        key=lambda p: p.name,
     )
     transitions = []
     for jp in json_paths:
         # This file is in a different format and not relevant.
-        if jp.endswith("washer.json"):
+        if jp.name == "washer.json":
             continue
-        with open(jp) as f:
+        with jp.open("r") as f:
             transitions.extend(json.load(f))
 
     # Create the transition rule objects with synset linkages
@@ -552,7 +552,7 @@ def create_transitions(kb, verbose):
     kb.washer_rule = load_washer_rule()
 
 def create_complaints(kb):
-    with open(GENERATED_DATA_DIR / "complaints.json", "r") as f:
+    with (GENERATED_DATA_DIR / "complaints.json").open("r") as f:
         complaints = json.load(f)
 
     for complaint in complaints:

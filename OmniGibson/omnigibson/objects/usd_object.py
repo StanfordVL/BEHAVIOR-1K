@@ -20,8 +20,8 @@ from omnigibson.object_states.factory import (
     get_fire_states,
     get_requirements_for_ability,
     get_state_name,
+    get_states_and_params_for_ability,
     get_states_by_dependency_order,
-    get_states_for_ability,
     get_steam_states,
     get_texture_change_priority,
     get_texture_change_states,
@@ -98,6 +98,7 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         load_config=None,
         abilities=None,
         include_default_states=True,
+        recorded_non_kin_state_names=None,
         expected_file_hash=None,
         **kwargs,
     ):
@@ -129,6 +130,10 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 a dict in the form of {ability: {param: value}} containing object abilities and parameters to pass to
                 the object state instance constructor.
             include_default_states (bool): whether to include the default object states from @get_default_states
+            recorded_non_kin_state_names (None or list[str]): Non-kinematic state classes present in a recording
+                that this object is being constructed to replay. Missing current states are constructed before
+                initialization so serialized rows from an older taxonomy retain their recorded layout. None for
+                ordinary, non-playback construction.
             expected_file_hash (str): The expected hash of the file to load. This is used to check if the file has changed. None to disable check.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject).
@@ -158,6 +163,15 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         self._visual_states = None
         self._current_texture_state = None
         self._include_default_states = include_default_states
+        self._recorded_non_kin_state_build_order = (
+            None if recorded_non_kin_state_names is None else tuple(recorded_non_kin_state_names)
+        )
+        self._recorded_non_kin_state_names = (
+            None if self._recorded_non_kin_state_build_order is None else set(self._recorded_non_kin_state_build_order)
+        )
+        # Set to the exact per-demo order by the playback wrapper after reset. The constructor
+        # receives a union because one environment can replay multiple recordings.
+        self._recorded_non_kin_state_order = None
 
         # Load abilities from taxonomy if needed & possible
         # TODO: Move this to dataset object? Loads B1K abilities for non-B1K objects.
@@ -243,11 +257,26 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         """
         raw_scale = self._load_config.get("scale", None)
         if raw_scale is not None:
-            scale = raw_scale if isinstance(raw_scale, th.Tensor) else th.tensor(raw_scale, dtype=th.float32)
+            scale = (
+                raw_scale
+                if isinstance(raw_scale, th.Tensor)
+                else th.tensor(raw_scale, dtype=th.float32, device=og.sim.device)
+            )
             if scale.dim() == 0:
                 scale = scale.expand(3)
-            return scale.float()
-        return th.ones(3)
+            return scale.float().to(og.sim.device)
+        return th.ones(3, device=og.sim.device)
+
+    def _apply_usd_hotfixes(self, stage, default_prim):
+        """
+        Hook for patching the object's USD in place before anything else inspects it. Subclasses can override to
+        fix up asset-side annotation bugs that we cannot currently re-export the assets for.
+
+        Args:
+            stage (Usd.Stage): The side stage opened by _preapply_articulation_root.
+            default_prim (Usd.Prim): The default prim of @stage.
+        """
+        pass
 
     def _preapply_articulation_root(self, usd_path):
         """
@@ -257,9 +286,12 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         stage = lazy.pxr.Usd.Stage.Open(usd_path)
         default_prim = stage.GetDefaultPrim()
 
+        # Apply any asset-specific hotfixes first, so that the joint / link counting below sees the final structure
+        self._apply_usd_hotfixes(stage, default_prim)
+
         for p in stage.Traverse():
             p.RemoveAPI(lazy.pxr.UsdPhysics.ArticulationRootAPI)
-            p.RemoveAPI(lazy.pxr.PhysxSchema.PhysxArticulationAPI)
+            og.sim.physics_backend.strip_articulation_schemas(p)
 
         n_joints, n_fixed_joints, has_attachment = count_joints(default_prim)
 
@@ -309,6 +341,15 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
             )
             n_fixed_joints += 1
 
+        # Add articulated_ prefix into prim path so ArticulationView can use a simple pattern match
+        # Only for non-robot articulated objects
+        if (
+            not kinematic_only
+            and (n_joints > 0 or n_fixed_joints > 0)
+            and not self._relative_prim_path.startswith("/controllable")
+        ):
+            self._relative_prim_path = f"/articulated__{self.name}"
+
         # Determine which prim should carry ArticulationRootAPI
         articulation_root_prim = None
         if not kinematic_only and (n_joints > 0 or n_fixed_joints > 0):
@@ -319,9 +360,8 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         if articulation_root_prim is not None:
             lazy.pxr.UsdPhysics.ArticulationRootAPI.Apply(articulation_root_prim)
-            lazy.pxr.PhysxSchema.PhysxArticulationAPI.Apply(articulation_root_prim)
-            articulation_root_prim.GetAttribute("physxArticulation:enabledSelfCollisions").Set(
-                bool(self._load_config.get("self_collisions", False))
+            og.sim.physics_backend.apply_articulation_schemas(
+                articulation_root_prim, self_collisions=bool(self._load_config.get("self_collisions", False))
             )
 
         # Export to a temp file
@@ -337,8 +377,8 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         This is useful for pre-compiling scene USDs, speeding up load times especially for parallel envs.
         """
         # The /World in the scene USD will be mapped to /World/scene_i in Isaac Sim.
-        prim_path = "/World" + self._relative_prim_path
         usd_path = self._prepare_to_load()
+        prim_path = "/World" + self._relative_prim_path
         prim = stage.GetPrimAtPath(prim_path)
         assert not prim.IsValid(), f"Prim path {prim_path} already exists in the stage!"
         prim = stage.DefinePrim(prim_path, "Xform")
@@ -535,11 +575,34 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
                         break
                 if compatible:
                     params = self._abilities[ability]
-                    for state_type in get_states_for_ability(ability):
+                    for state_type, state_params in get_states_and_params_for_ability(ability, params):
+                        # Fail loudly instead of silently letting the last ability's params win —
+                        # a single state instance can't serve two abilities (e.g. an object that
+                        # is both a heatSource and flammable is not supported; the BDDL data
+                        # generation sanity checks enforce this at the synset level). Raised
+                        # unconditionally (not an assert) so python -O cannot skip it.
+                        if state_type in states_info:
+                            raise ValueError(
+                                f"Object {self.name}: state {state_type.__name__} is requested by multiple abilities "
+                                f"({states_info[state_type]['ability']} and {ability}); this is not supported."
+                            )
                         states_info[state_type] = {
                             "ability": ability,
-                            "params": state_type.postprocess_ability_params(params, self.scene),
+                            "params": state_type.postprocess_ability_params(state_params, self.scene),
                         }
+
+        # A recording's flattened object state is not self-describing: if the current taxonomy
+        # has dropped a state, merely filtering out newly-added current states leaves the reader
+        # short and every subsequent object is parsed at the wrong offset. Construct only the
+        # missing recorded states here, after current abilities have supplied their parameters
+        # but before dependencies and tensor views are initialized. States requiring unavailable
+        # parameters or incompatible assets are deliberately allowed to fail loudly below.
+        if self._recorded_non_kin_state_build_order is not None:
+            for state_name in self._recorded_non_kin_state_build_order:
+                if state_name not in REGISTERED_OBJECT_STATES:
+                    raise ValueError(f"Object {self.name}: recording references unknown object state {state_name!r}")
+                state_type = REGISTERED_OBJECT_STATES[state_name]
+                states_info.setdefault(state_type, {"ability": None, "params": dict()})
 
         # Add the dependencies into the list, too, and sort based on the dependency chain
         # Must iterate over explicit tuple since dictionary changes size mid-iteration
@@ -586,8 +649,11 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         if emitter_type == EmitterType.FIRE:
             fire_at_meta_link = True
             if OnFire in self.states:
-                # Note whether the heat source link is explicitly set
-                link = self.states[OnFire].link
+                # Flammable object: the fire is placed at the companion heat source's link
+                # (the heatsource meta link when annotated, e.g. a candle wick; the root link
+                # otherwise). OnFire itself is a pure threshold detector and carries no link.
+                heat_source = self.states.get(HeatSourceOrSink)
+                link = heat_source.link if heat_source is not None else self.root_link
                 fire_at_meta_link = link != self.root_link
             elif HeatSourceOrSink in self.states:
                 # Only apply fire to non-root-link (i.e.: explicitly specified) heat source links
@@ -728,7 +794,9 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 colormap.CreateAttribute("rgbaPoints", lazy.pxr.Sdf.ValueTypeNames.Float4Array, False).Set(rgbaPoints)
             elif emitter_type == EmitterType.STEAM:
                 emitter.CreateAttribute("halfSize", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set(
-                    tuple(bbox_extent_local * th.tensor(m.STEAM_EMITTER_SIZE_RATIO) / 2.0)
+                    tuple(
+                        bbox_extent_local * th.tensor(m.STEAM_EMITTER_SIZE_RATIO, device=bbox_extent_local.device) / 2.0
+                    )
                 )
                 simulate.CreateAttribute("densityCellSize", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
                     bbox_extent_local[2].item() * m.STEAM_EMITTER_DENSITY_CELL_RATIO
@@ -988,11 +1056,13 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
             # and then take the arctangent of its projection onto the XY plane.
             rotated_X_axis = base_frame_to_world[:3, 0]
             rotation_around_Z_axis = th.arctan2(rotated_X_axis[1], rotated_X_axis[0])
-            xy_aligned_base_com_to_world = th.eye(4, dtype=th.float32)
+            # Must match base_frame_to_world's device explicitly (og.sim.device, via get_position_orientation()
+            # above). th.stack (not th.tensor, which mishandles a list mixing plain numbers and a 0-d tensor)
+            # to build the euler vector from rotation_around_Z_axis's own device/dtype.
+            xy_aligned_base_com_to_world = th.eye(4, dtype=th.float32, device=base_frame_to_world.device)
             xy_aligned_base_com_to_world[:3, 3] = translate
-            xy_aligned_base_com_to_world[:3, :3] = T.euler2mat(
-                th.tensor([0, 0, rotation_around_Z_axis], dtype=th.float32)
-            )
+            zero = th.zeros_like(rotation_around_Z_axis)
+            xy_aligned_base_com_to_world[:3, :3] = T.euler2mat(th.stack([zero, zero, rotation_around_Z_axis]))
 
             # Finally update our desired frame.
             desired_frame_to_world = xy_aligned_base_com_to_world
@@ -1023,8 +1093,11 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 if hull_points is not None:
                     points_in_world.extend(hull_points.tolist())
 
-        # Move the points to the desired frame
-        points = T.transform_points(th.tensor(points_in_world, dtype=th.float32), world_to_desired_frame)
+        # Move the points to the desired frame. points_in_world is a plain Python list (built via
+        # .tolist() above), so it needs an explicit device matching world_to_desired_frame's.
+        points = T.transform_points(
+            th.tensor(points_in_world, dtype=th.float32, device=world_to_desired_frame.device), world_to_desired_frame
+        )
 
         # All points are now in the desired frame: either the base CoM or the xy-plane-aligned base CoM.
         # Now fit a bounding box to all the points by taking the minimum/maximum in the desired frame.
@@ -1095,36 +1168,66 @@ class USDObject(EntityPrim, Registerable, metaclass=ABCMeta):
         # Call super method first
         state_flat = super().serialize(state=state)
 
-        # Iterate over all states and serialize them individually
+        # Iterate over all states and serialize them individually. Some object states' serialize()
+        # returns a device-less (CPU-default) tensor for values that aren't themselves physics state
+        # (e.g. a plain bool/int flag) -- normalize every piece to state_flat's device before
+        # concatenating, or th.cat below fails whenever physics state lives on CUDA.
         non_kin_state_flat = (
             th.cat(
                 [
-                    self._states[REGISTERED_OBJECT_STATES[state_name]].serialize(state_dict)
+                    self._states[REGISTERED_OBJECT_STATES[state_name]].serialize(state_dict).to(state_flat.device)
                     for state_name, state_dict in state["non_kin"].items()
                 ]
             )
             if len(state["non_kin"]) > 0
-            else th.empty(0)
+            else th.empty(0, device=state_flat.device)
         )
 
         # Combine these two arrays
         return th.cat([state_flat, non_kin_state_flat])
 
+    def _deserialize_non_kin_states(self, state, idx):
+        # Iterate over all states and deserialize their states if they're stateful. When replaying
+        # a recording, use its exact order; membership-only filtering is insufficient because
+        # taxonomy changes can reorder dependencies as well as add or remove states.
+        non_kin_state_dic = dict()
+        recorded_order = getattr(self, "_recorded_non_kin_state_order", None)
+        if recorded_order is None:
+            recorded_names = getattr(self, "_recorded_non_kin_state_names", None)
+            state_items = [
+                (get_state_name(state_type), state_instance)
+                for state_type, state_instance in self._states.items()
+                if state_instance.stateful and (recorded_names is None or get_state_name(state_type) in recorded_names)
+            ]
+        else:
+            current_states = {
+                get_state_name(state_type): state_instance for state_type, state_instance in self._states.items()
+            }
+            missing = [state_name for state_name in recorded_order if state_name not in current_states]
+            if missing:
+                raise ValueError(
+                    f"Object {self.name}: recording contains non-kinematic state(s) {missing}, but the replay "
+                    "object could not construct them. Refusing to deserialize the remaining row at wrong offsets."
+                )
+            state_items = [(state_name, current_states[state_name]) for state_name in recorded_order]
+
+        for state_name, state_instance in state_items:
+            if state_instance.stateful:
+                non_kin_state_dic[state_name], deserialized_items = state_instance.deserialize(state[idx:])
+                idx += deserialized_items
+            else:
+                raise ValueError(
+                    f"Object {self.name}: recorded non-kinematic state {state_name!r} is no longer stateful; "
+                    "its serialized width cannot be consumed safely."
+                )
+
+        return non_kin_state_dic, idx
+
     def deserialize(self, state):
         # Call super method first
         state_dic, idx = super().deserialize(state=state)
 
-        # Iterate over all states and deserialize their states if they're stateful
-        non_kin_state_dic = dict()
-        recorded_non_kin_state_names = getattr(self, "_recorded_non_kin_state_names", None)
-        for state_type, state_instance in self._states.items():
-            state_name = get_state_name(state_type)
-            if recorded_non_kin_state_names is not None and state_name not in recorded_non_kin_state_names:
-                continue
-            if state_instance.stateful:
-                non_kin_state_dic[state_name], deserialized_items = state_instance.deserialize(state[idx:])
-                idx += deserialized_items
-        state_dic["non_kin"] = non_kin_state_dic
+        state_dic["non_kin"], idx = self._deserialize_non_kin_states(state=state, idx=idx)
 
         return state_dic, idx
 

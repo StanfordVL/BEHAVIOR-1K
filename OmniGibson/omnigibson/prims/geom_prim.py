@@ -15,7 +15,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import mesh_prim_shape_to_trimesh_mesh
+from omnigibson.utils.usd_utils import PhysicsMaterial, mesh_prim_shape_to_trimesh_mesh
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -132,41 +132,34 @@ class GeomPrim(XFormPrim):
             self.set_attribute("primvars:displayOpacity", [opacity])
 
     @cached_property
-    def points(self):
-        """
-        Returns:
-            th.tensor: Local poses of all points
-        """
-        # If the geom is a mesh we can directly return its points.
+    def points_and_faces(self):
         mesh = self.prim
         mesh_type = mesh.GetPrimTypeInfo().GetTypeName()
         if mesh_type == "Mesh":
-            # If the geom is a mesh we can directly return its points.
-            return vtarray_to_torch(mesh.GetAttribute("points").Get(), dtype=th.float32)
+            points = vtarray_to_torch(mesh.GetAttribute("points").Get(), dtype=th.float32)
+            face_vertex_counts = vtarray_to_torch(mesh.GetAttribute("faceVertexCounts").Get(), dtype=th.int)
+            face_indices = vtarray_to_torch(mesh.GetAttribute("faceVertexIndices").Get(), dtype=th.int)
+
+            faces = []
+            i = 0
+            for count in face_vertex_counts:
+                for j in range(count - 2):
+                    faces.append([face_indices[i], face_indices[i + j + 1], face_indices[i + j + 2]])
+                i += count
+            faces = th.tensor(faces, dtype=th.int)
         else:
-            # Return the vertices of the trimesh
-            return th.tensor(mesh_prim_shape_to_trimesh_mesh(mesh).vertices, dtype=th.float32)
+            tm = mesh_prim_shape_to_trimesh_mesh(mesh)
+            points = th.tensor(tm.vertices, dtype=th.float32)
+            faces = th.tensor(tm.faces, dtype=th.int)
+        return points, faces
 
-    @cached_property
+    @property
+    def points(self):
+        return self.points_and_faces[0]
+
+    @property
     def faces(self):
-        mesh = self.prim
-        mesh_type = mesh.GetPrimTypeInfo().GetTypeName()
-        if mesh_type != "Mesh":
-            log.warning(f"Geom {self.prim_path} is not a mesh, returning None for faces.")
-            return None
-
-        face_vertex_counts = vtarray_to_torch(mesh.GetAttribute("faceVertexCounts").Get(), dtype=th.int)
-        face_indices = vtarray_to_torch(mesh.GetAttribute("faceVertexIndices").Get(), dtype=th.int)
-
-        faces = []
-        i = 0
-        for count in face_vertex_counts:
-            for j in range(count - 2):
-                faces.append([face_indices[i], face_indices[i + j + 1], face_indices[i + j + 2]])
-            i += count
-        faces = th.tensor(faces, dtype=th.int)
-
-        return faces
+        return self.points_and_faces[1]
 
     @cached_property
     def delaunay_triangulation(self):
@@ -209,7 +202,13 @@ class GeomPrim(XFormPrim):
 
     def check_local_points_in_volume(self, particle_positions_in_mesh_frame):
         if self._mesh_type == "Mesh":
-            return th.as_tensor(self.delaunay_triangulation.find_simplex(particle_positions_in_mesh_frame.numpy())) >= 0
+            return (
+                th.as_tensor(
+                    self.delaunay_triangulation.find_simplex(particle_positions_in_mesh_frame.cpu().numpy()),
+                    device=particle_positions_in_mesh_frame.device,
+                )
+                >= 0
+            )
         elif self._mesh_type == "Sphere":
             return check_points_in_sphere(
                 size=self.get_attribute("radius"),
@@ -237,9 +236,23 @@ class GeomPrim(XFormPrim):
         # Move particles into local frame
         world_pose_w_scale = self.scaled_transform
         particle_positions_world_homogeneous = th.cat(
-            (particle_positions_world, th.ones((particle_positions_world.shape[0], 1))), dim=1
+            (
+                particle_positions_world,
+                th.ones((particle_positions_world.shape[0], 1), device=particle_positions_world.device),
+            ),
+            dim=1,
         )
-        particle_positions_local = (particle_positions_world_homogeneous @ th.linalg.inv(world_pose_w_scale).T)[:, :3]
+        inv_transform = th.linalg.inv(world_pose_w_scale)
+        # NOTE: deliberately NOT `homogeneous @ inv_transform.T` -- that matmul form is a confirmed-broken
+        # CUDA kernel on this GPU/torch combination (RTX 5090, sm_120, torch 2.11.0+cu130) specifically for
+        # a batch size >1 against a non-contiguous 4x4 matrix (scaled_transform has stride (1,4), a
+        # transposed view): it silently returns wrong results for every row once N>1, while N=1 and CPU are
+        # both correct (see det3x3/prod3/quat_multiply in transform_utils.py for the same class of bug on
+        # this hardware). This broadcast-multiply-sum form computes the identical math via elementwise ops
+        # instead of a batched GEMM, sidestepping the broken kernel -- verified correct against N=1 and CPU
+        # for the same inputs.
+        homogeneous = particle_positions_world_homogeneous.to(world_pose_w_scale.device)
+        particle_positions_local = (homogeneous.unsqueeze(1) * inv_transform).sum(dim=-1)[:, :3]
         return self.check_local_points_in_volume(particle_positions_local)
 
     @property
@@ -248,20 +261,24 @@ class GeomPrim(XFormPrim):
         if points is None:
             return None
         position, orientation = self.get_position_orientation(frame="parent")
-        scale = self.scale
+        # points/scale are always CPU (raw USD-authored geometry), but position/orientation now track
+        # og.sim.device (see usd_utils.get_local_pose()) -- match points' device here since this is a
+        # purely local-frame geometric computation, not something that needs to combine with live
+        # physics-state tensors elsewhere (callers needing that go through transform_local_points_to_world,
+        # which does its own device matching against the target world transform).
+        scale = self.scale.to(points.device)
         points_scaled = points * scale
-        points_rotated = (T.quat2mat(orientation) @ points_scaled.T).T
-        points_transformed = points_rotated + position
+        points_rotated = (T.quat2mat(orientation.to(points.device)) @ points_scaled.T).T
+        points_transformed = points_rotated + position.to(points.device)
         return points_transformed
 
     @property
-    def aabb(self):
-        world_pose_w_scale = self.scaled_transform
+    def points_in_world_frame(self):
+        return self.transform_local_points_to_world(self.points)
 
-        # transform self.points into world frame
-        points = self.points
-        points_homogeneous = th.cat((points, th.ones((points.shape[0], 1))), dim=1)
-        points_transformed = (points_homogeneous @ world_pose_w_scale.T)[:, :3]
+    @property
+    def aabb(self):
+        points_transformed = self.points_in_world_frame
 
         aabb_lo = th.min(points_transformed, dim=0).values
         aabb_hi = th.max(points_transformed, dim=0).values
@@ -340,5 +357,6 @@ class GeomPrim(XFormPrim):
             if path == "":
                 return None
             else:
-                self._applied_physics_material = lazy.isaacsim.core.api.materials.PhysicsMaterial(prim_path=path)
+                with og.sim.editing_usd():
+                    self._applied_physics_material = PhysicsMaterial(prim_path=path)
                 return self._applied_physics_material

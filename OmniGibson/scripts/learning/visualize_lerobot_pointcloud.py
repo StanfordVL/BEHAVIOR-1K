@@ -61,14 +61,6 @@ def _as_hw_depth(value, unit: str) -> th.Tensor:
     return depth
 
 
-def _depth_unit(dataset: LeRobotDataset, key: str) -> str:
-    info = dataset.meta.features[key].get("info") or {}
-    unit = info.get("video.output_unit")
-    if unit is None:
-        raise ValueError(f"Depth feature {key} is missing info['video.output_unit']")
-    return unit
-
-
 def _load_intrinsics(args: argparse.Namespace, dataset: LeRobotDataset) -> dict[str, np.ndarray]:
     if args.intrinsics_json is not None:
         with Path(args.intrinsics_json).expanduser().open("r") as f:
@@ -115,7 +107,7 @@ def _build_camera_pcd(
     rgb = _as_hwc_rgb(item[rgb_key])
     if rgb.max() > 1.0:
         rgb = rgb / 255.0
-    depth = _as_hw_depth(item[depth_key], unit=_depth_unit(dataset, depth_key))
+    depth = _as_hw_depth(item[depth_key], unit=dataset.depth_output_unit)
     rel_pose_value = item[pose_key]
     rel_pose = (
         rel_pose_value.detach().cpu().float()
@@ -288,7 +280,7 @@ def main() -> None:
 
     root = args.root.expanduser()
     repo_id = args.repo_id or _infer_repo_id(root)
-    dataset = LeRobotDataset(repo_id=repo_id, root=root, video_backend="pyav")
+    dataset = LeRobotDataset(repo_id=repo_id, root=root, video_backend="pyav", depth_output_unit="m")
     intrinsics = _load_intrinsics(args, dataset)
     camera_names = _camera_names(dataset, args.cameras)
 

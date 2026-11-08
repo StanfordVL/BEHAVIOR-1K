@@ -74,7 +74,7 @@ class RigidPrim(XFormPrim):
         # Collision API references collected from the prim hierarchy (not 1:1 with meshes).
         # A single CollisionAPI on a scope prim may cover multiple geom prims.
         self._collision_apis = None  # list of UsdPhysics.CollisionAPI
-        self._physx_collision_apis = None  # list of PhysxSchema.PhysxCollisionAPI
+        self._engine_collision_apis = None  # list of the physics backend's own collider API handles
         self._mesh_collision_apis = None  # list of (USD prim, UsdPhysics.MeshCollisionAPI)
 
         # Run super init
@@ -88,9 +88,9 @@ class RigidPrim(XFormPrim):
         # Run super first
         super()._post_load()
 
-        # Apply rigid body and mass APIs
+        # Apply rigid body and mass APIs, plus whatever the engine needs on top of them
         ensure_usd_api(self._prim, lazy.pxr.UsdPhysics.RigidBodyAPI)
-        ensure_usd_api(self._prim, lazy.pxr.PhysxSchema.PhysxRigidBodyAPI)
+        og.sim.physics_backend.apply_rigid_body_schemas(self._prim)
         ensure_usd_api(self._prim, lazy.pxr.UsdPhysics.MassAPI)
 
         # Check if it's part of an articulation view
@@ -106,9 +106,7 @@ class RigidPrim(XFormPrim):
         )
 
         if not self._visual_only:
-            contact_api = ensure_usd_api(self._prim, lazy.pxr.PhysxSchema.PhysxContactReportAPI)
-            with og.sim.editing_usd():
-                contact_api.GetThresholdAttr().Set(0.0)
+            og.sim.physics_backend.enable_contact_reporting(self._prim)
 
         # Store references to owned visual / collision meshes
         # We iterate over all children of this object's prim,
@@ -168,7 +166,7 @@ class RigidPrim(XFormPrim):
         """
         self._collision_meshes, self._visual_meshes = dict(), dict()
         self._collision_apis = []
-        self._physx_collision_apis = []
+        self._engine_collision_apis = []
         self._mesh_collision_apis = []
 
         # Recursively find all geom prims, collecting collision API references into
@@ -180,8 +178,9 @@ class RigidPrim(XFormPrim):
             if prim.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI):
                 self._collision_apis.append(lazy.pxr.UsdPhysics.CollisionAPI(prim))
                 is_collision = True
-            if prim.HasAPI(lazy.pxr.PhysxSchema.PhysxCollisionAPI):
-                self._physx_collision_apis.append(lazy.pxr.PhysxSchema.PhysxCollisionAPI(prim))
+            engine_collision_api = og.sim.physics_backend.get_collision_api(prim)
+            if engine_collision_api is not None:
+                self._engine_collision_apis.append(engine_collision_api)
                 is_collision = True
 
             if prim.GetPrimTypeInfo().GetTypeName() in GEOM_TYPES:
@@ -197,7 +196,7 @@ class RigidPrim(XFormPrim):
 
         # Set default contact/rest offsets on all PhysxCollisionAPIs
         with og.sim.editing_usd():
-            for api in self._physx_collision_apis:
+            for api in self._engine_collision_apis:
                 api.GetContactOffsetAttr().Set(m.DEFAULT_CONTACT_OFFSET)
                 api.GetRestOffsetAttr().Set(m.DEFAULT_REST_OFFSET)
 
@@ -219,8 +218,10 @@ class RigidPrim(XFormPrim):
                 volume, com = get_mesh_volume_and_com(mesh.prim)
                 # We need to transform the volume and CoM from the mesh's local frame to the link's local frame
                 local_pos, local_orn = mesh.get_position_orientation(frame="parent")
-                vols.append(volume * th.prod(mesh.scale))
-                coms.append(T.quat2mat(local_orn) @ (com * mesh.scale) + local_pos)
+                vols.append(volume * T.prod3(mesh.scale))
+                # com is always CPU (trimesh-derived, no device concept), but local_pos/local_orn/
+                # mesh.scale now track og.sim.device -- match that here.
+                coms.append(T.quat2mat(local_orn) @ (com.to(local_orn.device) * mesh.scale) + local_pos)
                 # If the ratio between the max extent and min radius is too large (i.e. shape too oblong), use
                 # boundingCube approximation for the underlying collision approximation for GPU compatibility
                 if prim.HasAPI(lazy.pxr.UsdPhysics.MeshCollisionAPI) and not check_extent_radius_ratio(mesh, com):
@@ -250,7 +251,9 @@ class RigidPrim(XFormPrim):
         # If we have any collision meshes, compute the center of mass from collision geometry
         if len(coms) > 0:
             coms_tensor = th.stack(coms)
-            vols_tensor = th.tensor(vols).unsqueeze(1)
+            # vols' elements are 0-d tensors now (volume * T.prod3(mesh.scale) tracks og.sim.device) --
+            # th.stack (not th.tensor, which mishandles/CPU-defaults a list of tensors) to match.
+            vols_tensor = th.stack(vols).unsqueeze(1)
             com = th.sum(coms_tensor * vols_tensor, dim=0) / th.sum(vols_tensor)
             self.center_of_mass = com
 
@@ -279,7 +282,7 @@ class RigidPrim(XFormPrim):
                             Default value is -inf, means default is picked by simulation based on the shape extent.
         """
         with og.sim.editing_usd():
-            for api in self._physx_collision_apis:
+            for api in self._engine_collision_apis:
                 api.GetContactOffsetAttr().Set(offset)
 
     def set_rest_offset(self, offset):
@@ -291,7 +294,7 @@ class RigidPrim(XFormPrim):
                             Default value is -inf, means default is picked by simulation. For rigid bodies its zero.
         """
         with og.sim.editing_usd():
-            for api in self._physx_collision_apis:
+            for api in self._engine_collision_apis:
                 api.GetRestOffsetAttr().Set(offset)
 
     def set_torsional_patch_radius(self, radius):
@@ -302,7 +305,7 @@ class RigidPrim(XFormPrim):
             radius (float): radius of the contact patch used to apply torsional friction. Allowed range [0, max_float].
         """
         with og.sim.editing_usd():
-            for api in self._physx_collision_apis:
+            for api in self._engine_collision_apis:
                 api.GetTorsionalPatchRadiusAttr().Set(radius)
 
     def set_min_torsional_patch_radius(self, radius):
@@ -314,7 +317,7 @@ class RigidPrim(XFormPrim):
                             Allowed range [0, max_float].
         """
         with og.sim.editing_usd():
-            for api in self._physx_collision_apis:
+            for api in self._engine_collision_apis:
                 api.GetMinTorsionalPatchRadiusAttr().Set(radius)
 
     def set_collision_approximation(self, approximation_type):
@@ -431,7 +434,7 @@ class RigidPrim(XFormPrim):
         Returns:
             bool: Whether contact reporting is enabled for this rigid prim or not
         """
-        return self._prim.HasAPI(lazy.pxr.PhysxSchema.PhysxContactReportAPI)
+        return og.sim.physics_backend.contact_reporting_enabled(self._prim, self._visual_only)
 
     def _compute_points_on_convex_hull(self, visual):
         """
@@ -496,6 +499,42 @@ class RigidPrim(XFormPrim):
         if local_points is None:
             return None
         return self.transform_local_points_to_world(local_points)
+
+    @cached_property
+    def collision_mesh_cpu_data(self):
+        """
+        Returns:
+            (pts_cpu, faces_cpu) tuple of CPU torch tensors, or None if the link has no collision
+            geometry. Used by RigidBodyViewAPI.initialize_view() to batch H2D copies and
+            wp.Mesh construction across all links.
+
+            - pts_cpu: (N, 3) float32 — vertices of all collision geoms of this link, expressed
+              in the link's local frame, with the link's world scale baked in.
+            - faces_cpu: (M*3,) int32 — flat triangle vertex indices into pts_cpu (link-local;
+              offsets across geoms within the link are already applied).
+
+        The world scale is baked into the stored points so that downstream kernels can
+        transform back to world frame using just the link's pose-matrix (rotation + translation,
+        no scale) — matching what RigidBodyViewAPI.POSE_MATRICES provides.
+        """
+        world_to_scaled_link = T.pose_inv(T.pose2mat(self.get_position_orientation()))
+        pts_concat, idx_concat, point_offset = [], [], 0
+        for geom in self._collision_meshes.values():
+            pts = geom.points_in_world_frame
+            if pts is None or pts.shape[0] == 0:
+                continue
+            points_wrt_link = T.transform_points(pts, world_to_scaled_link)
+            faces = geom.faces
+            pts_concat.append(points_wrt_link)
+            idx_concat.append((faces + point_offset).flatten())
+            point_offset += points_wrt_link.shape[0]
+
+        if not pts_concat:
+            return None
+
+        pts_cpu = th.cat(pts_concat, dim=0).to(th.float32)
+        faces_cpu = th.cat(idx_concat, dim=0).to(th.int32)
+        return pts_cpu, faces_cpu
 
     @property
     def aabb(self):
@@ -636,10 +675,10 @@ class RigidPrim(XFormPrim):
                 In either case, this assumes the given meshes are convex hulls. For visual meshes, we enforce this
                 constraint by explicitly converting them into convex hulls
         """
-        in_volume = th.zeros(particle_positions_world.shape[0], dtype=th.bool)
+        in_volume = th.zeros(particle_positions_world.shape[0], dtype=th.bool, device=particle_positions_world.device)
         meshes_to_check = self.visual_meshes if use_visual_meshes else self.collision_meshes
         for mesh in meshes_to_check.values():
-            in_volume |= mesh.check_points_in_volume(particle_positions_world)
+            in_volume |= mesh.check_points_in_volume(particle_positions_world).to(particle_positions_world.device)
         return in_volume
 
     @cached_property
@@ -652,7 +691,7 @@ class RigidPrim(XFormPrim):
         min_n_particles = int(math.ceil(1.0 / precision))
 
         # Determine equally-spaced sampling distance to achieve this minimum particle count
-        aabb_volume = th.prod(self.visual_aabb_extent)
+        aabb_volume = T.prod3(self.visual_aabb_extent)
         sampling_distance = th.pow(aabb_volume / min_n_particles, 1 / 3.0)
         low, high = self.aabb
         n_particles_per_axis = ((high - low) / sampling_distance).int() + 1

@@ -75,6 +75,25 @@ class VisionSensor(BaseSensor):
         "pointcloud",
     )
 
+    RAW_SENSOR_TYPES = dict(
+        rgb="rgb",
+        depth="distance_to_camera",
+        depth_linear="distance_to_image_plane",
+        normal="normals",
+        # Semantic segmentation shows the category each pixel belongs to
+        seg_semantic="semantic_segmentation",
+        # Instance segmentation shows the name of the object each pixel belongs to
+        seg_instance="instance_segmentation",
+        # Instance ID segmentation shows the prim path of the visual mesh each pixel belongs to
+        seg_instance_id="instance_id_segmentation",
+        flow="motion_vectors",
+        bbox_2d_tight="bounding_box_2d_tight",
+        bbox_2d_loose="bounding_box_2d_loose",
+        bbox_3d="bounding_box_3d",
+        camera_params="camera_params",
+        pointcloud="pointcloud",
+    )
+
     # Documentation for the different types of segmentation for particle systems:
     # - Cloth (e.g. `dishtowel`):
     #   - semantic: all shows up under one semantic label (e.g. `"4207839377": "dishtowel"`)
@@ -105,6 +124,13 @@ class VisionSensor(BaseSensor):
     INSTANCE_ID_REMAPPER = Remapper()
     INSTANCE_REGISTRY = {0: "background", 1: "unlabelled"}
     INSTANCE_ID_REGISTRY = {0: "background"}
+
+    # Counter bumped whenever a semantic label is authored at runtime. On Isaac Sim 6.0, semantic
+    # labels added after a render product's annotators are attached never get registered into the existing
+    # render products' instance mappings (idToLabels), so then the results are unlabeled. Each
+    # sensor tracks the version it last synced to and refreshes its render product when it falls behind.
+    # See _refresh_semantic_instance_mapping for the workaround.
+    _SEMANTIC_LABELS_VERSION = 0
 
     def __init__(
         self,
@@ -140,29 +166,11 @@ class VisionSensor(BaseSensor):
         self._render_product = None
         self._image_height = image_height  # used when viewport is not created
         self._image_width = image_width  # used when viewport is not created
+        self._semantic_labels_version = 0  # Version of the semantic labels this sensor's annotators last synced to
 
-        self._RAW_SENSOR_TYPES = dict(
-            rgb="rgb",
-            depth="distance_to_camera",
-            depth_linear="distance_to_image_plane",
-            normal="normals",
-            # Semantic segmentation shows the category each pixel belongs to
-            seg_semantic="semantic_segmentation",
-            # Instance segmentation shows the name of the object each pixel belongs to
-            seg_instance="instance_segmentation",
-            # Instance ID segmentation shows the prim path of the visual mesh each pixel belongs to
-            seg_instance_id="instance_id_segmentation",
-            flow="motion_vectors",
-            bbox_2d_tight="bounding_box_2d_tight",
-            bbox_2d_loose="bounding_box_2d_loose",
-            bbox_3d="bounding_box_3d",
-            camera_params="camera_params",
-            pointcloud="pointcloud",
-        )
-
-        assert {key for key in self._RAW_SENSOR_TYPES.keys() if key != "camera_params"} == set(
+        assert {key for key in self.raw_sensor_types.keys() if key != "camera_params"} == set(
             self.all_modalities
-        ), "VisionSensor._RAW_SENSOR_TYPES must have the same keys as VisionSensor.all_modalities!"
+        ), "VisionSensor.RAW_SENSOR_TYPES must have the same keys as VisionSensor.ALL_MODALITIES!"
 
         if modalities == "all":
             modalities = self.all_modalities
@@ -190,9 +198,8 @@ class VisionSensor(BaseSensor):
         # Define a new camera prim at the current stage
         # Note that we can't use og.sim.stage here because the vision sensors get loaded first
         with og.sim.editing_usd():
-            return lazy.pxr.UsdGeom.Camera.Define(
-                lazy.isaacsim.core.utils.stage.get_current_stage(), self.prim_path
-            ).GetPrim()
+            stage = og.sim.render_backend.get_stage()
+            return lazy.pxr.UsdGeom.Camera.Define(stage, self.prim_path).GetPrim()
 
     def _post_load(self):
         # run super first
@@ -203,8 +210,9 @@ class VisionSensor(BaseSensor):
 
         resolution = (self._load_config["image_width"], self._load_config["image_height"])
         self._image_width, self._image_height = resolution
+
         with og.sim.editing_usd():
-            self._render_product = lazy.omni.replicator.core.create.render_product(self.prim_path, resolution)
+            self._render_product = og.sim.render_backend.create_camera_resource(self.prim_path, resolution)
 
         # Create a new viewport to link to this camera or link to a pre-existing one
         viewport_name = self._load_config["viewport_name"]
@@ -278,12 +286,16 @@ class VisionSensor(BaseSensor):
         for _ in range(4):
             og.sim.render()
 
+        # Annotators attached above build their instance mapping from scratch, so they are synced to all
+        # semantic labels authored up to this point
+        self._semantic_labels_version = VisionSensor._SEMANTIC_LABELS_VERSION
+
     def initialize_sensors(self, names):
         """Initializes a raw sensor in the simulation.
 
         Args:
             names (str or list of str): Name of the raw sensor(s) to initialize.
-                If they are not part of self._RAW_SENSOR_TYPES' keys, we will simply pass over them
+                If they are not part of self.raw_sensor_types' keys, we will simply pass over them
         """
         names = {names} if isinstance(names, str) else set(names)
         for name in names:
@@ -296,6 +308,13 @@ class VisionSensor(BaseSensor):
         # Run super first to grab any upstream obs
         obs, info = super()._get_obs()
 
+        # If semantic labels were authored after our annotators were attached, the annotators' idToLabels
+        # mappings are stale and the newly-labeled prims would come back UNLABELLED, so refresh first
+        if self._semantic_labels_version != VisionSensor._SEMANTIC_LABELS_VERSION and any(
+            self._is_semantic_modality(m) for m in self._modalities
+        ):
+            self._refresh_semantic_instance_mapping()
+
         # Reorder modalities to ensure that seg_semantic is always ran before seg_instance or seg_instance_id
         if "seg_semantic" in self._modalities:
             reordered_modalities = ["seg_semantic"] + [
@@ -305,9 +324,8 @@ class VisionSensor(BaseSensor):
             reordered_modalities = self._modalities
 
         for modality in reordered_modalities:
-            raw_obs = self._annotators[modality].get_data(device=og.sim.device)
-
             if modality == "pointcloud":
+                raw_obs = og.sim.render_backend.get_modality_data(self._annotators[modality], device=og.sim.device)
                 # Pointcloud is a special case where we need to concatenate the point xyz coordinates with the rgb values
                 # Note: rgb values are in the range of [0, 255], xyz is in world frame
                 concatenated = np.concatenate([raw_obs["pointRgb"][:, :3], raw_obs["data"]], axis=1)
@@ -318,20 +336,151 @@ class VisionSensor(BaseSensor):
                     obs[modality] = np.pad(concatenated, pad_width, mode="constant", constant_values=0)
                 else:
                     obs[modality] = concatenated
-            else:
-                # Obs is either a dictionary of {"data":, ..., "info": ...} or a direct array
-                obs[modality] = raw_obs["data"] if isinstance(raw_obs, dict) else raw_obs
 
-            if og.sim.device == "cpu":
-                obs[modality] = self._preprocess_cpu_obs(obs[modality], modality)
-            elif "cuda" in og.sim.device:
-                obs[modality] = self._preprocess_gpu_obs(obs[modality], modality)
+                obs[modality] = self._preprocess_obs_for_device(obs[modality], modality)
             else:
-                raise ValueError(f"Unsupported device {og.sim.device}")
+                raw_obs, obs[modality] = self._fetch_and_preprocess_modality(modality)
 
-            if "seg_" in modality or "bbox_" in modality:
+            if self._is_semantic_modality(modality):
                 self._remap_modality(modality, obs, info, raw_obs)
         return obs, info
+
+    def _fetch_and_preprocess_modality(self, modality):
+        """
+        Fetches raw annotator data for @modality (any modality except "pointcloud", which has its own fetch path)
+        and applies the device-specific preprocessing. Used both for the initial fetch and for the empty-buffer
+        retry in _get_obs.
+
+        Args:
+            modality (str): Name of the modality to fetch
+
+        Returns:
+            2-tuple:
+                - dict or array: Raw annotator output, as returned by the annotator's get_data()
+                - th.Tensor or array: Device-preprocessed observation for this modality
+        """
+        raw_obs = og.sim.render_backend.get_modality_data(self._annotators[modality], device=og.sim.device)
+        obs_value = raw_obs["data"] if isinstance(raw_obs, dict) else raw_obs
+
+        # Right after the render product is destroyed and recreated (see _recreate_render_product), Replicator's
+        # backing AOVs / instance mappings can take a few frames to catch up, so the first few reads can come back
+        # stale: an image-shaped modality may report the wrong shape, and a semantic modality's idToLabels mapping
+        # may come back empty even though the scene has labeled prims in view. Render a few more frames and retry
+        # until the data looks valid.
+        for _ in range(4):
+            if not self._is_stale_obs(modality, raw_obs, obs_value):
+                break
+            og.sim.render()
+            raw_obs = og.sim.render_backend.get_modality_data(self._annotators[modality], device=og.sim.device)
+            obs_value = raw_obs["data"] if isinstance(raw_obs, dict) else raw_obs
+
+        return raw_obs, self._preprocess_obs_for_device(obs_value, modality)
+
+    def _is_stale_obs(self, modality, raw_obs, obs_value):
+        """
+        Checks whether a freshly-fetched observation for @modality looks like it was read before Replicator caught
+        up to a render product recreation (see _recreate_render_product), as opposed to a legitimate reading (e.g.
+        genuinely zero bounding boxes because nothing is in view).
+
+        Args:
+            modality (str): Name of the modality @raw_obs / @obs_value belongs to
+            raw_obs (dict or array): Raw annotator output, as returned by the annotator's get_data()
+            obs_value (th.Tensor or array): Extracted observation value (raw_obs["data"] if @raw_obs is a dict)
+
+        Returns:
+            bool: Whether this observation should be re-fetched after another render
+        """
+        if self._is_semantic_modality(modality):
+            # A freshly-rebuilt instance mapping is never truly empty -- every scene has at least one labeled prim
+            # (e.g. the floor) in view of a sensibly-posed camera, so an empty mapping means Replicator hasn't
+            # caught up yet.
+            return len(raw_obs["info"]["idToLabels"]) == 0
+        elif modality not in ("pointcloud", "camera_params"):
+            return obs_value.shape[0] != self.image_height or obs_value.shape[1] != self.image_width
+        else:
+            return False
+
+    def _preprocess_obs_for_device(self, obs_value, modality):
+        """
+        Applies the device-specific preprocessing to an already-extracted observation value for @modality.
+
+        Args:
+            obs_value (th.Tensor or array): Observation value to preprocess
+            modality (str): Name of the modality @obs_value belongs to
+
+        Returns:
+            th.Tensor or array: Device-preprocessed observation
+        """
+        if og.sim.device == "cpu":
+            return self._preprocess_cpu_obs(obs_value, modality)
+        elif "cuda" in og.sim.device:
+            return self._preprocess_gpu_obs(obs_value, modality)
+        else:
+            raise ValueError(f"Unsupported device {og.sim.device}")
+
+    @staticmethod
+    def _is_semantic_modality(modality):
+        """
+        Args:
+            modality (str): Name of the modality to check
+
+        Returns:
+            bool: Whether @modality is a segmentation or bounding-box modality, i.e. one whose observations carry
+                a replicator idToLabels mapping that needs remapping (see _remap_modality) and can go stale (see
+                mark_semantics_stale)
+        """
+        return "seg_" in modality or "bbox_" in modality
+
+    @classmethod
+    def mark_semantics_stale(cls):
+        """
+        Flags the replicator semantic instance mappings as stale, so that sensors refresh them before the
+        next segmentation / bounding box read. Should be called whenever a semantic label is authored on a
+        prim at runtime (handled by omnigibson.utils.vision_utils.add_semantic_label).
+        """
+        cls._SEMANTIC_LABELS_VERSION += 1
+
+    def _refresh_semantic_instance_mapping(self):
+        """
+        Forces replicator to rebuild its semantic instance mappings (idToLabels).
+
+        On Isaac Sim 6.0 / Kit 110, semantic labels authored after a render product's annotators are
+        attached never get registered into the existing render products' instance mappings, so pixels of
+        newly-labeled prims (e.g. particles generated at runtime) are reported as UNLABELLED. Freshly
+        created render products build their mapping from scratch (and trigger a global rebuild that also
+        updates other existing render products), so recreate our render product and re-attach all
+        annotators, mirroring the flow used by the image_height / image_width setters.
+        """
+        self._recreate_render_product(self.image_width, self.image_height)
+        self._semantic_labels_version = VisionSensor._SEMANTIC_LABELS_VERSION
+
+    def _recreate_render_product(self, width, height):
+        """
+        Destroys the current render product and creates a new one at resolution (@width, @height), re-attaching
+        all active annotators to it. Shared by the image_height / image_width setters and
+        _refresh_semantic_instance_mapping, which all need to recreate the render product for different reasons.
+
+        Args:
+            width (int): Width of the new render product, in pixels
+            height (int): Height of the new render product, in pixels
+        """
+        with og.sim.editing_usd():
+            for annotator in self._annotators.values():
+                if annotator is not None:
+                    og.sim.render_backend.detach_modality(annotator, self._render_product)
+
+            og.sim.render_backend.destroy_camera_resource(self._render_product)
+            self._render_product = og.sim.render_backend.create_camera_resource(
+                self.prim_path, (width, height), force_new=True
+            )
+
+            for annotator in self._annotators.values():
+                if annotator is not None:
+                    og.sim.render_backend.attach_modality(annotator, self._render_product)
+
+        # Requires several renders for the new render product's data to propagate
+        for _ in range(4):
+            og.sim.render()
 
     def _preprocess_cpu_obs(self, obs, modality):
         # All segmentation modalities return uint32 numpy arrays on cpu, but PyTorch doesn't support it
@@ -493,18 +642,18 @@ class VisionSensor(BaseSensor):
                         value = value[: value.rfind(".")]
                     # Case 2: For everything else, we keep the name as is
                     """
-                    e.g. 
+                    e.g.
                     {
-                        '54': '/World/scene_0/water/waterInstancer0/prototype0.proto0_prototype0_id0', 
-                        '60': '/World/scene_0/water/waterInstancer0/prototype0.proto0_prototype0_id0', 
-                        '30': '/World/scene_0/breakfast_table/base_link/stainParticle1', 
-                        '27': '/World/scene_0/diced__apple/particles/diced__appleParticle0', 
-                        '58': '/World/scene_0/white_rice/white_riceInstancer0/prototype0.proto0_prototype0_id0', 
-                        '64': '/World/scene_0/white_rice/white_riceInstancer0/prototype0.proto0_prototype0_id0', 
-                        '40': '/World/scene_0/diced__apple/particles/diced__appleParticle1', 
-                        '48': '/World/scene_0/breakfast_table/base_link/stainParticle0', 
-                        '1': '/World/ground_plane/geom', 
-                        '19': '/World/scene_0/dishtowel/base_link_cloth', 
+                        '54': '/World/scene_0/water/waterInstancer0/prototype0.proto0_prototype0_id0',
+                        '60': '/World/scene_0/water/waterInstancer0/prototype0.proto0_prototype0_id0',
+                        '30': '/World/scene_0/breakfast_table/base_link/stainParticle1',
+                        '27': '/World/scene_0/diced__apple/particles/diced__appleParticle0',
+                        '58': '/World/scene_0/white_rice/white_riceInstancer0/prototype0.proto0_prototype0_id0',
+                        '64': '/World/scene_0/white_rice/white_riceInstancer0/prototype0.proto0_prototype0_id0',
+                        '40': '/World/scene_0/diced__apple/particles/diced__appleParticle1',
+                        '48': '/World/scene_0/breakfast_table/base_link/stainParticle0',
+                        '1': '/World/ground_plane/geom',
+                        '19': '/World/scene_0/dishtowel/base_link_cloth',
                         '6': '/World/scene_0/breakfast_table/base_link/visuals'
                     }
                     """
@@ -588,10 +737,8 @@ class VisionSensor(BaseSensor):
         """
         if self._annotators.get(modality, None) is None:
             with og.sim.editing_usd():
-                self._annotators[modality] = lazy.omni.replicator.core.AnnotatorRegistry.get_annotator(
-                    self._RAW_SENSOR_TYPES[modality]
-                )
-                self._annotators[modality].attach([self._render_product])
+                self._annotators[modality] = og.sim.render_backend.create_annotator(self.raw_sensor_types[modality])
+                og.sim.render_backend.attach_modality(self._annotators[modality], self._render_product)
 
     def _remove_modality_from_backend(self, modality):
         """
@@ -601,10 +748,8 @@ class VisionSensor(BaseSensor):
             modality (str): Name of the modality to remove from the Replicator backend
         """
         if self._annotators.get(modality, None) is not None:
-            # Passing an explicit list is bugged -- see omni source code
-            # So we only pass in the product directly, which gets post-processed correctly
             with og.sim.editing_usd():
-                self._annotators[modality].detach(self._render_product)
+                og.sim.render_backend.detach_modality(self._annotators[modality], self._render_product)
             self._annotators[modality] = None
 
     def remove(self):
@@ -616,8 +761,9 @@ class VisionSensor(BaseSensor):
             self.remove_modality(modality)
 
         # Destroy the render product
-        with og.sim.editing_usd():
-            self._render_product.destroy()
+        if self._render_product is not None:
+            with og.sim.editing_usd():
+                og.sim.render_backend.destroy_camera_resource(self._render_product)
 
         # Remove the viewport if it exists.
         if self._viewport is not None:
@@ -675,7 +821,7 @@ class VisionSensor(BaseSensor):
             for _ in range(4):
                 og.sim.render()
         # Grab and return the parameters
-        return self._annotators["camera_params"].get_data()
+        return og.sim.render_backend.get_modality_data(self._annotators["camera_params"])
 
     @property
     def viewer_visibility(self):
@@ -721,22 +867,7 @@ class VisionSensor(BaseSensor):
             width, _ = self._viewport.viewport_api.get_texture_resolution()
             self._viewport.viewport_api.set_texture_resolution((width, height))
 
-        # Also update render product and update all annotators
-        with og.sim.editing_usd():
-            for annotator in self._annotators.values():
-                annotator.detach([self._render_product.path])
-
-            self._render_product.destroy()
-            self._render_product = lazy.omni.replicator.core.create.render_product(
-                self.prim_path, (width, height), force_new=True
-            )
-
-            for annotator in self._annotators.values():
-                annotator.attach([self._render_product])
-
-        # Requires 4 updates to propagate changes
-        for i in range(4):
-            og.sim.render()
+        self._recreate_render_product(width, height)
 
     @property
     def image_width(self):
@@ -760,22 +891,7 @@ class VisionSensor(BaseSensor):
             _, height = self._viewport.viewport_api.get_texture_resolution()
             self._viewport.viewport_api.set_texture_resolution((width, height))
 
-        # Also update render product and update all annotators
-        with og.sim.editing_usd():
-            for annotator in self._annotators.values():
-                annotator.detach([self._render_product.path])
-
-            self._render_product.destroy()
-            self._render_product = lazy.omni.replicator.core.create.render_product(
-                self.prim_path, (width, height), force_new=True
-            )
-
-            for annotator in self._annotators.values():
-                annotator.attach([self._render_product])
-
-        # Requires 4 updates to propagate changes
-        for i in range(4):
-            og.sim.render()
+        self._recreate_render_product(width, height)
 
     @property
     def clipping_range(self):
@@ -996,6 +1112,10 @@ class VisionSensor(BaseSensor):
     @classproperty
     def all_modalities(cls):
         return {modality for modality in cls.ALL_MODALITIES if modality != "camera_params"}
+
+    @classproperty
+    def raw_sensor_types(cls):
+        return cls.RAW_SENSOR_TYPES.copy()
 
     @classproperty
     def no_noise_modalities(cls):

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "joylo"
-version = "3.9.2"
+version = "3.9.3"
 description = "JoyLo for OmniGibson"
 readme = { file = "README.md", content-type = "text/markdown" }
 authors = [{ name = "Stanford University" }]
@@ -20,7 +20,7 @@ dependencies = [
   "dynamixel-sdk",
   "hid",
   "joycon-python",
-  "numpy<2",
+  "numpy>=2",
   "numpy-quaternion",
   "Pillow",
   "pyglm",
@@ -41,7 +41,7 @@ dev = [
   "jupyterlab",
   "mypy",
   "neovim",
-  "pyright",
+  "pyright>=1.1.390",
   "pytest",
   "python-lsp-server[all]",
 ]
@@ -50,3 +50,7 @@ dev = [
 packages = { find = {} }
 include-package-data = true
 zip-safe = false
+
+[tool.pyright]
+include = ["gello", "scripts"]
+exclude = ["**/__pycache__"]

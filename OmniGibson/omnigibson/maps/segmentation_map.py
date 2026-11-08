@@ -3,6 +3,7 @@ import os
 import cv2
 import torch as th
 
+import omnigibson as og
 from omnigibson.maps.map_base import BaseMap
 from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.python_utils import torch_delete
@@ -128,7 +129,7 @@ class SegmentationMap(BaseMap):
         # assume only 1 floor
         floor = 0
         z = self.floor_heights[floor]
-        return floor, th.tensor([x, y, z])
+        return floor, th.tensor([x, y, z], device=og.sim.device)
 
     def get_random_point_by_room_instance(self, room_instance):
         """
@@ -154,7 +155,7 @@ class SegmentationMap(BaseMap):
         # assume only 1 floor
         floor = 0
         z = self.floor_heights[floor]
-        return floor, th.tensor([x, y, z])
+        return floor, th.tensor([x, y, z], device=og.sim.device)
 
     def get_room_type_by_point(self, xy):
         """

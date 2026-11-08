@@ -4,7 +4,6 @@ from typing import Literal
 import torch as th
 
 import omnigibson as og
-import omnigibson.lazy as lazy
 
 from .rigid_prim import RigidPrim
 
@@ -48,12 +47,9 @@ class RigidDynamicPrim(RigidPrim):
         self.set_attribute("physics:rigidBodyEnabled", True)
 
         # Create the rigid prim view
-        # Import now to avoid too-eager load of Omni classes due to inheritance
-        from omnigibson.utils.deprecated_utils import RigidPrimView
-
         # set reset_xform_properties to False for load time
         with og.sim.editing_usd():
-            self._rigid_prim_view = RigidPrimView(self.prim_path, reset_xform_properties=False)
+            self._rigid_prim_view = og.sim.physics_backend.create_rigid_body_view(self.prim_path)
 
         # Run super method to handle common functionality
         super()._post_load()
@@ -72,7 +68,7 @@ class RigidDynamicPrim(RigidPrim):
             og.sim.is_playing() and not self._rigid_prim_view.is_valid
         ), "Rigid prim view must be valid if physics is running!"
 
-        self._rigid_prim_view.initialize(og.sim.physics_sim_view)
+        self._rigid_prim_view.initialize(og.sim.physics_backend.physics_sim_view)
 
     def set_linear_velocity(self, velocity):
         """
@@ -137,9 +133,10 @@ class RigidDynamicPrim(RigidPrim):
         position = current_position if position is None else position
         orientation = current_orientation if orientation is None else orientation
 
-        # Convert to th.Tensor if necessary
-        position = th.as_tensor(position, dtype=th.float32)
-        orientation = th.as_tensor(orientation, dtype=th.float32)
+        # Convert to th.Tensor if necessary. Must land on og.sim.device explicitly -- see
+        # XFormPrim.set_position_orientation()'s equivalent comment for why.
+        position = th.as_tensor(position, dtype=th.float32, device=og.sim.device)
+        orientation = th.as_tensor(orientation, dtype=th.float32, device=og.sim.device)
 
         # Assert validity of the orientation
         assert math.isclose(
@@ -156,6 +153,13 @@ class RigidDynamicPrim(RigidPrim):
         ), "Unexpected: rigid prim view is not valid while simulation is playing."
         self._rigid_prim_view.set_world_poses(positions=position[None, :], orientations=orientation[None, [3, 0, 1, 2]])
         og.sim.sync_physx_to_fabric()
+
+        # Tensorized state caches (AABB / Touching / Adjacency / ...) read from pose tensors
+        # that are now one frame behind. Flag them as stale so the next state read forces a
+        # refresh via the lazy-refresh gate in TensorizedState._get_value.
+        from omnigibson.object_states.tensorized_state import TensorizedState
+
+        TensorizedState.caches_dirty = True
 
     def get_position_orientation(self, frame: Literal["world", "scene"] = "world", clone=True):
         """
@@ -266,7 +270,7 @@ class RigidDynamicPrim(RigidPrim):
         Returns:
             bool: whether this rigid prim is asleep or not
         """
-        return og.sim.psi.is_sleeping(og.sim.stage_id, lazy.pxr.PhysicsSchemaTools.sdfPathToInt(self.prim_path))
+        return og.sim.physics_backend.is_asleep(self.prim_path)
 
     def enable_gravity(self):
         """
@@ -286,15 +290,13 @@ class RigidDynamicPrim(RigidPrim):
         """
         Enable physics for this rigid body
         """
-        prim_id = lazy.pxr.PhysicsSchemaTools.sdfPathToInt(self.prim_path)
-        og.sim.psi.wake_up(og.sim.stage_id, prim_id)
+        og.sim.physics_backend.wake(self.prim_path)
 
     def sleep(self):
         """
         Disable physics for this rigid body
         """
-        prim_id = lazy.pxr.PhysicsSchemaTools.sdfPathToInt(self.prim_path)
-        og.sim.psi.put_to_sleep(og.sim.stage_id, prim_id)
+        og.sim.physics_backend.sleep(self.prim_path)
 
     @property
     def stabilization_threshold(self):

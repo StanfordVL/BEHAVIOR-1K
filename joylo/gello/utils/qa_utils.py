@@ -707,7 +707,8 @@ class TaskRelevantObjectVelocityMetric(MetricBase):
         step_metrics = dict()
         from omnigibson.systems.system_base import BaseSystem
 
-        for name, bddl_inst in env.task.object_scope.items():
+        # object_scopes is indexed per env; JoyLo QA always runs a single env
+        for name, bddl_inst in env.task.object_scopes[0].items():
             if (
                 isinstance(bddl_inst, BaseSystem)
                 or bddl_inst is None

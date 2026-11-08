@@ -4,17 +4,12 @@ import sys
 import json
 from omnigibson.utils.python_utils import recursively_convert_to_torch
 from omnigibson.utils.config_utils import TorchEncoder
-import bddl
+from bddl.activity import get_all_activities
 from gello.utils.qa_utils import *
 
 
 def get_valid_tasks():
-    return set(
-        activity
-        for activity in os.listdir(
-            os.path.join(bddl.__path__[0], "activity_definitions")
-        )
-    )
+    return set(get_all_activities())
 
 
 def evaluate_qa_metrics(fpath, task):

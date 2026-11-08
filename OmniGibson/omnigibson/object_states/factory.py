@@ -62,7 +62,9 @@ _ABILITY_DEPENDENCIES = {
     "meltable": AbilityDependencies(states=[MaxTemperature], requirements=[]),
     "mixingTool": AbilityDependencies(states=[], requirements=[]),
     "openable": AbilityDependencies(states=[Open], requirements=[]),
-    "flammable": AbilityDependencies(states=[OnFire], requirements=[]),
+    # A flammable object is an OnFire threshold detector plus a heat source that is only active
+    # while the object is on fire (see the per-state param transforms below).
+    "flammable": AbilityDependencies(states=[OnFire, HeatSourceOrSink], requirements=[]),
     "saturable": AbilityDependencies(states=[Saturated], requirements=[]),
     "sliceable": AbilityDependencies(states=[], requirements=[SliceableRequirement]),
     "slicer": AbilityDependencies(states=[SlicerActive], requirements=[]),
@@ -70,6 +72,41 @@ _ABILITY_DEPENDENCIES = {
     "cloth": AbilityDependencies(states=[Folded, Unfolded, Overlaid, Draped], requirements=[]),
     "fillable": AbilityDependencies(states=[Filled, Contains], requirements=[]),
 }
+
+# Per-(ability, state) __init__ kwarg transforms applied when hydrating a state from an ability's
+# params. Needed when one ability hydrates multiple states from a single shared param dict whose
+# keys don't all match each state's constructor signature. Each entry is (renames, extra_kwargs).
+_ABILITY_STATE_PARAM_TRANSFORMS = {
+    # The flammable params describe both the detector (ignition_temperature, consumed by OnFire
+    # and by the heat source's self-sustain clamp) and the fire itself (fire_temperature,
+    # heating_rate, distance_threshold, consumed by the requires_on_fire heat source).
+    ("flammable", HeatSourceOrSink): (
+        {"fire_temperature": "temperature"},
+        {"requires_on_fire": True},
+    ),
+}
+
+
+def transform_ability_params_for_state(ability, state_type, params):
+    """
+    Applies the per-(ability, state) kwarg transform (if any) to @params.
+
+    Args:
+        ability (str): Ability name
+        state_type (type): Object state class being hydrated from @ability's params
+        params (dict): Raw ability params
+
+    Returns:
+        dict: Transformed copy of @params
+    """
+    transform = _ABILITY_STATE_PARAM_TRANSFORMS.get((ability, state_type), None)
+    if transform is None:
+        return dict(params)
+    renames, extra_kwargs = transform
+    params = {renames.get(key, key): value for key, value in params.items()}
+    params.update(extra_kwargs)
+    return params
+
 
 _DEFAULT_STATE_SET = frozenset(
     [
@@ -166,6 +203,31 @@ def get_states_for_ability(ability):
     if ability not in _ABILITY_DEPENDENCIES:
         return []
     return _ABILITY_DEPENDENCIES[ability].states
+
+
+def get_states_and_params_for_ability(ability, params):
+    """
+    Enumerate the (state_type, params) pairs an @ability contributes, with the per-(ability, state)
+    param transform (see @transform_ability_params_for_state) applied to each.
+
+    Both object hydration (USDObject) and asset model-validation
+    (get_all_object_category_models_with_abilities) must instantiate an ability's states with the
+    SAME kwargs, otherwise a model can pass one path and fail the other. They therefore share this
+    helper so the two never drift apart -- e.g. `flammable` injects requires_on_fire=True into
+    HeatSourceOrSink, which flips its meta-link requirement; without the transform, validation
+    would demand a heatsource meta link that hydration does not.
+
+    Args:
+        ability (str): Ability name
+        params (dict): Raw ability params
+
+    Returns:
+        list of (type, dict): (state_type, transformed_params) for each state @ability contributes
+    """
+    return [
+        (state_type, transform_ability_params_for_state(ability, state_type, params))
+        for state_type in get_states_for_ability(ability)
+    ]
 
 
 def get_requirements_for_ability(ability):

@@ -52,6 +52,10 @@ class HDF5DataWrapper(DataWrapper):
                 For more information, check out https://docs.h5py.org/en/stable/high/dataset.html#filter-pipeline
                 Example: {"compression": "gzip", "compression_opts": 9} for gzip with level 9 compression
         """
+        # HDF5 data wrapper is single-env by design: create_dataset saves env.scene and writes
+        # task metadata at scene index 0. Fail fast before super().__init__ triggers create_dataset.
+        assert env.num_envs == 1, f"HDF5DataWrapper is single-env only; got num_envs={env.num_envs}."
+
         self.compression = dict() if compression is None else compression
         self.hdf5_file = None
 
@@ -74,8 +78,9 @@ class HDF5DataWrapper(DataWrapper):
             data_grp = self.hdf5_file["data"]
 
         if overwrite or "config" not in set(data_grp.attrs.keys()):
+            # Single-env data wrapper: scene index 0
             if isinstance(env.task, BehaviorTask):
-                env.task.update_bddl_scope_metadata(env)
+                env.task.update_bddl_scope_metadata(env, env_idx=0)
             scene_file = env.scene.save()
             config = deepcopy(env.config)
             self.add_metadata(group=data_grp, name="config", data=config)
@@ -374,7 +379,7 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
         # First pad all state values to be the same max (uniform) size
         for step_data in traj_data:
             state = step_data["state"]
-            padded_state = th.zeros(self.max_state_size, dtype=th.float32)
+            padded_state = th.zeros(self.max_state_size, dtype=th.float32, device=og.sim.device)
             padded_state[: len(state)] = state
             step_data["state"] = padded_state
 
@@ -434,6 +439,7 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
         Args:
             viewport_camera_path (str): Prim path to the camera to use for the viewer for data collection
         """
+
         # Disable all render products to save on speed
         # See https://forums.developer.nvidia.com/t/speeding-up-simulation-2023-1-1/300072/6
         for sensor in VisionSensor.SENSORS.values():
@@ -550,7 +556,7 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
         # First pad all state values to be the same max (uniform) size
         for step_data in traj_data:
             state = step_data["state"]
-            padded_state = th.zeros(self.max_state_size, dtype=th.float32)
+            padded_state = th.zeros(self.max_state_size, dtype=th.float32, device=og.sim.device)
             padded_state[: len(state)] = state
             step_data["state"] = padded_state
 

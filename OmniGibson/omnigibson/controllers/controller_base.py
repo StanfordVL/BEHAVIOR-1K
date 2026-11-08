@@ -604,10 +604,15 @@ class BaseController(Serializable, Registerable, Recreatable):
         self._load_state(controller_idx=controller_idx, state=state)
 
     def serialize(self, state, controller_idx: int):
-        goal_set_tensor = th.tensor([float(state["goal_set"])], dtype=th.float32)
+        # Local import to avoid a circular import at module load time.
+        import omnigibson as og
+
+        goal_set_tensor = th.tensor([float(state["goal_set"])], dtype=th.float32, device=og.sim.device)
         goals = state["goals"]
-        goal_flat = th.cat([v.flatten() for v in goals.values()]) if goals else th.zeros(self.goal_dim)
-        return th.cat([goal_set_tensor, goal_flat])
+        goal_flat = (
+            th.cat([v.flatten() for v in goals.values()]) if goals else th.zeros(self.goal_dim, device=og.sim.device)
+        )
+        return th.cat([goal_set_tensor, goal_flat.to(og.sim.device)])
 
     def deserialize(self, state, controller_idx: int):
         goal_set = bool(state[0].item())

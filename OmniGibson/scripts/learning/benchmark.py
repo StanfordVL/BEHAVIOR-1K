@@ -61,16 +61,6 @@ def _as_numpy_frame(value) -> np.ndarray:
     return value.astype(np.float32, copy=False)
 
 
-def _depth_unit(dataset: LeRobotDataset, depth_key: str) -> str:
-    feature_info = dataset.meta.features[depth_key].get("info") or {}
-    unit = feature_info.get("video.output_unit")
-    if unit is None:
-        raise ValueError(f"Depth feature {depth_key} is missing info['video.output_unit']")
-    if unit not in {"m", "mm"}:
-        raise ValueError(f"Unsupported depth unit for {depth_key}: {unit!r}")
-    return unit
-
-
 def _to_meters(depth: np.ndarray, unit: str) -> np.ndarray:
     if unit == "m":
         return depth
@@ -142,7 +132,7 @@ def _dataset_summary(dataset: LeRobotDataset) -> None:
         print(
             f"  {key}: codec={info.get('video.codec')} pix_fmt={info.get('video.pix_fmt')} "
             f"g={info.get('video.g')} crf={info.get('video.crf')} depth={info.get('is_depth_map', False)} "
-            f"output_unit={info.get('video.output_unit')}"
+            f"output_unit={dataset.depth_output_unit if key in dataset.meta.depth_keys else None}"
         )
 
 
@@ -225,7 +215,7 @@ def benchmark_depth_reconstruction(
             for idx in tqdm(indices, desc=depth_key, leave=False):
                 idx = int(idx)
                 item = dataset[idx]
-                decoded = _to_meters(_as_numpy_frame(item[depth_key]), _depth_unit(dataset, depth_key))
+                decoded = _to_meters(_as_numpy_frame(item[depth_key]), dataset.depth_output_unit)
                 gt = np.asarray(obs[hdf5_key][idx], dtype=np.float32)
                 errors.append(np.abs(decoded - gt).ravel())
 
@@ -258,7 +248,12 @@ def main() -> None:
     parser.add_argument("--json", default=None, help="Optional path to write machine-readable results.")
     args = parser.parse_args()
 
-    dataset = LeRobotDataset(repo_id=args.repo_id, root=Path(args.root).expanduser(), video_backend=args.video_backend)
+    dataset = LeRobotDataset(
+        repo_id=args.repo_id,
+        root=Path(args.root).expanduser(),
+        video_backend=args.video_backend,
+        depth_output_unit="m",
+    )
     hdf5_path = _resolve_hdf5_path(args)
     if not hdf5_path.exists():
         raise FileNotFoundError(hdf5_path)
