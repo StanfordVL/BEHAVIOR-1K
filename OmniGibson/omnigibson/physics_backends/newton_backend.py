@@ -1236,6 +1236,13 @@ class NewtonBackend(PhysicsBackend):
         # Newton collision pipeline feeding the plain (rigid-only) SolverMuJoCo path -- see _rebuild()
         self._rigid_collision_pipeline = None
         self._mpm_in_place = False
+        # SolverImplicitMPM stepping the fluid once per step after the cloth substeps, when both are in the scene
+        self._fluid_solver = None
+        # [mesh, cloth particle ids, triangles, last positions] of the fluid's cloth collider, see
+        # _make_fluid_cloth_collider()
+        self._fluid_cloth_collider = None
+        # (body_count, 6) wrench the fluid put on each body over the last step, see _fluid_body_wrenches()
+        self._fluid_body_wrench = None
         self._pre_step_cb = None
         self._post_step_cb = None
         self._joint_break_cb = None
@@ -1603,6 +1610,9 @@ class NewtonBackend(PhysicsBackend):
                 substep_dt = self.get_physics_dt() / self._PARTICLE_SUBSTEPS
                 # Hold an applied force through every substep, so it delivers one full physics step's impulse
                 applied_body_f = self._applied_body_forces()
+                if self._fluid_body_wrench is not None and applied_body_f is not None:
+                    # Along with the fluid's push over the previous step
+                    applied_body_f += self._fluid_body_wrench
                 for i in range(self._PARTICLE_SUBSTEPS):
                     if self._kinematic_moves:
                         self._apply_kinematic_moves((i + 1) / self._PARTICLE_SUBSTEPS)
@@ -1620,6 +1630,12 @@ class NewtonBackend(PhysicsBackend):
                     self._state_0, self._state_1 = self._state_1, self._state_0
                 self._kinematic_moves = {}
                 self._stepped_since_rebuild = True
+                if self._fluid_solver is not None:
+                    # Then the fluid, in one step, against the rigid bodies' and cloth's new poses
+                    self._keep_fluid_grid_around_particles()
+                    self._sync_fluid_cloth_collider()
+                    self._fluid_solver.step(self._state_0, self._state_0, self._control, None, self.get_physics_dt())
+                    self._fluid_body_wrench = self._fluid_body_wrenches()
             else:
                 # Replay this substep from a CUDA graph when one is available.
                 step_dt = self.get_physics_dt()
@@ -2509,18 +2525,23 @@ class NewtonBackend(PhysicsBackend):
         self._bvh_dirty = False
 
         self._mpm_in_place = False
+        self._fluid_solver = None
+        self._fluid_cloth_collider = None
+        self._fluid_body_wrench = None
         has_cloth = bool(path_cloth_particle_map)
         has_fluid = any(end > start for start, end in path_fluid_particle_map.values())
         has_rigid = self._model.joint_count > 0
         self._rigid_collision_pipeline = None
-        if has_cloth and has_fluid:
-            # Not yet supported simultaneously
-            log.warning(
-                "Newton backend does not yet support cloth and fluid particles simultaneously in the "
-                "same scene -- only the fluid system(s) will be simulated this rebuild."
-            )
+        # With both cloth and fluid, the cloth path below steps the cloth (and rigid bodies) alone, and a separate MPM
+        # solver then steps the fluid
+        cloth_with_fluid = has_cloth and has_fluid
+        cloth_particles = (
+            [i for start, end in path_cloth_particle_map.values() for i in range(start, end)]
+            if cloth_with_fluid
+            else None
+        )
 
-        if has_fluid and has_rigid:
+        if has_fluid and has_rigid and not cloth_with_fluid:
             from newton.solvers.experimental.coupled import SolverCoupledProxy
             from newton.solvers import SolverImplicitMPM
 
@@ -2567,7 +2588,7 @@ class NewtonBackend(PhysicsBackend):
             self._collision_pipeline = newton.CollisionPipeline(self._model, soft_contact_max=0)
             self._contacts = self._collision_pipeline.contacts()
             self._mpm_in_place = True
-        elif has_fluid:
+        elif has_fluid and not cloth_with_fluid:
             # Fluid but no rigid bodies.
             mpm_config = self._make_mpm_config()
             self._solver = self._make_mpm_solver(self._model, mpm_config)
@@ -2586,7 +2607,7 @@ class NewtonBackend(PhysicsBackend):
                     SolverCoupledProxy.Entry(
                         name="xpbd",
                         solver=lambda v: newton.solvers.SolverXPBD(model=v, iterations=40),
-                        particles=list(range(self._model.particle_count)),
+                        particles=cloth_particles or list(range(self._model.particle_count)),
                     ),
                     SolverCoupledProxy.Entry(
                         name="mjc",
@@ -2604,15 +2625,31 @@ class NewtonBackend(PhysicsBackend):
                     iterations=1,
                 ),
             )
-            self._collision_pipeline = newton.CollisionPipeline(self._model)
+            self._collision_pipeline = self._make_particle_collision_pipeline(cloth_particles)
             self._contacts = self._collision_pipeline.contacts()
             self._mpm_in_place = False
         elif self._model.particle_count > 0:
             # Particles/cloth but no rigid bodies
             self._model.soft_contact_ke = 1.0e2
             self._model.soft_contact_kd = 1.0
-            self._solver = newton.solvers.SolverXPBD(model=self._model, iterations=40)
-            self._collision_pipeline = newton.CollisionPipeline(self._model)
+            if cloth_with_fluid:
+                from newton.solvers.experimental.coupled import SolverCoupledProxy
+
+                # Coupled only so XPBD steps just the cloth particles
+                self._solver = SolverCoupledProxy(
+                    model=self._model,
+                    entries=[
+                        SolverCoupledProxy.Entry(
+                            name="xpbd",
+                            solver=lambda v: newton.solvers.SolverXPBD(model=v, iterations=40),
+                            particles=cloth_particles,
+                        )
+                    ],
+                    coupling=SolverCoupledProxy.Config(proxies=[], iterations=1),
+                )
+            else:
+                self._solver = newton.solvers.SolverXPBD(model=self._model, iterations=40)
+            self._collision_pipeline = self._make_particle_collision_pipeline(cloth_particles)
             self._contacts = self._collision_pipeline.contacts()
             self._mpm_in_place = False
         elif self._model.joint_count > 0:
@@ -2640,6 +2677,10 @@ class NewtonBackend(PhysicsBackend):
         else:
             self._collision_pipeline = None
             self._solver = None
+        if cloth_with_fluid:
+            self._fluid_solver = self._make_mpm_solver(
+                self._model, self._make_mpm_config(), cloth_particles=cloth_particles
+            )
 
         self._elevate_low_friction_geom_priority(low_friction_body_idx)
         self._configure_finger_contacts(finger_body_idx)
@@ -2751,12 +2792,16 @@ class NewtonBackend(PhysicsBackend):
             nconmax=self._RIGID_CONTACT_MAX,
         )
 
-    def _make_mpm_solver(self, model, config):
+    def _make_mpm_solver(self, model, config, cloth_particles=None):
         """
         SolverImplicitMPM for @model. It takes its colliders' thickness from the shape margins, which are 0 here, so
         water leaked through thin walls (e.g. a pot's): raise them to _FLUID_COLLIDER_THICKNESS while it reads them,
         then restore them for the rigid contacts.
+
+        With @cloth_particles, the solver steps on its own after the cloth path (see step_physics_once()): the rigid
+        bodies are kinematic colliders, and the cloth a thin shell moving with it (see _sync_fluid_cloth_collider()).
         """
+        import newton
         import warp as wp
         from newton.solvers import SolverImplicitMPM
 
@@ -2764,9 +2809,130 @@ class NewtonBackend(PhysicsBackend):
         original = margin.clone()
         margin.clamp_(min=self._FLUID_COLLIDER_THICKNESS)
         try:
-            return SolverImplicitMPM(model=model, config=config)
+            solver = SolverImplicitMPM(model=model, config=config)
+            if cloth_particles is not None:
+                # The default colliders: static shapes (body -1) and each body's shapes that collide with particles
+                shape_flags = model.shape_flags.numpy()
+                shape_body = model.shape_body.numpy()
+                collides = (shape_flags & int(newton.ShapeFlags.COLLIDE_PARTICLES)) != 0
+                body_ids = sorted({int(body) for body in shape_body[collides]})
+                cloth_mesh = self._make_fluid_cloth_collider(cloth_particles)
+                # SolverImplicitMPM would simulate the cloth particles as fluid too, unless they belong to a
+                # (particle-driven) deformable collider: give them one far away, which is never synced to them
+                unused_mesh = wp.Mesh(
+                    points=wp.full(len(cloth_particles), wp.vec3(1.0e6), dtype=wp.vec3, device=model.device),
+                    indices=wp.array([0, 1, 2], dtype=wp.int32, device=model.device),
+                )
+                n_bodies = len(body_ids)
+                solver.setup_collider(
+                    collider_meshes=[None] * n_bodies + [cloth_mesh, unused_mesh],
+                    collider_body_ids=body_ids + [None, None],
+                    collider_margins=[None] * n_bodies + [self._FLUID_COLLIDER_THICKNESS, 0.0],
+                    collider_particle_ids=[None] * (n_bodies + 1) + [cloth_particles],
+                    # Kinematic here: the rigid bodies get the fluid's push afterwards (see _fluid_body_wrenches()), and
+                    # the cloth doesn't get it
+                    body_mass=wp.zeros_like(model.body_mass),
+                )
+            return solver
         finally:
             margin.copy_(original)
+
+    # Half the thickness (m) of the shell around the cloth that the fluid collides against, see
+    # _make_fluid_cloth_collider()
+    _FLUID_CLOTH_SHELL_HALF_THICKNESS = 0.001
+
+    def _make_fluid_cloth_collider(self, cloth_particles):
+        """
+        Mesh for the fluid to collide against the cloth: a closed, thin shell around it, from a layer of the cloth's
+        triangles on either side and faces joining them along its edges. SolverImplicitMPM tells a collider's inside
+        from its outside by its faces' normals, so an open cloth mesh itself would let water through from one side.
+        """
+        import warp as wp
+
+        device = self._model.device.alias
+        cloth_ids = th.tensor(cloth_particles, dtype=th.long, device=device)
+        tris = th.searchsorted(cloth_ids, th.as_tensor(self._model.tri_indices.numpy(), dtype=th.long, device=device))
+        n = len(cloth_ids)
+        # Edges of a single triangle bound the cloth, each in its triangle's winding
+        edges = th.cat([tris[:, [0, 1]], tris[:, [1, 2]], tris[:, [2, 0]]])
+        _, edge_ids, counts = th.unique(th.sort(edges, dim=1).values, dim=0, return_inverse=True, return_counts=True)
+        a, b = edges[counts[edge_ids] == 1].T
+        # Front layer at [0, n), back layer (reversed winding) at [n, 2n), and two triangles per boundary edge
+        indices = th.cat(
+            [tris, tris[:, [0, 2, 1]] + n, th.stack([b, a, a + n], dim=1), th.stack([b, a + n, b + n], dim=1)]
+        )
+        points = wp.zeros(2 * n, dtype=wp.vec3, device=self._model.device)
+        velocities = wp.zeros(2 * n, dtype=wp.vec3, device=self._model.device)
+        self._fluid_cloth_collider = [None, cloth_ids, tris, None]
+        # Built around the cloth's current pose: a BVH built around placeholder points stays slow to refit and query
+        self._sync_fluid_cloth_collider(points, velocities)
+        mesh = wp.Mesh(
+            points=points, indices=wp.from_torch(indices.flatten().to(th.int32).contiguous()), velocities=velocities
+        )
+        self._fluid_cloth_collider[0] = mesh
+        return mesh
+
+    def _sync_fluid_cloth_collider(self, points=None, velocities=None):
+        """
+        Moves the fluid's cloth collider (see _make_fluid_cloth_collider()) to the cloth's current pose, or writes its
+        vertex @points and @velocities if given
+        """
+        import warp as wp
+
+        mesh, cloth_ids, tris, prev_q = self._fluid_cloth_collider
+        q = _wp_to_torch(self._state_0.particle_q)[cloth_ids, :3]
+        # The cloth's velocity over the whole step: XPBD's particle velocities are just its last substep's
+        qd = th.zeros_like(q) if prev_q is None else (q - prev_q) / self.get_physics_dt()
+        self._fluid_cloth_collider[3] = q
+        # Area-weighted vertex normals
+        face_normals = th.linalg.cross(q[tris[:, 1]] - q[tris[:, 0]], q[tris[:, 2]] - q[tris[:, 0]])
+        normals = th.zeros_like(q).index_add_(0, tris.flatten(), face_normals.repeat_interleave(3, dim=0))
+        offset = self._FLUID_CLOTH_SHELL_HALF_THICKNESS * th.nn.functional.normalize(normals, dim=1)
+        wp.to_torch(mesh.points if points is None else points).copy_(th.cat([q + offset, q - offset]))
+        wp.to_torch(mesh.velocities if velocities is None else velocities).copy_(th.cat([qd, qd]))
+        if points is None:
+            mesh.refit()
+
+    def _fluid_body_wrenches(self):
+        """
+        (body_count, 6) force and torque the fluid put on each body over the last step (None without bodies), from the
+        fluid solver's collider impulses. It takes the bodies as kinematic (see _make_mpm_solver()), so they get them a step late.
+        """
+        import warp as wp
+
+        if self._model.body_count == 0:
+            return None
+        impulses, positions, collider_ids = self._fluid_solver.collect_collider_impulses(self._state_0)
+        impulses, positions = wp.to_torch(impulses), wp.to_torch(positions)
+        collider_ids = wp.to_torch(collider_ids).long()
+        collider_body = wp.to_torch(self._fluid_solver.collider_body_index).long()
+        body = th.where(collider_ids >= 0, collider_body[collider_ids.clamp(min=0)], -1)
+        hit = body >= 0
+        body = body[hit]
+        force = impulses[hit] / self.get_physics_dt()
+        body_q = _wp_to_torch(self._state_0.body_q)[body]
+        com = body_q[:, :3] + _quat_rotate_batch(body_q[:, 3:7], _wp_to_torch(self._model.body_com)[body])
+        torque = th.linalg.cross(positions[hit] - com, force)
+        wrench = th.zeros((self._model.body_count, 6), dtype=force.dtype, device=force.device)
+        return wrench.index_add_(0, body, th.cat([force, torque], dim=1))
+
+    def _make_particle_collision_pipeline(self, particles=None):
+        """
+        CollisionPipeline for the XPBD particle path, with its particle-shape contacts limited to @particles if given.
+        It checks every particle against every shape, so fluid particles, which XPBD doesn't step, would cost it a mesh
+        query per shape each substep.
+        """
+        import newton
+        import warp as wp
+
+        if particles is None:
+            return newton.CollisionPipeline(self._model)
+        pipeline = newton.CollisionPipeline(self._model, soft_contact_max=len(particles) * self._model.shape_count)
+        pairs = pipeline.soft_rigid_contact_pairs.numpy()
+        pairs = pairs[th.isin(th.from_numpy(pairs[:, 0]), th.tensor(particles)).numpy()]
+        pipeline.soft_rigid_contact_pairs = wp.array(pairs, dtype=wp.vec2i, device=self._model.device)
+        pipeline._soft_contact_pair_count = len(pairs)
+        return pipeline
 
     def _make_mpm_config(self):
         """SolverImplicitMPM.Config, validated standalone against a water-like blob (settles/spreads
@@ -3015,6 +3181,9 @@ class NewtonBackend(PhysicsBackend):
             else th.arange(start, end, device=particle_q.device)
         )
         particle_q[idx, :3] = th.as_tensor(positions, dtype=particle_q.dtype, device=particle_q.device).reshape(-1, 3)
+        if self._fluid_cloth_collider is not None:
+            # A jump, not motion the fluid's cloth collider should take as velocity
+            self._fluid_cloth_collider[3] = None
 
     def get_cloth_particle_velocities(self, prim_path):
         if prim_path not in self._path_cloth_particle_map:
@@ -3095,7 +3264,11 @@ class NewtonBackend(PhysicsBackend):
         """
         from newton.solvers.experimental.coupled import SolverCoupledProxy
 
-        if not self._mpm_in_place or self._solver is None or self._rebuilding or self._live_state_discarded:
+        if self._rebuilding or self._live_state_discarded:
+            return None
+        if self._fluid_solver is not None:
+            return self._fluid_solver, [self._model], [self._state_0, self._state_1]
+        if not self._mpm_in_place or self._solver is None:
             return None
         if not isinstance(self._solver, SolverCoupledProxy):
             return self._solver, [self._model], [self._state_0, self._state_1]
@@ -3327,12 +3500,15 @@ class NewtonBackend(PhysicsBackend):
         """
         import warp as wp
 
-        if not self._mpm_in_place:
+        if not self._mpm_in_place and self._fluid_solver is None:
             return {}
         from newton.solvers.experimental.coupled import SolverCoupledProxy
 
-        # SolverImplicitMPM has a `solver` attribute too, so check the type
-        mpm = self._solver.solver("mpm") if isinstance(self._solver, SolverCoupledProxy) else self._solver
+        if self._fluid_solver is not None:
+            mpm = self._fluid_solver
+        else:
+            # SolverImplicitMPM has a `solver` attribute too, so check the type
+            mpm = self._solver.solver("mpm") if isinstance(self._solver, SolverCoupledProxy) else self._solver
         if self._fluid_surface_cache.get("solver") is not mpm:
             # Each rebuild makes a new solver (and particle layout), so the extraction contexts are per solver
             self._fluid_surface_cache = {"solver": mpm, "surfaces": {}, "flags": {}}
@@ -3404,7 +3580,7 @@ class NewtonBackend(PhysicsBackend):
         """
         import warp as wp
 
-        if not self._mpm_in_place:
+        if not self._mpm_in_place and self._fluid_solver is None:
             return {}
         surfaces = surfaces or {}
         positions_all = _wp_to_torch(self._state_0.particle_q)[:, :3]
