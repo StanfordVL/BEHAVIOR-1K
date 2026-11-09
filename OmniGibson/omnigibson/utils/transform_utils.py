@@ -470,9 +470,9 @@ def _assert_rotation_matrix_unscaled(rmat: torch.Tensor) -> None:
     # scaled/invalid matrix; the default tolerance was simply too tight for float32 SVD residuals. A
     # truly invalid/degenerate matrix (e.g. from collinear input vectors) would miss det=1 by far more
     # than 1e-3, so this stays a meaningful check.
-    assert torch.allclose(
-        det3x3(rmat), torch.tensor(1.0, device=rmat.device), atol=1e-3
-    ), "Rotation matrix must not be scaled"
+    assert torch.allclose(det3x3(rmat), torch.tensor(1.0, device=rmat.device), atol=1e-3), (
+        "Rotation matrix must not be scaled"
+    )
 
 
 @torch_compile
