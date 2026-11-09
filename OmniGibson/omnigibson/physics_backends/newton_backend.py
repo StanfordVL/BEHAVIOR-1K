@@ -3159,7 +3159,8 @@ class NewtonBackend(PhysicsBackend):
             # A "fixed" grid is allocated once around the active particles, so new particles may fall outside it
             mpm._scratchpad = None
             self._fluid_grid_bounds = None
-        self._fluid_surface_cache = {}
+        # The surfaces' particle masks (see get_fluid_surface_meshes()) follow the particle flags
+        self._fluid_surface_cache.get("flags", {}).clear()
 
     def generate_particles(self, system_name, positions, velocities=None):
         positions = th.as_tensor(positions, dtype=th.float32, device=self.sim.device).reshape(-1, 3)
@@ -3347,6 +3348,7 @@ class NewtonBackend(PhysicsBackend):
                 cache["surfaces"][system_name] = mpm.create_particle_surface(
                     voxel_size=self._FLUID_SURFACE_VOXEL_SIZE, **self._fluid_surface_kwargs(system_name)
                 )
+            if system_name not in cache["flags"]:
                 flags = None
                 if (start, end) != (0, self._model.particle_count):
                     # Surface only this system's particles, so separate fluids (or cloth) don't merge into one mesh
