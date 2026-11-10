@@ -128,7 +128,7 @@ Detailed specifications live on the canonical challenge pages: [Dataset](./datas
 
 The challenge provides large-scale human teleoperation demonstrations for learning long-horizon household behaviors. The release includes RGB and depth observations, robot proprioception and actions, and skill/subtask annotations; the full dataset format and statistics are documented on the [Dataset](./dataset.md) page.
 
-Demonstrations were collected with **JoyLo**, a whole-body teleoperation interface for controlling the robot base, torso, arms, and grippers. We thank [Simovation](https://www.linkedin.com/company/simovationinc/) for providing high-quality JoyLo teleoperation data in simulation.
+Demonstrations were collected with **JoyLo**, a whole-body teleoperation interface for controlling the robot base, torso, arms, and grippers. We thank [LightWheel](https://lightwheel.ai/) for providing high-quality JoyLo teleoperation data in simulation.
 
 <div class="challenge-video-grid">
   <iframe width="560" height="315" src="https://www.youtube.com/embed/oVr3IYnQiys?modestbranding=1&showinfo=0&rel=0&controls=1" title="BEHAVIOR Annotation Video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
@@ -172,13 +172,13 @@ To cite BEHAVIOR-1K, please use:
 
 ## :material-handshake: **Sponsors**
 
-High-quality simulation data provided by Simovation.
+High-quality simulation data provided by LightWheel.
 
 We gratefully acknowledge the support of our sponsors who make this challenge possible:
 
 <div style="display: flex; flex-wrap: nowrap; gap: 1.5rem; justify-content: center; align-items: center; margin: 1rem 0;">
-  <a href="https://www.linkedin.com/company/simovationinc/" title="Simovation" style="display: flex; align-items: center; justify-content: center; width: 170px; height: 100px;">
-    <img src="../assets/challenge_2025/simovation_logo.png" alt="Simovation" style="max-height: 100%; max-width: 100%; width: auto; height: auto; object-fit: contain;" />
+  <a href="https://lightwheel.ai/" title="LightWheel" style="display: flex; align-items: center; justify-content: center; width: 170px; height: 100px;">
+    <img src="../assets/challenge_2026/lightwheel_logo.png" alt="LightWheel" style="max-height: 100%; max-width: 100%; width: auto; height: auto; object-fit: contain;" />
   </a>
   <a href="https://www.physicl.ai/" title="Physicl" style="display: flex; align-items: center; justify-content: center; width: 170px; height: 100px;">
     <img src="../assets/challenge_2025/physicl_logo.svg" alt="Physicl" style="max-height: 100%; max-width: 100%; width: auto; height: auto; object-fit: contain;" />
