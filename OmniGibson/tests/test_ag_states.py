@@ -48,6 +48,7 @@ _AG_BLOCK_LEN = 2 + _AG_STATE_SIZE
 def _force_ag_grasp(robot, arm, target_obj, frame_params):
     """Create an AG joint on `arm` with deterministic hand-crafted params."""
     target_link_name = sorted(target_obj.links.keys())[0]
+    frame_params = {k: v.to(og.sim.device) if isinstance(v, th.Tensor) else v for k, v in frame_params.items()}
     constraint_params = {
         "target_obj": target_obj,
         "target_link_name": target_link_name,
@@ -223,7 +224,8 @@ def test_ag_serialized_block_right_arm_only(env, assisted_robot, apple):
             0.0,
             1.0,  # child_frame_orn
             0.0,  # joint_type: FixedJoint
-        ]
+        ],
+        device=ag_block.device,
     )
     assert th.allclose(
         ag_block, expected, atol=1e-6
@@ -259,9 +261,11 @@ def test_ag_serialized_block_both_arms_layout(env, assisted_robot, apple, bowl):
 
 def _run_ag_roundtrip(robot_model):
     """Spin up a fresh env with the given robot and verify dict+tensor roundtrip."""
-    og.clear()
+    if og.sim is not None:
+        og.clear()
 
     config = {
+        "env": {"device": og.sim.device if og.sim is not None else None},
         "scene": {"type": "Scene"},
         "robots": [
             {

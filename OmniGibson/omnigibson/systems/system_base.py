@@ -419,10 +419,14 @@ class BaseSystem(Serializable):
         # silently produce garbage rather than failing.
         return th.cat(
             [
-                th.tensor([state["n_particles"]], dtype=th.float32),
+                th.tensor([state["n_particles"]], dtype=th.float32, device=state["min_scale"].device),
                 # .get() so a state dict loaded from a file written before this field existed can
                 # still be re-serialized; absent means "same frame as this system", see _load_state.
-                th.tensor([-1.0 - float(state.get("uses_local_poses", self._store_local_poses))], dtype=th.float32),
+                th.tensor(
+                    [-1.0 - float(state.get("uses_local_poses", self._store_local_poses))],
+                    dtype=th.float32,
+                    device=state["min_scale"].device,
+                ),
                 state["min_scale"],
                 state["max_scale"],
                 state["positions"].flatten(),

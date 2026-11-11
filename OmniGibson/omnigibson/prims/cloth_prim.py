@@ -906,7 +906,8 @@ class ClothPrim(GeomPrim):
         Returns:
             int: Particle group this instancer belongs to
         """
-        return self.get_attribute(attr="physxParticle:particleGroup")
+        group = self.get_attribute(attr="physxParticle:particleGroup")
+        return 0 if group is None else group
 
     @particle_group.setter
     def particle_group(self, group):
