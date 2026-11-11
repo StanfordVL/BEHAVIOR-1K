@@ -82,9 +82,9 @@ class PhysXBackend(PhysicsBackend):
         return launch_kit_app()
 
     def assert_clean_start(self):
-        assert (
-            lazy.isaacsim.core.utils.stage.get_current_stage() is None
-        ), "Stage should not exist when creating a new Simulator instance"
+        assert lazy.isaacsim.core.utils.stage.get_current_stage() is None, (
+            "Stage should not exist when creating a new Simulator instance"
+        )
 
     def before_clear(self):
         # Stop the viewport menubar USD watcher before teardown.
@@ -147,16 +147,16 @@ class PhysXBackend(PhysicsBackend):
 
     def get_world_transform_with_scale(self, prim_path):
         # Check that no reads from Fabric are happening during a physics step.
-        assert (
-            not self.sim.currently_stepping
-        ), "Do not read poses from Fabric during a physics step, this is quite slow!"
+        assert not self.sim.currently_stepping, (
+            "Do not read poses from Fabric during a physics step, this is quite slow!"
+        )
 
         return self.sim.fabric_hierarchy.get_world_xform(lazy.usdrt.Sdf.Path(prim_path))
 
     def get_local_transform_with_scale(self, prim_path):
-        assert (
-            not self.sim.currently_stepping
-        ), "Do not read poses from Fabric during a physics step, this is quite slow!"
+        assert not self.sim.currently_stepping, (
+            "Do not read poses from Fabric during a physics step, this is quite slow!"
+        )
 
         return self.sim.fabric_hierarchy.get_local_xform(lazy.usdrt.Sdf.Path(prim_path))
 

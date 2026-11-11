@@ -412,18 +412,18 @@ def _launch_simulator(*args, **kwargs):
             """
             render_physics_ratio = rendering_dt / physics_dt
             sim_render_ratio = sim_step_dt / rendering_dt
-            assert math.isclose(
-                render_physics_ratio, round(render_physics_ratio)
-            ), f"Rendering dt ({rendering_dt}) must be a multiple of physics dt ({physics_dt})"
-            assert (
-                rendering_dt >= physics_dt
-            ), f"Rendering dt ({rendering_dt}) cannot be smaller than physics dt ({rendering_dt})"
-            assert math.isclose(
-                sim_render_ratio, round(sim_render_ratio)
-            ), f"Simulation step dt ({sim_step_dt}) must be a multiple of rendering dt ({rendering_dt})"
-            assert (
-                sim_step_dt >= rendering_dt
-            ), f"Simulation step dt ({sim_step_dt}) cannot be smaller than rendering dt ({rendering_dt})"
+            assert math.isclose(render_physics_ratio, round(render_physics_ratio)), (
+                f"Rendering dt ({rendering_dt}) must be a multiple of physics dt ({physics_dt})"
+            )
+            assert rendering_dt >= physics_dt, (
+                f"Rendering dt ({rendering_dt}) cannot be smaller than physics dt ({rendering_dt})"
+            )
+            assert math.isclose(sim_render_ratio, round(sim_render_ratio)), (
+                f"Simulation step dt ({sim_step_dt}) must be a multiple of rendering dt ({rendering_dt})"
+            )
+            assert sim_step_dt >= rendering_dt, (
+                f"Simulation step dt ({sim_step_dt}) cannot be smaller than rendering dt ({rendering_dt})"
+            )
 
             # If we're headless, we also enforce that sim_step_dt == rendering_dt because it doesn't make sense
             # to waste rendering that is not observed by the user
@@ -590,9 +590,9 @@ def _launch_simulator(*args, **kwargs):
             assert self.is_stopped(), "Simulator must be stopped while importing a scene!"
             if isinstance(scenes, Scene):
                 scenes = [scenes]
-            assert all(
-                isinstance(scene, Scene) for scene in scenes
-            ), "import_scene can only be called with Scene instances"
+            assert all(isinstance(scene, Scene) for scene in scenes), (
+                "import_scene can only be called with Scene instances"
+            )
             assert len(scenes) > 0, "import_scene requires at least one scene"
 
             # Check that the scene is not already imported
