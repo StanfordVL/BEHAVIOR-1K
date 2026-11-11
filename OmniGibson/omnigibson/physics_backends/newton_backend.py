@@ -1613,6 +1613,7 @@ class NewtonBackend(PhysicsBackend):
                 if self._fluid_body_wrench is not None and applied_body_f is not None:
                     # Along with the fluid's push over the previous step
                     applied_body_f += self._fluid_body_wrench
+                body_q_begin = _wp_to_torch(self._state_0.body_q).clone() if self._fluid_solver is not None else None
                 for i in range(self._PARTICLE_SUBSTEPS):
                     if self._kinematic_moves:
                         self._apply_kinematic_moves((i + 1) / self._PARTICLE_SUBSTEPS)
@@ -1631,10 +1632,18 @@ class NewtonBackend(PhysicsBackend):
                 self._kinematic_moves = {}
                 self._stepped_since_rebuild = True
                 if self._fluid_solver is not None:
-                    # Then the fluid, in one step, against the rigid bodies' and cloth's new poses
+                    # Then the fluid, in one step, against the cloth's new pose
                     self._keep_fluid_grid_around_particles()
                     self._sync_fluid_cloth_collider()
+                    # Against the bodies where they started the step, moving to where they ended it (see
+                    # _set_fluid_body_velocities())
+                    body_q, body_qd = _wp_to_torch(self._state_0.body_q), _wp_to_torch(self._state_0.body_qd)
+                    body_q_end, body_qd_end = body_q.clone(), body_qd.clone()
+                    self._set_fluid_body_velocities(body_q_begin)
+                    body_q.copy_(body_q_begin)
                     self._fluid_solver.step(self._state_0, self._state_0, self._control, None, self.get_physics_dt())
+                    body_q.copy_(body_q_end)
+                    body_qd.copy_(body_qd_end)
                     self._fluid_body_wrench = self._fluid_body_wrenches()
             else:
                 # Replay this substep from a CUDA graph when one is available.
@@ -2799,7 +2808,8 @@ class NewtonBackend(PhysicsBackend):
         then restore them for the rigid contacts.
 
         With @cloth_particles, the solver steps on its own after the cloth path (see step_physics_once()): the rigid
-        bodies are kinematic colliders, and the cloth a thin shell moving with it (see _sync_fluid_cloth_collider()).
+        bodies are colliders it doesn't move, and the cloth a thin shell moving with it (see
+        _sync_fluid_cloth_collider()).
         """
         import newton
         import warp as wp
@@ -2829,9 +2839,10 @@ class NewtonBackend(PhysicsBackend):
                     collider_body_ids=body_ids + [None, None],
                     collider_margins=[None] * n_bodies + [self._FLUID_COLLIDER_THICKNESS, 0.0],
                     collider_particle_ids=[None] * (n_bodies + 1) + [cloth_particles],
-                    # Kinematic here: the rigid bodies get the fluid's push afterwards (see _fluid_body_wrenches()), and
-                    # the cloth doesn't get it
-                    body_mass=wp.zeros_like(model.body_mass),
+                    # The rigid bodies keep their masses (kinematic ones none), so the fluid's push on them accounts
+                    # for how they give way to it: they only get it afterwards (see _fluid_body_wrenches() and
+                    # _set_fluid_body_velocities()), and as immovable walls a light container filled with fluid got
+                    # pushed ever harder and flung its fluid. The cloth doesn't get the push
                 )
             return solver
         finally:
@@ -2896,7 +2907,8 @@ class NewtonBackend(PhysicsBackend):
     def _fluid_body_wrenches(self):
         """
         (body_count, 6) force and torque the fluid put on each body over the last step (None without bodies), from the
-        fluid solver's collider impulses. It takes the bodies as kinematic (see _make_mpm_solver()), so they get them a step late.
+        fluid solver's collider impulses. It doesn't move the bodies itself (see _make_mpm_solver()), so they get them a
+        step late.
         """
         import warp as wp
 
@@ -2915,6 +2927,36 @@ class NewtonBackend(PhysicsBackend):
         torque = th.linalg.cross(positions[hit] - com, force)
         wrench = th.zeros((self._model.body_count, 6), dtype=force.dtype, device=force.device)
         return wrench.index_add_(0, body, th.cat([force, torque], dim=1))
+
+    def _set_fluid_body_velocities(self, body_q_begin):
+        """
+        Sets the bodies' velocities on state_0 to what the fluid solver should see after a step that started at
+        @body_q_begin, as SolverCoupledProxy's lagged proxies give them to it:
+        - The velocities that carry them from @body_q_begin to their poses now over the step: their own end-of-step
+          velocities don't, since the cloth path splits the step into substeps (nor do kinematic moves have any), and
+          the bottom of a rising container then caught up with its fluid and let it through
+        - Less the fluid's push over the step (see _fluid_body_wrenches()), which the fluid solver works out again
+          against their masses: without that, a container resting on the floor gave way to its fluid's weight and
+          leaked it
+        """
+        dt = self.get_physics_dt()
+        body_q = _wp_to_torch(self._state_0.body_q)
+        com = _wp_to_torch(self._model.body_com)
+        quat_begin, quat_end = body_q_begin[:, 3:7], body_q[:, 3:7]
+        lin = (body_q[:, :3] + _quat_rotate_batch(quat_end, com)) - (
+            body_q_begin[:, :3] + _quat_rotate_batch(quat_begin, com)
+        )
+        rel = T.quat_multiply(quat_end.T, th.cat([-quat_begin[:, :3], quat_begin[:, 3:]], dim=1).T).T
+        # The shorter way around
+        rel = th.where(rel[:, 3:] < 0, -rel, rel)
+        body_qd = _wp_to_torch(self._state_0.body_qd)
+        body_qd.copy_(th.cat([lin, T.quat2axisangle(rel)], dim=1) / dt)
+        if self._fluid_body_wrench is not None:
+            force, torque = self._fluid_body_wrench[:, :3], self._fluid_body_wrench[:, 3:]
+            inv_inertia = _wp_to_torch(self._model.body_inv_inertia).reshape(-1, 3, 3)
+            local_torque = _quat_rotate_batch(th.cat([-quat_end[:, :3], quat_end[:, 3:]], dim=1), torque)
+            body_qd[:, :3] -= dt * _wp_to_torch(self._model.body_inv_mass)[:, None] * force
+            body_qd[:, 3:] -= dt * _quat_rotate_batch(quat_end, (inv_inertia @ local_torque[:, :, None])[:, :, 0])
 
     def _make_particle_collision_pipeline(self, particles=None):
         """
