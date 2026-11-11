@@ -215,7 +215,7 @@ class MacroParticleSystem(BaseSystem):
         """
         # Update color if the particle object has any material
         color = th.ones(3)
-        if self.particle_object.has_material():
+        if self.particle_object.material is not None:
             color = self.particle_object.material.average_diffuse_color
         self._color = color
 
@@ -530,6 +530,16 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             assert (
                 obj.prim.GetParent().GetPath().pathString == "/World"
             ), "cloth object should exist as direct child of /World prim!"
+
+        # Callers pass either batched tensors or per-particle lists of tensors / coordinates
+        def _batch(values):
+            if values is None or isinstance(values, th.Tensor):
+                return values
+            if len(values) == 0:
+                return th.zeros((0, 3), device=og.sim.device)
+            return th.stack([th.as_tensor(v, dtype=th.float32, device=og.sim.device) for v in values])
+
+        positions, orientations, scales = _batch(positions), _batch(orientations), _batch(scales)
 
         n_particles = len(positions)
         if orientations is None:
@@ -1269,7 +1279,8 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             particle_offset *= ratio
             particle_radius = m.MIN_PARTICLE_RADIUS
 
-        self._particle_offset = particle_offset
+        # Combined with live particle transforms, which live on og.sim.device
+        self._particle_offset = particle_offset.to(og.sim.device)
         self._particle_radius = particle_radius
 
     def update_handles(self):

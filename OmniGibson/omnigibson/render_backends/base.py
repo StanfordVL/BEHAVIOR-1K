@@ -18,6 +18,14 @@ class RenderBackend(ABC):
     Abstract base class for a render backend.
     """
 
+    # Capability flags
+    supports_camera_capture = False  # create_camera_resource/create_annotator/... camera pipeline
+    supports_viewport = False  # GUI viewport windows (dock_window, active_camera_path, teleoperation)
+    supports_materials = False  # MDL/material authoring (MaterialPrim's Kit-command backend)
+    supports_bbox = False  # bbox_2d_tight/loose, bbox_3d modalities
+    supports_pointcloud = False  # pointcloud modality
+    supports_tiled_rendering = False  # batched multi-camera tiled capture (TiledVisionSensor)
+
     def __init__(self, sim=None):
         self.sim = sim
 

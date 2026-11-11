@@ -351,7 +351,9 @@ def test_cooking_physical_particle_rule_failure_recipe_systems(env, stove, stock
     og.sim.step()
     assert stockpot.states[OnTop].get_value(stove)
 
-    brown_rice.generate_particles(positions=[(stockpot.aabb_center + th.tensor([0.03, 0.0, 0.0])).tolist()])
+    brown_rice.generate_particles(
+        positions=[(stockpot.aabb_center + th.tensor([0.03, 0.0, 0.0], device=stockpot.aabb_center.device)).tolist()]
+    )
     # This fails the recipe because water (recipe system) is not in the stockpot
     water.generate_particles(positions=[[-0.25, 0.17, 1.95]])
 
@@ -388,8 +390,12 @@ def test_cooking_physical_particle_rule_success(env, stove, stockpot):
     og.sim.step()
     assert stockpot.states[OnTop].get_value(stove)
 
-    brown_rice.generate_particles(positions=[(stockpot.aabb_center + th.tensor([0.03, 0.0, 0.0])).tolist()])
-    water.generate_particles(positions=[(stockpot.aabb_center + th.tensor([-0.03, 0.0, 0.0])).tolist()])
+    brown_rice.generate_particles(
+        positions=[(stockpot.aabb_center + th.tensor([0.03, 0.0, 0.0], device=stockpot.aabb_center.device)).tolist()]
+    )
+    water.generate_particles(
+        positions=[(stockpot.aabb_center + th.tensor([-0.03, 0.0, 0.0], device=stockpot.aabb_center.device)).tolist()]
+    )
 
     assert stockpot.states[Contains].get_value(brown_rice)
     assert stockpot.states[Contains].get_value(water)
@@ -443,7 +449,7 @@ def test_mixing_rule_failure_recipe_systems(env, bowl, tablespoon):
 
     # Move the tablespoon to touch the bowl
     tablespoon.set_position_orientation(
-        position=[0.10, 0.0, 0.01], orientation=T.euler2quat(th.tensor([0.0, -math.pi / 2, 0.0]))
+        position=[0.06, 0.0, 0.10], orientation=T.euler2quat(th.tensor([0.0, -math.pi / 2, 0.0]))
     )
     og.sim.step()
     tablespoon.keep_still()
@@ -491,7 +497,7 @@ def test_mixing_rule_failure_nonrecipe_systems(env, bowl, tablespoon):
 
     # Move the tablespoon to touch the bowl
     tablespoon.set_position_orientation(
-        position=[0.10, 0.0, 0.01], orientation=T.euler2quat(th.tensor([0.0, -math.pi / 2, 0.0]))
+        position=[0.06, 0.0, 0.10], orientation=T.euler2quat(th.tensor([0.0, -math.pi / 2, 0.0]))
     )
     og.sim.step()
     tablespoon.keep_still()
@@ -535,7 +541,7 @@ def test_mixing_rule_success(env, bowl, tablespoon):
 
     # Move the tablespoon to touch the bowl
     tablespoon.set_position_orientation(
-        position=[0.10, 0.0, 0.01], orientation=T.euler2quat(th.tensor([0.0, -math.pi / 2, 0.0]))
+        position=[0.06, 0.0, 0.10], orientation=T.euler2quat(th.tensor([0.0, -math.pi / 2, 0.0]))
     )
     og.sim.step()
     tablespoon.keep_still()
@@ -800,6 +806,8 @@ def test_cooking_object_rule_failure_wrong_container(env, oven, stockpot, bagel_
 
     bagel_dough.set_position_orientation([0, 0, 0.464], [0, 0, 0, 1])
     raw_egg.set_position_orientation([0.02, 0, 0.506], [0, 0, 0, 1])
+    bagel_dough.keep_still()
+    raw_egg.keep_still()
     for _ in range(10):
         og.sim.step()
     assert bagel_dough.states[Inside].get_value(stockpot)
@@ -838,6 +846,8 @@ def test_cooking_object_rule_failure_recipe_objects(env, oven, baking_sheet, bag
     # This fails the recipe because it requires the bagel dough to be on top of the baking sheet
     bagel_dough.set_position_orientation(position=[1, 0, 0.5], orientation=[0, 0, 0, 1])
     raw_egg.set_position_orientation(position=[1.02, 0, 0.55], orientation=[0, 0, 0, 1])
+    bagel_dough.keep_still()
+    raw_egg.keep_still()
     og.sim.step()
     assert not bagel_dough.states[OnTop].get_value(baking_sheet)
 
@@ -867,13 +877,15 @@ def test_cooking_object_rule_failure_unary_states(env, oven, baking_sheet, bagel
     place_obj_on_floor_plane(oven)
     og.sim.step()
 
-    baking_sheet.set_position_orientation(position=[0.0, 0.07, 0.42], orientation=[0, 0, 0, 1])
+    baking_sheet.set_position_orientation(position=[0.0, 0.07, 0.39], orientation=[0, 0, 0, 1])
     for _ in range(5):
         og.sim.step()
     assert baking_sheet.states[Inside].get_value(oven)
 
     bagel_dough.set_position_orientation(position=[0.0, 0.07, 0.45], orientation=[0, 0, 0, 1])
     raw_egg.set_position_orientation(position=[0.0, 0.07, 0.48], orientation=[0, 0, 0, 1])
+    bagel_dough.keep_still()
+    raw_egg.keep_still()
     for _ in range(10):
         og.sim.step()
     assert bagel_dough.states[OnTop].get_value(baking_sheet)
@@ -906,13 +918,15 @@ def test_cooking_object_rule_failure_binary_system_states(env, oven, baking_shee
     place_obj_on_floor_plane(oven)
     og.sim.step()
 
-    baking_sheet.set_position_orientation(position=[0.0, 0.07, 0.42], orientation=[0, 0, 0, 1])
+    baking_sheet.set_position_orientation(position=[0.0, 0.07, 0.39], orientation=[0, 0, 0, 1])
     for _ in range(5):
         og.sim.step()
     assert baking_sheet.states[Inside].get_value(oven)
 
     bagel_dough.set_position_orientation(position=[0.0, 0.07, 0.45], orientation=[0, 0, 0, 1])
     raw_egg.set_position_orientation(position=[0.0, 0.07, 0.48], orientation=[0, 0, 0, 1])
+    bagel_dough.keep_still()
+    raw_egg.keep_still()
     for _ in range(10):
         og.sim.step()
     assert bagel_dough.states[OnTop].get_value(baking_sheet)
@@ -945,14 +959,16 @@ def test_cooking_object_rule_failure_binary_object_states(env, oven, baking_shee
     place_obj_on_floor_plane(oven)
     og.sim.step()
 
-    baking_sheet.set_position_orientation(position=[0.0, 0.07, 0.42], orientation=[0, 0, 0, 1])
+    baking_sheet.set_position_orientation(position=[0.0, 0.07, 0.39], orientation=[0, 0, 0, 1])
     for _ in range(3):
         og.sim.step()
     assert baking_sheet.states[Inside].get_value(oven)
 
     bagel_dough.set_position_orientation(position=[0.0, 0.07, 0.45], orientation=[0, 0, 0, 1])
     raw_egg.set_position_orientation(position=[2.0, 0.07, 0.48], orientation=[0, 0, 0, 1])
-    for _ in range(3):
+    bagel_dough.keep_still()
+    raw_egg.keep_still()
+    for _ in range(10):
         og.sim.step()
     assert bagel_dough.states[OnTop].get_value(baking_sheet)
     # This fails the recipe because it requires the raw egg to be on top of the bagel dough
@@ -989,11 +1005,15 @@ def test_cooking_object_rule_failure_wrong_heat_source(env, stove, baking_sheet,
     stove.states[HeatSourceOrSink].link.get_position_orientation()[0]
 
     # Put the baking sheet on the stove
-    baking_sheet.set_position_orientation(position=[-0.1, -0.15, 0.80], orientation=[0, 0, 0, 1])
-    og.sim.step()
+    baking_sheet.set_position_orientation(position=[-0.1, -0.15, 0.81], orientation=[0, 0, 0, 1])
+    baking_sheet.keep_still()
+    for _ in range(10):
+        og.sim.step()
 
     bagel_dough.set_position_orientation(position=[-0.1, -0.15, 0.84], orientation=[0, 0, 0, 1])
     raw_egg.set_position_orientation(position=[-0.1, -0.15, 0.89], orientation=[0, 0, 0, 1])
+    bagel_dough.keep_still()
+    raw_egg.keep_still()
     for _ in range(10):
         og.sim.step()
     assert bagel_dough.states[OnTop].get_value(baking_sheet)
@@ -1032,13 +1052,15 @@ def test_cooking_object_rule_success(env, oven, baking_sheet, bagel_dough, raw_e
     place_obj_on_floor_plane(oven)
     og.sim.step()
 
-    baking_sheet.set_position_orientation(position=[0.0, 0.07, 0.42], orientation=[0, 0, 0, 1])
+    baking_sheet.set_position_orientation(position=[0.0, 0.07, 0.39], orientation=[0, 0, 0, 1])
     for _ in range(3):
         og.sim.step()
     assert baking_sheet.states[Inside].get_value(oven)
 
     bagel_dough.set_position_orientation(position=[0.0, 0.07, 0.45], orientation=[0, 0, 0, 1])
     raw_egg.set_position_orientation(position=[0.0, 0.07, 0.48], orientation=[0, 0, 0, 1])
+    bagel_dough.keep_still()
+    raw_egg.keep_still()
     for _ in range(3):
         og.sim.step()
     assert bagel_dough.states[OnTop].get_value(baking_sheet)
@@ -1315,8 +1337,9 @@ def test_single_toggleable_machine_rule_output_system_failure_nonrecipe_objects(
     remove_all_systems(env.scene)
     # Spawning the bowl in the blender's location causes PhysX to crash,
     # resulting in "Invalid PhysX transform detected" errors. To avoid this, we temporarily move the blender aside.
+    blender_pos = blender.get_position_orientation()[0]
     blender.set_position_orientation(
-        position=blender.get_position_orientation()[0] + th.tensor([1.0, 0.0, 0.0], dtype=th.float32)
+        position=blender_pos + th.tensor([1.0, 0.0, 0.0], dtype=th.float32, device=blender_pos.device)
     )
     for obj_cfg in deleted_objs_cfg:
         obj = DatasetObject(**obj_cfg)

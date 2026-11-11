@@ -15,6 +15,14 @@ class PhysicsBackend(ABC):
     Abstract base class for a physics engine backend.
     """
 
+    # Whether this backend supports PhysX-specific particle / cloth / lidar features, engine-level
+    # contact reporting, and scene queries (raycasts/overlaps).
+    supports_particles = False
+    supports_cloth = False
+    supports_lidar = False
+    supports_contact_reporting = False
+    supports_scene_queries = False
+
     def __init__(self, sim=None):
         self.sim = sim
 
@@ -324,6 +332,14 @@ class PhysicsBackend(ABC):
         """
         return False
 
+    def get_live_world_pose(self, prim_path):
+        """
+        Live (position (3,), orientation (4,) xyzw) world-frame pose for a tracked rigid body's own
+        prim path, read directly from this backend's own simulation state -- or None if untracked
+        (e.g. sim not yet played) or not applicable.
+        """
+        return None
+
     # ---- Per-prim articulation view I/O (backs EntityPrim / JointPrim) ----
 
     @abstractmethod
@@ -444,6 +460,36 @@ class PhysicsBackend(ABC):
     def set_cloth_stiffness(self, prim_path, bend=None, damping=None, shear=None, stretch=None):
         """Set any subset of this cloth's bend/damping/shear/stretch stiffness values (None = unchanged)."""
 
+    # ---- Fluid/granular particle-system state I/O ----
+
+    @abstractmethod
+    def create_particle_system(self, system_name):
+        """Register a new, initially-empty named particle system."""
+
+    @abstractmethod
+    def generate_particles(self, system_name, positions, velocities=None):
+        """Add new particles (world-frame positions, optional velocities, else zero) to a system."""
+
+    @abstractmethod
+    def remove_particles(self, system_name, idxs):
+        """Remove particles at the given indices from a system."""
+
+    @abstractmethod
+    def get_particle_positions(self, system_name):
+        """Return an (N, 3) world-frame particle position tensor for a system."""
+
+    @abstractmethod
+    def set_particle_positions(self, system_name, positions, idxs=None):
+        """Set world-frame particle positions (shape must match get_particle_positions)."""
+
+    @abstractmethod
+    def get_particle_velocities(self, system_name):
+        """Return an (N, 3) world-frame particle velocity tensor for a system."""
+
+    @abstractmethod
+    def set_particle_velocities(self, system_name, velocities, idxs=None):
+        """Set world-frame particle velocities (shape must match get_particle_velocities)."""
+
     # ---- Joint-break events ----
 
     @abstractmethod
@@ -453,3 +499,56 @@ class PhysicsBackend(ABC):
     @abstractmethod
     def decode_joint_break_event(self, event):
         """Return the broken joint's prim path as a string, given a raw backend event."""
+
+    # ---- Runtime attachment constraints ----
+
+    def create_attachment_constraint(
+        self,
+        prim_path,
+        joint_type,
+        body0,
+        body1,
+        joint_frame_in_parent_frame_pos,
+        joint_frame_in_parent_frame_quat,
+        joint_frame_in_child_frame_pos,
+        joint_frame_in_child_frame_quat,
+    ):
+        """
+        Rigidly (FixedJoint) or point-wise (SphericalJoint) attaches @body1 to @body0 at runtime, e.g. for
+        assisted grasping. This default implementation authors a USD joint for the engine to pick up.
+
+        Args:
+            prim_path (str): where a USD joint prim would be created (also used as an identifier)
+            joint_type (str): "FixedJoint" or "SphericalJoint"
+            body0 (str): prim path of the parent body
+            body1 (str): prim path of the child body
+            joint_frame_in_parent_frame_pos (th.tensor): joint frame position in @body0's (scaled) frame
+            joint_frame_in_parent_frame_quat (th.tensor): joint frame (x,y,z,w) orientation in @body0's frame
+            joint_frame_in_child_frame_pos (th.tensor): joint frame position in @body1's (scaled) frame
+            joint_frame_in_child_frame_quat (th.tensor): joint frame (x,y,z,w) orientation in @body1's frame
+
+        Returns:
+            any: opaque handle to pass to remove_attachment_constraint()
+        """
+        from omnigibson.utils.usd_utils import create_joint
+
+        return create_joint(
+            prim_path=prim_path,
+            joint_type=joint_type,
+            body0=body0,
+            body1=body1,
+            enabled=True,
+            exclude_from_articulation=True,
+            joint_frame_in_parent_frame_pos=joint_frame_in_parent_frame_pos,
+            joint_frame_in_parent_frame_quat=joint_frame_in_parent_frame_quat,
+            joint_frame_in_child_frame_pos=joint_frame_in_child_frame_pos,
+            joint_frame_in_child_frame_quat=joint_frame_in_child_frame_quat,
+        )
+
+    def remove_attachment_constraint(self, handle):
+        """Removes a constraint previously created by create_attachment_constraint()."""
+        import omnigibson as og
+        from omnigibson.utils.usd_utils import delete_or_deactivate_prim
+
+        delete_or_deactivate_prim(handle.GetPath().pathString)
+        og.sim.update_handles()
