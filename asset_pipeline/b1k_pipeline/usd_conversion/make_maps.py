@@ -10,10 +10,11 @@ import tqdm
 PIPELINE_ROOT = pathlib.Path(__file__).parents[2]
 
 RESOLUTION = 0.01
-Z_START = 2.0  # Just above the typical robot height
+# Door headers commonly have their collider bottom at exactly 2.00 m. A query
+# box whose top is exactly 2.00 m touches them, which marks the whole doorway
+# as blocked (see issue #2373), so stop just below the nominal 2.0 m height.
+Z_START = 2.0 - 1e-3  # Just above the typical robot height
 Z_END = -0.1  # Just below the floor
-HALF_Z = (Z_START + Z_END) / 2.0
-HALF_HEIGHT = (Z_START - Z_END) / 2.0
 
 WALL_CATEGORIES = ["walls", "rail_fence"]
 FLOOR_CATEGORIES = ["floors", "driveway", "lawn"]
@@ -60,10 +61,24 @@ def map_to_world(xy, trav_map_resolution, trav_map_size):
     return np.flip((xy - trav_map_size / 2.0) * trav_map_resolution, axis=axis)
 
 
-def generate_maps_for_current_scene(save_path):
+def generate_maps_for_current_scene(save_path, z_start=Z_START, z_end=Z_END):
+    """
+    Generates the traversability and segmentation maps for the current scene.
+
+    Args:
+        save_path (str): Directory to write the map PNGs to.
+        z_start (float): Top of the overlap query box, in world frame. Defaults
+            to just below 2.0 m so door headers whose collider bottom is at
+            exactly 2.0 m do not close the doorway. Pass the robot height plus
+            a margin for robots shorter or taller than the default.
+        z_end (float): Bottom of the overlap query box, in world frame.
+    """
     import omnigibson as og
     from omnigibson.macros import gm
     import omnigibson.object_states as object_states
+
+    half_z = (z_start + z_end) / 2.0
+    half_height = (z_start - z_end) / 2.0
 
     # Create the output directory
     os.makedirs(save_path, exist_ok=True)
@@ -194,9 +209,9 @@ def generate_maps_for_current_scene(save_path):
                     # Run the actual overlap query
                     og.sim.psqi.overlap_box(
                         halfExtent=np.array(
-                            [RESOLUTION / 2, RESOLUTION / 2, HALF_HEIGHT]
+                            [RESOLUTION / 2, RESOLUTION / 2, half_height]
                         ),
-                        pos=np.array([world_pos[0], world_pos[1], HALF_Z]),
+                        pos=np.array([world_pos[0], world_pos[1], half_z]),
                         rot=np.array([0, 0, 0, 1.0]),
                         reportFn=_check_hit,
                     )
