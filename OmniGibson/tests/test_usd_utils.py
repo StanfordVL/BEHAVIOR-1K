@@ -56,3 +56,11 @@ def test_min_distance_to_mesh_surface_is_not_just_vertices():
     # For a thin plate, the nearest vertex is far but the surface is just half the thickness away
     assert surface_distance < vertex_distance
     assert np.isclose(surface_distance, mesh.extents.min() / 2.0, atol=1e-4)
+
+def test_min_distance_without_faces_falls_back_to_vertices():
+    """Meshes without any triangles should not raise; fall back to the nearest vertex."""
+    points = th.tensor([[0.0, 0.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0]], dtype=th.float32)
+    faces = th.zeros((0, 3), dtype=th.int64)
+
+    distance = _min_distance_to_mesh_surface(points, faces, th.tensor([1.0, 1.0, 0.0])).item()
+    assert np.isclose(distance, np.sqrt(2.0), atol=1e-5)
