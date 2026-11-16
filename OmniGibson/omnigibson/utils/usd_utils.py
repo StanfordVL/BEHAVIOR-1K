@@ -3379,6 +3379,11 @@ def _min_distance_to_mesh_surface(points, faces, point):
     Returns:
         th.tensor: Scalar minimum distance from @point to the mesh surface
     """
+    if faces.numel() == 0:
+        # Degenerate meshes (e.g. a point cloud with no triangulation) have no surface to measure against,
+        # so fall back to the nearest vertex, which matches the pre-#773 behaviour.
+        return th.norm(points - point, dim=-1).min()
+
     triangles = points[faces]
     a, b, c = triangles[:, 0], triangles[:, 1], triangles[:, 2]
     ab, ac, ap = b - a, c - a, point - a
