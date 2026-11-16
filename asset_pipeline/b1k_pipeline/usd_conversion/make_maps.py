@@ -10,10 +10,11 @@ import tqdm
 PIPELINE_ROOT = pathlib.Path(__file__).parents[2]
 
 RESOLUTION = 0.01
-# Door headers commonly have their collider bottom at exactly 2.00 m. A query
-# box whose top is exactly 2.00 m touches them, which marks the whole doorway
-# as blocked (see issue #2373), so stop just below the nominal 2.0 m height.
-Z_START = 2.0 - 1e-3  # Just above the typical robot height
+# Door headers commonly have their collider bottom at exactly 2.00 m, and
+# OmniGibson's default contact offset is 1 mm, so a box that reaches 2.00 m can
+# still touch them and mark the whole doorway as blocked (issue #2373). Stop one
+# map cell (1 cm) below the nominal 2.0 m height.
+Z_START = 2.0 - RESOLUTION  # Just above the typical robot height
 Z_END = -0.1  # Just below the floor
 
 WALL_CATEGORIES = ["walls", "rail_fence"]
