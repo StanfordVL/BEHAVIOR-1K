@@ -13,11 +13,6 @@ from omnigibson.utils.constants import JointType
 from omnigibson.utils.python_utils import multi_dim_linspace
 
 
-# Gives 1 - 5% better speedup, according to https://github.com/NVlabs/curobo/discussions/245#discussioncomment-9265692
-th.backends.cudnn.benchmark = True
-th.backends.cuda.matmul.allow_tf32 = True
-th.backends.cudnn.allow_tf32 = True
-
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
@@ -97,6 +92,11 @@ class CuRoboMotionGenerator:
                 Increasing this value will make the motion planner more conservative in its planning with respect
                 to the underlying sphere representation of the robot. Note that this does not affect self-collisions detection.
         """
+        # Gives 1 - 5% better speedup, according to https://github.com/NVlabs/curobo/discussions/245#discussioncomment-9265692
+        th.backends.cudnn.benchmark = True
+        th.backends.cuda.matmul.allow_tf32 = True
+        th.backends.cudnn.allow_tf32 = True
+
         # Store internal variables
         self._tensor_args = lazy.curobo.types.base.TensorDeviceType(device=th.device(device))
         self.debug = debug
@@ -117,8 +117,8 @@ class CuRoboMotionGenerator:
         print(
             """
             NOTE: Currently (v3.9.3), for cuda architecture 12.0 (e.g. RTX 50-series), using Default embodiment for Tiago or non-DEFAULT embodiment for R1Pro
-                will raise CUDA illegal memory access error during mg.warmup() due to cuRobo compatibility issues. 
-                Therefore, we automatically exclude these incompatible embodiments when we detect such GPU is being used. 
+                will raise CUDA illegal memory access error during mg.warmup() due to cuRobo compatibility issues.
+                Therefore, we automatically exclude these incompatible embodiments when we detect such GPU is being used.
             """
         )
         if th.cuda.get_device_capability(device) == (12, 0):
