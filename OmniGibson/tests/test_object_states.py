@@ -1462,6 +1462,7 @@ def test_kinematic_only_contact_no_error():
     }
     if os.environ.get("OMNIGIBSON_DEVICE"):
         cfg["env"] = {"device": os.environ["OMNIGIBSON_DEVICE"]}
+
     # try/finally so a failed assertion below still runs the test_clear_sim() cleanup at the end --
     # otherwise og.sim is left "playing" for whatever test runs next in file order.
     try:
