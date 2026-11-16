@@ -179,9 +179,9 @@ def _get_visual_objs_from_urdf(urdf_path):
                     obj_file = None if sub_ele.find(".//mesh") is None else sub_ele.find(".//mesh").get("filename")
                     if obj_file is None:
                         log.debug(f"Warning: No obj file found associated with {name}/{visual_mesh_name}!")
-                    assert (
-                        visual_mesh_name not in visual_objs[name]
-                    ), f"Visual mesh name {visual_mesh_name} already exists for link {name}!"
+                    assert visual_mesh_name not in visual_objs[name], (
+                        f"Visual mesh name {visual_mesh_name} already exists for link {name}!"
+                    )
                     visual_objs[name][visual_mesh_name] = obj_file
 
     return visual_objs
@@ -1285,9 +1285,9 @@ def convert_urdf_to_usd(
         references = possible_referrer.GetPrimStack()[0].referenceList.prependedItems
         if references:
             assert possible_referrer.GetName() in ["visuals", "collisions"]
-            assert (
-                len(references) == 1
-            ), f"Expected exactly one reference for {possible_referrer.GetPath()}, got {len(references)}"
+            assert len(references) == 1, (
+                f"Expected exactly one reference for {possible_referrer.GetPath()}, got {len(references)}"
+            )
             referrer_path = possible_referrer.GetPath()
             referee_path = references[0].primPath
             # Isaac Sim's URDF importer emits a placeholder `visuals` /
@@ -1583,9 +1583,9 @@ def _add_meta_links_to_urdf(urdf_path, obj_category, obj_model, dataset_root):
         metadata = json.load(f)
 
     # Pop meta links
-    assert not (
-        "links" in metadata and "meta_links" in metadata
-    ), "Only expected one of links and meta_links to be found in metadata, but found both!"
+    assert not ("links" in metadata and "meta_links" in metadata), (
+        "Only expected one of links and meta_links to be found in metadata, but found both!"
+    )
 
     if "meta_links" in metadata:
         # Rename meta links, e.g. from "fillable" to "container"
@@ -1603,17 +1603,17 @@ def _add_meta_links_to_urdf(urdf_path, obj_category, obj_model, dataset_root):
         log.debug("meta_links:", meta_links)
         for parent_link_name, child_link_attrs in meta_links.items():
             for meta_link_name, ml_attrs in child_link_attrs.items():
-                assert (
-                    meta_link_name in _ALLOWED_META_TYPES
-                ), f"meta_link_name {meta_link_name} not in {_ALLOWED_META_TYPES}"
+                assert meta_link_name in _ALLOWED_META_TYPES, (
+                    f"meta_link_name {meta_link_name} not in {_ALLOWED_META_TYPES}"
+                )
 
                 for ml_id, attrs_list in ml_attrs.items():
                     # If the attrs list is a dictionary (legacy format), convert it to a list
                     if isinstance(attrs_list, dict):
                         keys = [int(k) for k in attrs_list.keys()]
-                        assert set(keys) == set(
-                            range(len(keys))
-                        ), f"Expected keys to be 0-indexed integers, but got {keys}"
+                        assert set(keys) == set(range(len(keys))), (
+                            f"Expected keys to be 0-indexed integers, but got {keys}"
+                        )
                         int_key_dict = {int(k): v for k, v in attrs_list.items()}
                         attrs_list = [int_key_dict[i] for i in range(len(keys))]
 
@@ -1626,9 +1626,9 @@ def _add_meta_links_to_urdf(urdf_path, obj_category, obj_model, dataset_root):
                             # For non-attachment meta links, we expect only one instance per type
                             # E.g. heatsource_leftstove_0, heatsource_rightstove_0, but not heatsource_leftstove_1
                             if meta_link_name != "attachment":
-                                assert (
-                                    len(attrs_list) == 1
-                                ), f"Expected only one instance for meta_link {meta_link_name}_{ml_id}, but found {len(attrs_list)}"
+                                assert len(attrs_list) == 1, (
+                                    f"Expected only one instance for meta_link {meta_link_name}_{ml_id}, but found {len(attrs_list)}"
+                                )
 
                         for i, attrs in enumerate(attrs_list):
                             pos = th.as_tensor(attrs["position"])
@@ -1638,9 +1638,9 @@ def _add_meta_links_to_urdf(urdf_path, obj_category, obj_model, dataset_root):
                             # If the meta link is created based on the orientation of the first mesh that is a cone, we need to rotate it by 180 degrees
                             # because the cone is pointing in the wrong direction.
                             if meta_link_name == "particleapplier" and attrs["type"] == "cone":
-                                assert (
-                                    len(attrs_list) == 1
-                                ), f"Expected only one instance for meta_link {meta_link_name}_{ml_id}, but found {len(attrs_list)}"
+                                assert len(attrs_list) == 1, (
+                                    f"Expected only one instance for meta_link {meta_link_name}_{ml_id}, but found {len(attrs_list)}"
+                                )
                                 quat = T.quat_multiply(quat, T.axisangle2quat(th.tensor([math.pi, 0.0, 0.0])))
 
                             # Create meta link
@@ -2209,9 +2209,9 @@ def get_collision_approximation_for_urdf(
 
                     # OmniGibson requires unit-bbox collision meshes, so here we do that scaling
                     bounding_box = processed_collision_mesh.bounding_box.extents
-                    assert all(
-                        x > 0 for x in bounding_box
-                    ), f"Bounding box extents are not all positive: {bounding_box}"
+                    assert all(x > 0 for x in bounding_box), (
+                        f"Bounding box extents are not all positive: {bounding_box}"
+                    )
                     collision_scale = 1.0 / bounding_box
                     collision_scale_matrix = th.eye(4)
                     collision_scale_matrix[:3, :3] = th.diag(th.as_tensor(collision_scale))
@@ -2289,9 +2289,9 @@ def generate_urdf_for_mesh(
         asset_path = pathlib.Path(asset_path)
 
     # Validate that the filename starts with a letter. Isaac 4.5 has issues if you don't do this.
-    assert asset_path.stem[
-        0
-    ].isalpha(), f"Invalid asset path: {asset_path}. Isaac Sim expects the filename to start with a letter."
+    assert asset_path.stem[0].isalpha(), (
+        f"Invalid asset path: {asset_path}. Isaac Sim expects the filename to start with a letter."
+    )
 
     # Create directory structure
     if not overwrite:
