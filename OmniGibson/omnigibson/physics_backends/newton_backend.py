@@ -120,57 +120,6 @@ def _assign(wp_array, idx, value):
     target[idx] = th.as_tensor(value).reshape(-1).to(device=target.device, dtype=target.dtype)
 
 
-def _xyzw_to_wxyz(quat):
-    return quat[..., [3, 0, 1, 2]]
-
-
-def _wxyz_to_xyzw(quat):
-    return quat[..., [1, 2, 3, 0]]
-
-
-def _quat_mul_batch(q1, q0):
-    x0, y0, z0, w0 = q0.unbind(-1)
-    x1, y1, z1, w1 = q1.unbind(-1)
-    return th.stack(
-        [
-            x1 * w0 + y1 * z0 - z1 * y0 + w1 * x0,
-            -x1 * z0 + y1 * w0 + z1 * x0 + w1 * y0,
-            x1 * y0 - y1 * x0 + z1 * w0 + w1 * z0,
-            -x1 * x0 - y1 * y0 - z1 * z0 + w1 * w0,
-        ],
-        dim=-1,
-    )
-
-
-def _quat_rotate_batch(q, v):
-    qxyz = q[..., :3]
-    qw = q[..., 3:4]
-    t = 2.0 * th.linalg.cross(qxyz, v, dim=-1)
-    return v + qw * t + th.linalg.cross(qxyz, t, dim=-1)
-
-
-def _quat_to_abs_rotmat_batch(q):
-    x, y, z, w = q.unbind(-1)
-    xx, yy, zz = x * x, y * y, z * z
-    xy, xz, yz = x * y, x * z, y * z
-    wx, wy, wz = w * x, w * y, w * z
-    r = th.stack(
-        [
-            1 - 2 * (yy + zz),
-            2 * (xy - wz),
-            2 * (xz + wy),
-            2 * (xy + wz),
-            1 - 2 * (xx + zz),
-            2 * (yz - wx),
-            2 * (xz - wy),
-            2 * (yz + wx),
-            1 - 2 * (xx + yy),
-        ],
-        dim=-1,
-    ).reshape(-1, 3, 3)
-    return r.abs()
-
-
 class _SceneQueryHit:
     __slots__ = ("rigid_body", "collision", "position", "normal", "distance")
 
@@ -480,7 +429,7 @@ class NewtonArticulationHandle:
         root_body_idx = self._backend._path_body_map[self._root_link_prim_path]
         body_q = _wp_to_torch(self._backend._state_0.body_q)
         positions = th.as_tensor(positions).reshape(-1).to(device=body_q.device, dtype=body_q.dtype)
-        orientations = _wxyz_to_xyzw(th.as_tensor(orientations).reshape(-1)).to(
+        orientations = T.convert_quat(th.as_tensor(orientations).reshape(-1), to="xyzw").to(
             device=body_q.device, dtype=body_q.dtype
         )
         body_q[root_body_idx, :3] = positions
@@ -550,10 +499,10 @@ class NewtonRigidBodyHandle:
             from omnigibson.utils.usd_utils import get_world_pose
 
             pos, quat_wxyz_from_xyzw = get_world_pose(self.prim_path)
-            return pos.unsqueeze(0), _xyzw_to_wxyz(quat_wxyz_from_xyzw).unsqueeze(0)
+            return pos.unsqueeze(0), T.convert_quat(quat_wxyz_from_xyzw, to="wxyz").unsqueeze(0)
         body_q = _wp_to_torch(self._backend._state_0.body_q)
         pos = body_q[self._body_idx, :3].unsqueeze(0)
-        quat_wxyz = _xyzw_to_wxyz(body_q[self._body_idx, 3:7]).unsqueeze(0)
+        quat_wxyz = T.convert_quat(body_q[self._body_idx, 3:7], to="wxyz").unsqueeze(0)
         # Always copy: an int index gives a live view of body_q, and callers rely on fresh tensors like PhysX's.
         return pos.clone(), quat_wxyz.clone()
 
@@ -562,7 +511,7 @@ class NewtonRigidBodyHandle:
             return
         body_q = _wp_to_torch(self._backend._state_0.body_q)
         positions = th.as_tensor(positions).reshape(-1).to(device=body_q.device, dtype=body_q.dtype)
-        orientations = _wxyz_to_xyzw(th.as_tensor(orientations).reshape(-1)).to(
+        orientations = T.convert_quat(th.as_tensor(orientations).reshape(-1), to="xyzw").to(
             device=body_q.device, dtype=body_q.dtype
         )
         body_q[self._body_idx, :3] = positions
@@ -983,8 +932,8 @@ class _NewtonRigidContactView:
         point0_local = _wp_to_torch(self._backend._contact_report_contacts.rigid_contact_point0)[: len(shape0)]
         point1_local = _wp_to_torch(self._backend._contact_report_contacts.rigid_contact_point1)[: len(shape0)]
         normal = _wp_to_torch(self._backend._contact_report_contacts.rigid_contact_normal)[: len(shape0)]
-        world_point0 = body_q[body0, :3] + _quat_rotate_batch(body_q[body0, 3:7], point0_local)
-        world_point1 = body_q[body1, :3] + _quat_rotate_batch(body_q[body1, 3:7], point1_local)
+        world_point0 = body_q[body0, :3] + T.quat_apply_batch(body_q[body0, 3:7], point0_local)
+        world_point1 = body_q[body1, :3] + T.quat_apply_batch(body_q[body1, 3:7], point1_local)
         force_mag = force.norm(dim=-1)
 
         groups = {}
@@ -1976,7 +1925,7 @@ class NewtonBackend(PhysicsBackend):
             if root_body_idx is not None:
                 body_q = _wp_to_torch(self._state_0.body_q)
                 world_pos = body_q[root_body_idx, :3].clone()
-                world_quat = _xyzw_to_wxyz(body_q[root_body_idx, 3:7]).clone()
+                world_quat = T.convert_quat(body_q[root_body_idx, 3:7], to="wxyz").clone()
             gains_ke, gains_kd = (None, None)
             if handle.num_dof > 0:
                 gains_ke, gains_kd = handle.get_gains()
@@ -2128,7 +2077,7 @@ class NewtonBackend(PhysicsBackend):
             return
         body_q = _wp_to_torch(self._state_0.body_q)
         com_local = _wp_to_torch(self._model.body_com)[body_idx]
-        com_world = body_q[body_idx, :3] + _quat_rotate_batch(
+        com_world = body_q[body_idx, :3] + T.quat_apply_batch(
             body_q[body_idx, 3:7].unsqueeze(0), com_local.unsqueeze(0)
         ).squeeze(0)
         force_t = th.as_tensor(force, dtype=com_world.dtype, device=com_world.device)
@@ -2163,16 +2112,16 @@ class NewtonBackend(PhysicsBackend):
         shape_local_pos = shape_tf[:, :3]
         shape_local_quat = shape_tf[:, 3:7]
 
-        world_quat = _quat_mul_batch(body_quat, shape_local_quat)
-        world_pos = body_pos + _quat_rotate_batch(body_quat, shape_local_pos)
+        world_quat = T.quat_multiply_batch(body_quat, shape_local_quat)
+        world_pos = body_pos + T.quat_apply_batch(body_quat, shape_local_pos)
 
         aabb_lower_local = _wp_to_torch(model.shape_collision_aabb_lower)
         aabb_upper_local = _wp_to_torch(model.shape_collision_aabb_upper)
         c_local = (aabb_lower_local + aabb_upper_local) / 2.0
         he_local = (aabb_upper_local - aabb_lower_local) / 2.0
 
-        r_abs = _quat_to_abs_rotmat_batch(world_quat)
-        c_world = world_pos + _quat_rotate_batch(world_quat, c_local)
+        r_abs = T.quat2mat(world_quat).abs()
+        c_world = world_pos + T.quat_apply_batch(world_quat, c_local)
         he_world = th.einsum("nij,nj->ni", r_abs, he_local)
 
         return valid, c_world - he_world, c_world + he_world, shape_body

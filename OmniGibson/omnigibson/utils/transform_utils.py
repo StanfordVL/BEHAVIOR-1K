@@ -215,6 +215,49 @@ def quat_multiply(quaternion1: torch.Tensor, quaternion0: torch.Tensor) -> torch
     )
 
 
+def quat_multiply_batch(quaternion1: torch.Tensor, quaternion0: torch.Tensor) -> torch.Tensor:
+    """
+    Return elementwise multiplication of two batches of quaternions (q1 * q0).
+
+    Args:
+        quaternion1 (torch.Tensor): (..., 4) (x,y,z,w) quaternions
+        quaternion0 (torch.Tensor): (..., 4) (x,y,z,w) quaternions
+
+    Returns:
+        torch.Tensor: (..., 4) (x,y,z,w) multiplied quaternions
+    """
+    x0, y0, z0, w0 = quaternion0.unbind(-1)
+    x1, y1, z1, w1 = quaternion1.unbind(-1)
+
+    return torch.stack(
+        [
+            x1 * w0 + y1 * z0 - z1 * y0 + w1 * x0,
+            -x1 * z0 + y1 * w0 + z1 * x0 + w1 * y0,
+            x1 * y0 - y1 * x0 + z1 * w0 + w1 * z0,
+            -x1 * x0 - y1 * y0 - z1 * z0 + w1 * w0,
+        ],
+        dim=-1,
+    )
+
+
+def quat_apply_batch(quat: torch.Tensor, vec: torch.Tensor) -> torch.Tensor:
+    """
+    Rotate each vector by its corresponding quaternion. Unlike quat_apply, which rotates every vector by every
+    quaternion, this pairs them up elementwise.
+
+    Args:
+        quat (torch.Tensor): (..., 4) (x,y,z,w) quaternions
+        vec (torch.Tensor): (..., 3) vectors, broadcastable against quat's leading dimensions
+
+    Returns:
+        torch.Tensor: (..., 3) rotated vectors
+    """
+    qxyz = quat[..., :3]
+    qw = quat[..., 3:4]
+    t = 2.0 * torch.linalg.cross(qxyz, vec, dim=-1)
+    return vec + qw * t + torch.linalg.cross(qxyz, t, dim=-1)
+
+
 @torch_compile
 def quat_conjugate(quaternion: torch.Tensor) -> torch.Tensor:
     """

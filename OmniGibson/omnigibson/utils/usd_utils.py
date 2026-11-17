@@ -25,6 +25,9 @@ from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 # Create module logger
 log = create_module_logger(module_name=__name__)
 
+# Default size in m of unit-shape meshes, matches Kit setting of half-scale = 1, in cm.
+PRIMITIVE_MESH_DEFAULT_SIZE = 0.02
+
 
 @wp.func
 def rigid_inverse_mat44(T: wp.mat44) -> wp.mat44:
@@ -3116,7 +3119,7 @@ def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=Non
 
 
 def _create_mesh_prim_standalone(primitive_type, prim_path, u_patches=None, v_patches=None, stage=None):
-    """Kit-free create_primitive_mesh(); emits Kit's 2cm default size, which callers rescale by extents * 50."""
+    """Kit-free create_primitive_mesh(). Matches Kit's output size (PRIMITIVE_MESH_DEFAULT_SIZE, i.e. 2cm-wide)."""
     sections = max(u_patches, v_patches) if (u_patches is not None and v_patches is not None) else 32
     if primitive_type == "Sphere":
         tm = trimesh.creation.uv_sphere(radius=0.5, count=(sections, sections))
@@ -3133,7 +3136,8 @@ def _create_mesh_prim_standalone(primitive_type, prim_path, u_patches=None, v_pa
     else:  # "Plane"
         tm = trimesh.creation.box(extents=(1.0, 1.0, 1e-4))
 
-    tm.vertices *= 0.02
+    # Shapes above are unit-sized; shrink them to Kit's 2cm default so create_primitive_mesh()'s rescale applies
+    tm.vertices *= PRIMITIVE_MESH_DEFAULT_SIZE
 
     stage = og.sim.stage if stage is None else stage
     with og.sim.editing_usd(stage=stage):
@@ -3388,12 +3392,13 @@ def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None
         mesh = lazy.pxr.UsdGeom.Mesh.Define(og.sim.stage if stage is None else stage, prim_path)
 
         # Modify the points and normals attributes so that total extents is the desired
-        # This means multiplying omni's default by extents * 50.0, as the native mesh generated has extents [-0.01, 0.01]
-        # -- i.e.: 2cm-wide mesh
+        # This means multiplying the default by extents / PRIMITIVE_MESH_DEFAULT_SIZE, as the native mesh generated has
+        # extents [-0.01, 0.01] -- i.e.: 2cm-wide mesh
         extents = th.ones(3) * extents if isinstance(extents, float) else th.tensor(extents)
+        scale = extents / PRIMITIVE_MESH_DEFAULT_SIZE
         for attr in (mesh.GetPointsAttr(), mesh.GetNormalsAttr()):
             vals = th.tensor(attr.Get()).double()
-            attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*(val * extents * 50.0).tolist()) for val in vals]))
+            attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*(val * scale).tolist()) for val in vals]))
         mesh.GetExtentAttr().Set(
             lazy.pxr.Vt.Vec3fArray(
                 [lazy.pxr.Gf.Vec3f(*(-extents / 2.0).tolist()), lazy.pxr.Gf.Vec3f(*(extents / 2.0).tolist())]

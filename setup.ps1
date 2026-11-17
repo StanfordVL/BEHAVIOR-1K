@@ -459,6 +459,9 @@ if ($extrasList.Count -gt 0) {
     # Force reinstall cffi 1.17.1 to resolve compatibility issues with Isaac Sim extensions
     pip install --force-reinstall cffi==1.17.1
 
+    # Override isaacsim-core's older newton pin; keep in sync with extras_require["newton"] in OmniGibson/setup.py
+    pip install "newton[sim]==1.7.0"
+
     Write-Host "OmniGibson installation completed successfully!"
 }
 
