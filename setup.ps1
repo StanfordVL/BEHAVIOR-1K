@@ -149,7 +149,7 @@ function Prompt-ForTerms {
 2. NVIDIA ISAAC SIM EULA
    - Required for OmniGibson installation
    - By accepting, you agree to NVIDIA Isaac Sim End User License Agreement
-   - See: https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement
+   - See: https://docs.isaacsim.omniverse.nvidia.com/6.0.0/common/licenses-isaac-sim.html
 
 "@
     }
