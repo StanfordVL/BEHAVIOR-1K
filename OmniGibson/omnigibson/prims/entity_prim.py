@@ -113,12 +113,12 @@ class EntityPrim(XFormPrim):
                 if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
                     assert old_link_prim is None, "Found multiple XForm links for a Cloth entity prim! Expected: 1"
                     old_link_prim = prim
-                    for child in prim.GetChildren():
-                        if child.GetPrimTypeInfo().GetTypeName() == "Mesh" and not child.HasAPI(
+                    for descendant in lazy.pxr.Usd.PrimRange(prim):
+                        if descendant.GetPrimTypeInfo().GetTypeName() == "Mesh" and not descendant.HasAPI(
                             lazy.pxr.UsdPhysics.CollisionAPI
                         ):
                             assert cloth_mesh_prim is None, "Found multiple meshes for a Cloth entity prim! Expected: 1"
-                            cloth_mesh_prim = child
+                            cloth_mesh_prim = descendant
 
             # Move mesh prim one level up via copy, then delete the original link
             # NOTE: We copy because we cannot directly move the prim because it is ancestral
@@ -887,7 +887,7 @@ class EntityPrim(XFormPrim):
         Returns:
             th.Tensor: (n_dof,) boolean tensor. True for rotational DOFs, False for translational.
         """
-        return th.as_tensor(self._articulation_view.get_dof_is_rotational())
+        return th.as_tensor(self._articulation_view.get_dof_is_rotational(), device=og.sim.device)
 
     def get_joint_velocities(self, normalized=False):
         """

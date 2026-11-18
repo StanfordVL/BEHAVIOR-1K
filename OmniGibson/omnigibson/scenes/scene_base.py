@@ -414,7 +414,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             else:
                 new_scene_edge = last_scene_edge + scene_margin + (aabb_max[0] - aabb_min[0])
         else:
-            scene_position = th.zeros(3)
+            scene_position = th.zeros(3, device=og.sim.device)
             aabb_min, aabb_max = og.sim.render_backend.compute_world_aabb(scene_absolute_path)
             new_scene_edge = 0.0 if len(self._init_objs) == 0 else aabb_max[0]
 
@@ -1286,9 +1286,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             # where it is and shift the object poses over instead, so that running several
             # scenes at once does not pile them all onto the recorded spot and let their
             # objects collide.
-            rec_pos = th.as_tensor(state["pos"], dtype=th.float32).reshape(3)
-            rec_ori = th.as_tensor(state["ori"], dtype=th.float32).reshape(4)
             cur_pos, cur_ori = self.get_position_orientation()
+            rec_pos = th.as_tensor(state["pos"], dtype=th.float32, device=cur_pos.device).reshape(3)
+            rec_ori = th.as_tensor(state["ori"], dtype=th.float32, device=cur_ori.device).reshape(4)
             registry_state = state["registry"]
             if not (th.equal(rec_pos, cur_pos) and th.equal(rec_ori, cur_ori)):
                 # rel = cur ∘ rec⁻¹ moves a recorded pose over to this scene. When the two

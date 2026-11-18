@@ -374,7 +374,7 @@ def test_pose(env, breakfast_table, dishtowel):
 def test_joint(env, breakfast_table, bottom_cabinet):
     lo = bottom_cabinet.joint_lower_limits
     hi = bottom_cabinet.joint_upper_limits
-    q_rand = lo + (hi - lo) * th.rand(bottom_cabinet.n_joints)
+    q_rand = lo + (hi - lo) * th.rand(bottom_cabinet.n_joints, device=lo.device)
     bottom_cabinet.set_joint_positions(q_rand)
 
     assert th.allclose(bottom_cabinet.states[Joint].get_value(), q_rand)
@@ -394,10 +394,11 @@ def test_aabb(env, breakfast_table, dishtowel):
     # Need to take one sim step
     og.sim.step()
 
-    assert th.allclose(breakfast_table.states[AABB].get_value()[0], breakfast_table.aabb[0])
-    assert th.allclose(breakfast_table.states[AABB].get_value()[1], breakfast_table.aabb[1])
+    assert th.allclose(breakfast_table.states[AABB].get_value()[0], breakfast_table.aabb[0].cpu())
+    assert th.allclose(breakfast_table.states[AABB].get_value()[1], breakfast_table.aabb[1].cpu())
     assert th.all(
-        (breakfast_table.states[AABB].get_value()[0] < pos1) & (pos1 < breakfast_table.states[AABB].get_value()[1])
+        (breakfast_table.states[AABB].get_value()[0] < pos1.cpu())
+        & (pos1.cpu() < breakfast_table.states[AABB].get_value()[1])
     )
 
     # skip until #2042
@@ -1035,7 +1036,7 @@ def test_particle_sink(env, furniture_sink):
     assert water_system.n_particles == 0
 
     sink_pos = sink.states[ParticleSink].link.get_position_orientation()[0]
-    water_system.generate_particles(positions=[(sink_pos + th.tensor([0, 0, 0.05])).tolist()])
+    water_system.generate_particles(positions=[(sink_pos + th.tensor([0, 0, 0.05], device=sink_pos.device)).tolist()])
     # There should be exactly 1 water particle.
     assert water_system.n_particles == 1
 
@@ -1445,33 +1446,36 @@ def test_kinematic_only_contact_no_error():
             },
         ],
     }
-    env = og.Environment(configs=cfg)
+    # try/finally so a failed assertion below still runs the test_clear_sim() cleanup at the end --
+    # otherwise og.sim is left "playing" for whatever test runs next in file order.
+    try:
+        env = og.Environment(configs=cfg)
 
-    # og.sim.step() internally calls RigidContactAPI.initialize_view(); must not raise.
-    og.sim.step()
+        # og.sim.step() internally calls RigidContactAPI.initialize_view(); must not raise.
+        og.sim.step()
 
-    # Explicit call must also not raise.
-    RigidContactAPI.initialize_view()
+        # Explicit call must also not raise.
+        RigidContactAPI.initialize_view()
 
-    scene_idx = env.scene.idx
-    table = env.scene.object_registry("name", "table")
-    bowl = env.scene.object_registry("name", "bowl")
+        scene_idx = env.scene.idx
+        table = env.scene.object_registry("name", "table")
+        bowl = env.scene.object_registry("name", "bowl")
 
-    # Contact queries against a kinematic-only scene must return False, not error.
-    assert not RigidContactAPI.is_in_contact(
-        scene_idx=scene_idx, query_set=[table], with_set=[bowl], ignore_set=None, current_only=False
-    )
-    assert not RigidContactAPI.is_in_contact(
-        scene_idx=scene_idx, query_set=[table], with_set=[bowl], ignore_set=None, current_only=True
-    )
-    assert not RigidContactAPI.is_in_contact(
-        scene_idx=scene_idx, query_set=[bowl], with_set=[table], ignore_set=None, current_only=False
-    )
-    assert not RigidContactAPI.is_in_contact(
-        scene_idx=scene_idx, query_set=[bowl], with_set=[table], ignore_set=None, current_only=True
-    )
-
-    test_clear_sim()
+        # Contact queries against a kinematic-only scene must return False, not error.
+        assert not RigidContactAPI.is_in_contact(
+            scene_idx=scene_idx, query_set=[table], with_set=[bowl], ignore_set=None, current_only=False
+        )
+        assert not RigidContactAPI.is_in_contact(
+            scene_idx=scene_idx, query_set=[table], with_set=[bowl], ignore_set=None, current_only=True
+        )
+        assert not RigidContactAPI.is_in_contact(
+            scene_idx=scene_idx, query_set=[bowl], with_set=[table], ignore_set=None, current_only=False
+        )
+        assert not RigidContactAPI.is_in_contact(
+            scene_idx=scene_idx, query_set=[bowl], with_set=[table], ignore_set=None, current_only=True
+        )
+    finally:
+        test_clear_sim()
 
 
 def test_clear_sim():
