@@ -1,6 +1,5 @@
 import math
 
-import pytest
 import torch as th
 
 import omnigibson as og
@@ -15,11 +14,6 @@ SYSTEM_EXAMPLES = {
     "diced__apple": MacroPhysicalParticleSystem,
     "stain": MacroVisualParticleSystem,
 }
-if gm.PHYSICS_BACKEND == "newton":
-    # Newton has no physical particle support yet
-    SYSTEM_EXAMPLES = {k: v for k, v in SYSTEM_EXAMPLES.items() if v is MacroVisualParticleSystem}
-
-requires_fluids = pytest.mark.skipif(gm.PHYSICS_BACKEND == "newton", reason="Newton has no fluid support yet")
 
 
 def retrieve_obj_cfg(obj):

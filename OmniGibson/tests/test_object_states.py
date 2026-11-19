@@ -9,7 +9,6 @@ from utils import (
     get_random_pose,
     place_obj_on_floor_plane,
     place_objA_on_objB_bbox,
-    requires_fluids,
 )
 
 import omnigibson as og
@@ -1007,7 +1006,6 @@ def test_zero_dt_refresh_does_not_advance_time_dependent_states(env, microwave, 
     ), "Temperature should decay toward DEFAULT_TEMPERATURE after a real step"
 
 
-@requires_fluids
 def test_particle_source(env, furniture_sink):
     sink = env.scene.object_registry("name", "furniture_sink")
 
@@ -1035,7 +1033,6 @@ def test_particle_source(env, furniture_sink):
     water_system.remove_all_particles()
 
 
-@requires_fluids
 def test_particle_sink(env, furniture_sink):
     sink = env.scene.object_registry("name", "furniture_sink")
     place_obj_on_floor_plane(sink)
@@ -1065,7 +1062,6 @@ def test_particle_sink(env, furniture_sink):
 
 
 @pytest.mark.skip(reason="investigate why particle applier and remover tests are failing, see issue #2066")
-@requires_fluids
 def test_particle_applier(env, breakfast_table, acetone_atomizer, applier_dishtowel):
     # Test projection
 
@@ -1123,7 +1119,6 @@ def test_particle_applier(env, breakfast_table, acetone_atomizer, applier_dishto
 
 
 @pytest.mark.skip(reason="investigate why particle applier and remover tests are failing, see issue #2066")
-@requires_fluids
 def test_particle_remover(env, breakfast_table, vacuum, remover_dishtowel):
     # Test projection
 
@@ -1184,7 +1179,6 @@ def test_particle_remover(env, breakfast_table, vacuum, remover_dishtowel):
     water_system.remove_all_particles()
 
 
-@requires_fluids
 def test_saturated(env, remover_dishtowel):
     place_obj_on_floor_plane(remover_dishtowel)
 

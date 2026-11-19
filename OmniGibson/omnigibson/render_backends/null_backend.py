@@ -1,8 +1,7 @@
 from omnigibson.render_backends.base import RenderBackend
-from omnigibson.render_backends.usd_stage_services import UsdStageServicesMixin
 
 
-class NullRenderBackend(UsdStageServicesMixin, RenderBackend):
+class NullRenderBackend(RenderBackend):
     def render(self):
         pass
 

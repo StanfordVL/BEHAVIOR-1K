@@ -10,6 +10,7 @@ relocated here; the remaining Kit-specific call sites are being moved behind thi
 incrementally.
 """
 
+import contextlib
 from abc import ABC, abstractmethod
 
 
@@ -62,43 +63,49 @@ class RenderBackend(ABC):
 
     # ---- Stage / application services ----
 
-    @abstractmethod
     def create_default_pbr_material(self, scope_path, material_path, target_prim_path):
         """
         Creates a default PBR material at @material_path (under a Scope authored at @scope_path) and
         binds it to @target_prim_path.
         """
+        pass
 
-    @abstractmethod
     def get_stage(self):
         """
         Returns:
             pxr.Usd.Stage: The stage this backend renders from.
         """
+        return self.sim.stage
 
-    @abstractmethod
     def copy_prim(self, source_prim_path, dest_prim_path):
         """Copies the prim at @source_prim_path, and its whole subtree, to @dest_prim_path."""
+        from omnigibson.utils.usd_utils import copy_prim_tree_to_path
 
-    @abstractmethod
+        copy_prim_tree_to_path(source_prim_path, dest_prim_path)
+
     def copy_mesh_prim(self, source_prim_path, dest_prim_path):
         """
         Copies the single, childless Mesh prim at @source_prim_path to @dest_prim_path. Narrower than
         copy_prim(); the caller guarantees there is no subtree to carry along.
         """
+        from omnigibson.utils.usd_utils import copy_mesh_prim_to_path
 
-    @abstractmethod
+        copy_mesh_prim_to_path(source_prim_path, dest_prim_path)
+
     def deactivate_prim(self, prim):
         """Removes @prim from the scene as far as anything reading the stage is concerned."""
+        prim.SetActive(False)
 
-    @abstractmethod
     def delete_prim(self, prim_path, destructive=True):
         """
         Deletes the prim at @prim_path. @destructive=False deactivates it instead of removing it,
         which is all that is possible for a prim whose definition comes from a reference arc.
         """
+        if destructive:
+            self.sim.stage.RemovePrim(prim_path)
+        else:
+            self.sim.stage.GetPrimAtPath(prim_path).SetActive(False)
 
-    @abstractmethod
     def is_prim_ancestral(self, prim):
         """
         Returns:
@@ -106,8 +113,11 @@ class RenderBackend(ABC):
                 inside a dataset object's referenced USD), as opposed to being authored directly on
                 the live stage. Such a prim can only be deactivated, never removed.
         """
+        prim_stack = prim.GetPrimStack()
+        prim_stage = prim.GetStage()
+        own_layers = {prim_stage.GetRootLayer(), prim_stage.GetSessionLayer()}
+        return bool(prim_stack) and prim_stack[0].layer not in own_layers
 
-    @abstractmethod
     def add_reference_to_stage(self, asset_path, prim_path):
         """
         References the USD at @asset_path in at @prim_path.
@@ -115,36 +125,45 @@ class RenderBackend(ABC):
         Returns:
             Usd.Prim: The referencing prim.
         """
+        prim = self.sim.stage.GetPrimAtPath(prim_path)
+        if not prim.IsValid():
+            prim = self.sim.stage.DefinePrim(prim_path, "Xform")
+        prim.GetReferences().AddReference(asset_path)
+        return prim
 
-    @abstractmethod
     def create_primitive_mesh(self, primitive_type, prim_path, u_patches=None, v_patches=None, stage=None):
         """
         Authors a @primitive_type mesh (one of `PRIMITIVE_MESH_TYPES`) at @prim_path, optionally
         tessellated to @u_patches x @v_patches.
         """
+        from omnigibson.utils.usd_utils import _create_mesh_prim_standalone
 
-    @abstractmethod
+        _create_mesh_prim_standalone(primitive_type, prim_path, u_patches=u_patches, v_patches=v_patches, stage=stage)
+
     def compute_world_aabb(self, prim_path):
         """
         Returns:
             2-tuple: (aabb_min, aabb_max) world-frame axis-aligned bounds of @prim_path, each a
                 3-tuple of floats.
         """
+        from omnigibson.utils.usd_utils import compute_path_world_aabb
 
-    @abstractmethod
+        return compute_path_world_aabb(prim_path)
+
     def recompute_extents(self, prim):
         """Re-syncs @prim's authored extent attribute to its actual geometry."""
+        pass
 
-    @abstractmethod
     def add_semantic_labels(self, prim, label, instance_name="class"):
         """Tags @prim with semantic @label under @instance_name, for segmentation rendering."""
+        pass
 
-    @abstractmethod
     def suppress_log(self, channels=None):
         """
         Returns:
             contextmanager: Suppresses @channels (or all logging, if None) for its duration.
         """
+        return contextlib.nullcontext()
 
     # ---- Render-graph lifecycle ----
 
