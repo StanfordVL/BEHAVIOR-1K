@@ -1510,6 +1510,8 @@ class NewtonBackend(PhysicsBackend):
     def _rebuild_impl(self, newton, wp):
         from pxr import Gf
 
+        from omnigibson.physics_backends.newton_visuals import add_usd_visual_shapes
+
         captured_state = self._capture_state()
         self._already_broken_joints = set()
 
@@ -1561,6 +1563,8 @@ class NewtonBackend(PhysicsBackend):
                 hide_collision_shapes=True,
                 ignore_paths=ignore_paths_by_obj.get(obj),
             )
+            # add_usd()'s own visual import is off; bake textured render-only shapes for Newton's viewers instead
+            add_usd_visual_shapes(newton, builder, self.sim.stage, obj.prim_path, info["path_body_map"])
 
             path_body_map.update(info["path_body_map"])
             path_joint_map.update(info["path_joint_map"])
@@ -2100,8 +2104,12 @@ class NewtonBackend(PhysicsBackend):
         model = self._model
         if model is None or model.shape_count == 0:
             return None
+        import newton
+
         shape_body = _wp_to_torch(model.shape_body)
-        valid = shape_body >= 0
+        # Only collision shapes count, not render-only visual shapes
+        collides = (_wp_to_torch(model.shape_flags) & int(newton.ShapeFlags.COLLIDE_SHAPES)) != 0
+        valid = (shape_body >= 0) & collides
         if not bool(valid.any()):
             return None
         body_q = _wp_to_torch(self._state_0.body_q)

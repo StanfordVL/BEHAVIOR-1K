@@ -184,7 +184,7 @@ gm.PHYSICS_BACKEND = "physx"
 
 # Which render backend to use. Must be a key in omnigibson.render_backends.RENDER_BACKENDS. An
 # independent axis from PHYSICS_BACKEND: which engine simulates and what turns that into pixels are
-# separate choices, even though Kit is currently the only implementation of either.
+# separate choices. "newton" renders rgb through Newton's ViewerGL and requires Newton physics.
 gm.RENDER_BACKEND = "kit"
 
 # Whether the Newton backend replays its physics substep from a captured CUDA graph (GPU only)
