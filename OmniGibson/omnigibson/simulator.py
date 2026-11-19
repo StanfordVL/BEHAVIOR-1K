@@ -34,7 +34,6 @@ from omnigibson.utils.python_utils import Serializable
 from omnigibson.utils.python_utils import clear as clear_python_utils
 from omnigibson.utils.python_utils import create_object_from_init_info, recursively_convert_to_torch
 from omnigibson.utils.ui_utils import (
-    CameraMover,
     create_module_logger,
     disclaimer,
     logo_small,
@@ -662,8 +661,7 @@ def _launch_simulator(*args, **kwargs):
             Enables keyboard control of the active viewer camera for this simulation
             """
             assert gm.RENDER_VIEWER_CAMERA, "Viewer camera must be enabled to enable teleoperation!"
-            self._camera_mover = CameraMover(cam=self._viewer_camera)
-            self._camera_mover.print_info()
+            self._camera_mover = self._render_backend.enable_viewer_camera_teleoperation()
             return self._camera_mover
 
         def import_scene(self, scenes):
@@ -1870,6 +1868,7 @@ def _launch_simulator(*args, **kwargs):
             TiledVisionSensor.clear()
 
             # Clear all scenes
+            self._render_backend.close()
             for scene in self.scenes:
                 scene.clear()
 

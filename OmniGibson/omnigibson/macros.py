@@ -180,12 +180,12 @@ gm.NO_OMNI_LOGS = os.getenv("OMNIGIBSON_NO_OMNI_LOGS", "False").lower() in ("tru
 gm.SHOW_DISCLAIMERS = False
 
 # Which physics backend to use. Must be a key in omnigibson.physics_backends.PHYSICS_BACKENDS
-gm.PHYSICS_BACKEND = "physx"
+gm.PHYSICS_BACKEND = os.getenv("OMNIGIBSON_PHYSICS_BACKEND", "physx")
 
 # Which render backend to use. Must be a key in omnigibson.render_backends.RENDER_BACKENDS. An
 # independent axis from PHYSICS_BACKEND: which engine simulates and what turns that into pixels are
-# separate choices, even though Kit is currently the only implementation of either.
-gm.RENDER_BACKEND = "kit"
+# separate choices.
+gm.RENDER_BACKEND = os.getenv("OMNIGIBSON_RENDER_BACKEND", "kit")
 
 # Whether the Newton backend replays its rigid-body physics substep from a captured CUDA graph (GPU only).
 # The substep is host-launch-bound, so this is much faster; it falls back to uncaptured stepping on failure

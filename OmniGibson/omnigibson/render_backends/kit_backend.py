@@ -391,6 +391,13 @@ class KitRenderBackend(RenderBackend):
             usdrt_stage.GetFabricId(), usdrt_stage.GetStageIdAsStageId()
         )
 
+    def enable_viewer_camera_teleoperation(self):
+        from omnigibson.utils.ui_utils import CameraMover
+
+        controller = CameraMover(cam=self.sim.viewer_camera)
+        controller.print_info()
+        return controller
+
     def setup_viewer_camera(self, viewer_width, viewer_height):
         # _set_viewer_camera() also applies the default viewer pose -- see its own implementation.
         self.sim._set_viewer_camera(viewer_width=viewer_width, viewer_height=viewer_height)

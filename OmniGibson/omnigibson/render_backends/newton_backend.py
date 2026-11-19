@@ -141,6 +141,7 @@ class NewtonRenderBackend(UsdStageServicesMixin, RenderBackend):
     """
 
     supports_camera_capture = True
+    requires_physics_visual_shapes = True
 
     def __init__(self, sim=None):
         super().__init__(sim=sim)

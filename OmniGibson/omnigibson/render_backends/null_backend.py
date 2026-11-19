@@ -15,6 +15,9 @@ class NullRenderBackend(UsdStageServicesMixin, RenderBackend):
     Render backend that renders nothing. All capability flags stay at their False defaults.
     """
 
+    # Legacy standalone viewers run with the null backend and read the physics model's visuals.
+    requires_physics_visual_shapes = True
+
     def render(self):
         pass
 

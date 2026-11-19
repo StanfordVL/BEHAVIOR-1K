@@ -25,6 +25,7 @@ class RenderBackend(ABC):
     supports_bbox = False  # bbox_2d_tight/loose, bbox_3d modalities
     supports_pointcloud = False  # pointcloud modality
     supports_tiled_rendering = False  # batched multi-camera tiled capture (TiledVisionSensor)
+    requires_physics_visual_shapes = False  # viewer reads visual geometry from the physics model
 
     def __init__(self, sim=None):
         self.sim = sim
@@ -40,6 +41,12 @@ class RenderBackend(ABC):
         """
         Hook called every time `Simulator.play()` transitions from stopped to playing.
         """
+
+    def close(self):
+        """Release standalone windows and rendering resources on clear or shutdown."""
+
+    def enable_viewer_camera_teleoperation(self):
+        """Enable this backend's camera navigation, returning a controller if applicable."""
 
     # ---- Simulator setup hooks ----
 

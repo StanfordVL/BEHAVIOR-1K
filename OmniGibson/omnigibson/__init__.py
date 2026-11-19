@@ -138,6 +138,8 @@ def clear(
 
 
 def cleanup(*args, **kwargs):
+    if sim is not None:
+        sim.render_backend.close()
     # TODO: Currently tempfile removal will fail due to CopyPrim command (for example, GranularSystem in dicing_apple example.)
     try:
         shutil.rmtree(tempdir)

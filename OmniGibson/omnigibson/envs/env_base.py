@@ -76,7 +76,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Setting this to 0 skips the extra renders (IsaacLab's num_rerenders_on_reset convention): cheaper, but
         # image observations returned by reset() will be stale (last pre-reset frame).
         self._num_rerenders_on_reset = self.env_config["num_rerenders_on_reset"]
-        self.device = self.env_config["device"] if self.env_config["device"] else "cpu"
+        self.device = self.env_config["device"] or os.getenv("OMNIGIBSON_DEVICE", "cpu")
 
         physics_dt = 1.0 / self.env_config["physics_frequency"]
         rendering_dt = 1.0 / self.env_config["rendering_frequency"]

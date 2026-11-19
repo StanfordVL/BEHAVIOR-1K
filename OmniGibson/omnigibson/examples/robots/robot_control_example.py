@@ -2,6 +2,14 @@
 Example script demo'ing robot control.
 
 Options for random actions, as well as selection of robot action space
+
+Standalone Warp viewer (Newton environment, CUDA path tracing + OIDN):
+    python -m omnigibson.examples.robots.robot_control_example --quickstart --renderer warp
+Mouse controls: left-drag orbit, right-drag look around, middle-drag pan, scroll dolly.
+The sidebar displays timing and pose information; keyboard input remains reserved for robot control.
+Add --output /tmp/robot_control.mp4 --num-steps 100 for headless random-action recording.
+Requires pyglet, OpenEXR and CUDA-enabled OIDN 2.5.1 extracted under $CONDA_PREFIX/opt;
+alternatively set OIDN_LIBRARY to the installed libOpenImageDenoise.so.2 path.
 """
 
 import torch as th
@@ -65,7 +73,7 @@ def main(
     headless=False,
     short_exec=False,
     quickstart=False,
-    renderer="kit",
+    renderer=None,
     output=None,
     num_steps=100,
 ):
@@ -73,20 +81,23 @@ def main(
     Robot control demo with selection
     Queries the user to select a robot, the controllers, a scene and a type of input (random actions or teleop)
 
-    :param renderer: "kit" for Omniverse or "rtx"/"gl" to run on Newton
-    :param output: for renderer "rtx"/"gl": if given, runs headless and writes a recorded video to
+    :param renderer: "kit" for Omniverse or "rtx"/"gl"/"warp" to run on Newton
+    :param output: for renderer "rtx"/"gl"/"warp": if given, runs headless and writes a recorded video to
         this path. If omitted, opens a live on-screen window instead.
-    :param num_steps: number of steps to run when renderer is "rtx" or "gl".
+    :param num_steps: number of recorded steps for standalone renderers.
     """
     og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
+    renderer = gm["RENDER_BACKEND"] if renderer is None else renderer
     if renderer != "kit":
         if renderer == "gl" and output:
             import pyglet
 
             pyglet.options["headless"] = True
         gm.PHYSICS_BACKEND = "newton"
-        gm.RENDER_BACKEND = "none"
+        gm.RENDER_BACKEND = "warp" if renderer == "warp" else "none"
+        if output or headless:
+            gm.HEADLESS = True
 
     # Choose scene to load
     scene_model = "Rs_int"
@@ -110,7 +121,7 @@ def main(
     # Add the robot we want to load
     robot0_cfg = dict()
     robot0_cfg["model"] = robot_name
-    robot0_cfg["obs_modalities"] = ["rgb"] if gm.RENDER_BACKEND != "none" else []
+    robot0_cfg["obs_modalities"] = ["rgb"] if gm.RENDER_BACKEND != "none" and renderer != "warp" else []
     robot0_cfg["action_type"] = "continuous"
     robot0_cfg["action_normalize"] = True
 
@@ -118,6 +129,8 @@ def main(
     cfg = dict(scene=scene_cfg, robots=[robot0_cfg])
     if renderer != "kit":
         cfg["env"] = {"device": "cuda:0"}
+    if renderer == "warp":
+        cfg["render"] = {"viewer_width": 960, "viewer_height": 540}
 
     # Create the environment
     env = og.Environment(configs=cfg)
@@ -159,6 +172,22 @@ def main(
     # Reset environment and robot
     env.reset()
     robot.reset()
+
+    if renderer == "warp":
+        from omnigibson.utils.warp_viewer_recording import run_with_warp_viewer
+
+        try:
+            run_with_warp_viewer(
+                env,
+                robot,
+                output=output,
+                num_steps=num_steps,
+                headless=headless,
+                control_mode=control_mode,
+            )
+        finally:
+            og.shutdown()
+        return
 
     # Create teleop controller
     action_generator = KeyboardRobotController(robot=robot)
@@ -211,20 +240,23 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--renderer",
-        choices=["kit", "rtx", "gl"],
-        default="kit",
+        choices=["kit", "rtx", "gl", "warp"],
+        default=None,
         help=(
-            "'kit' (default) is the interactive Omniverse Kit viewport. 'rtx' and 'gl' run physics "
+            "Defaults to OMNIGIBSON_RENDER_BACKEND (kit if unset). 'kit' is the Omniverse Kit viewport. "
+            "'rtx' and 'gl' run physics "
             "on Newton through Newton's own ray-traced or OpenGL viewer instead, using "
-            "random actions."
+            "random actions. 'warp' uses CUDA path tracing (pt1_oidn) with standalone keyboard control."
         ),
     )
     parser.add_argument(
         "--output",
         type=str,
         default=None,
-        help="Video output path for --renderer rtx/gl (headless recording). Omit for a live window.",
+        help="Video output path for --renderer rtx/gl/warp (headless recording). Omit for a live window.",
     )
-    parser.add_argument("--num-steps", type=int, default=100, help="Number of steps to run for --renderer rtx/gl.")
+    parser.add_argument(
+        "--num-steps", type=int, default=100, help="Number of recorded steps for --renderer rtx/gl/warp."
+    )
     args = parser.parse_args()
     main(quickstart=args.quickstart, renderer=args.renderer, output=args.output, num_steps=args.num_steps)

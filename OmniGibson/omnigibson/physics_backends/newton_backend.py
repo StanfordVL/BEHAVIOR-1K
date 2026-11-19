@@ -1397,11 +1397,14 @@ class NewtonBackend(PhysicsBackend):
 
     def render(self):
         self._sim_context.render()
+        self.sim.render_backend.render()
 
     def step(self, render):
         # Apply any deferred particle-set change before physics runs.
         self.ensure_model_current()
         self._sim_context.step(render=render)
+        if render:
+            self.sim.render_backend.render()
 
     # Relative margin added on top of a body's triangle-inequality deficit by _balance_body_inertia().
     # MuJoCo has NO tolerance here (measured: it rejects a deficit of -1e-10 and accepts exactly 0), so
@@ -2002,7 +2005,8 @@ class NewtonBackend(PhysicsBackend):
                 ignore_paths=getattr(obj, "ignore_paths", None) or ignore_paths_by_obj.get(obj),
             )
 
-            add_usd_visual_shapes(newton, builder, self.sim.stage, obj.prim_path, info["path_body_map"])
+            if self.sim.render_backend.requires_physics_visual_shapes:
+                add_usd_visual_shapes(newton, builder, self.sim.stage, obj.prim_path, info["path_body_map"])
 
             path_body_map.update(info["path_body_map"])
             path_joint_map.update(info["path_joint_map"])
