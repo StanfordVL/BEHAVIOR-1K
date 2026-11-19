@@ -215,7 +215,7 @@ class MacroParticleSystem(BaseSystem):
         """
         # Update color if the particle object has any material
         color = th.ones(3)
-        if self.particle_object.has_material():
+        if self.particle_object.material is not None:
             color = self.particle_object.material.average_diffuse_color
         self._color = color
 

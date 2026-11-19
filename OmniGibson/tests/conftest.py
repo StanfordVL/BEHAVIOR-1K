@@ -1,3 +1,5 @@
+import os
+
 import pytest
 import torch as th
 
@@ -7,7 +9,13 @@ from omnigibson.objects import DatasetObject
 from omnigibson.robots import Robot
 from omnigibson.utils.constants import ParticleModifyCondition, ParticleModifyMethod
 
-from utils import MULTI_ENV_ROBOTS
+if os.environ.get("OMNIGIBSON_PHYSICS_BACKEND"):
+    gm.PHYSICS_BACKEND = os.environ["OMNIGIBSON_PHYSICS_BACKEND"]
+if os.environ.get("OMNIGIBSON_RENDER_BACKEND"):
+    gm.RENDER_BACKEND = os.environ["OMNIGIBSON_RENDER_BACKEND"]
+_DEVICE_OVERRIDE = os.environ.get("OMNIGIBSON_DEVICE")
+
+from utils import MULTI_ENV_ROBOTS  # noqa: E402  (after the backend override, which utils reads)
 
 
 @pytest.fixture
@@ -17,7 +25,10 @@ def stopped_env():
         gm.USE_GPU_DYNAMICS = True
         gm.ENABLE_TRANSITION_RULES = True
 
-    env = og.Environment(configs={"scene": {"type": "Scene"}})
+    configs = {"scene": {"type": "Scene"}}
+    if _DEVICE_OVERRIDE:
+        configs["env"] = {"device": _DEVICE_OVERRIDE}
+    env = og.Environment(configs=configs)
     og.sim.stop()
     yield env
 

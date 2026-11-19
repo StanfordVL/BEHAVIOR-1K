@@ -86,6 +86,14 @@ m.MAX_ANGULAR_VELOCITY = th.pi
 m.MAX_EFFORT = 1000.0
 m.BASE_JOINT_CONTROLLER_POSITION_KP = 100.0
 
+# Backend-specific robot tuning, keyed by gm.PHYSICS_BACKEND; backends without an entry keep the generic behavior.
+# Per-controller-group (kp, kd) position gains, applied only when the controller uses the backend default gains
+m.BACKEND_POSITION_GAINS = {
+    "newton": {"trunk": (20000.0, 2000.0), "arm": (650.0, 100.0), "gripper": (30.0, 3.0)},
+}
+# Damping on a holonomic base's unactuated z/rx/ry joints
+m.BACKEND_PASSIVE_BASE_DOF_KD = {"newton": 500.0}
+
 
 AG_MODES = {
     "physical",
@@ -634,10 +642,21 @@ class Robot(USDObject, GymObservable):
         """
         # Update the control modes of each joint based on the outputted control from the controllers
         unused_dofs = {i for i in range(self.n_dof)}
-        for group_key, _ in self._controllers.values():
+        for name, (group_key, _) in self._controllers.items():
             isaac_kp = ControllerView.get_isaac_kp(group_key)
             isaac_kd = ControllerView.get_isaac_kd(group_key)
             control_type = ControllerView.get_control_type(group_key)
+            group_gains = m.BACKEND_POSITION_GAINS.get(gm.PHYSICS_BACKEND)
+            if (
+                group_gains is not None
+                and control_type == ControlType.POSITION
+                and ControllerView.isaac_gains_are_default(group_key)
+            ):
+                # Controller names are "trunk", "arm_<arm>", "gripper_<arm>", ...
+                gains = group_gains.get(name.split("_")[0])
+                if gains is not None:
+                    isaac_kp = th.full_like(isaac_kp, gains[0])
+                    isaac_kd = th.full_like(isaac_kd, gains[1])
             for i, dof in enumerate(ControllerView.get_dof_idx(group_key).tolist()):
                 # Make sure the DOF has not already been set yet, and remove it afterwards
                 assert dof in unused_dofs
@@ -652,6 +671,12 @@ class Robot(USDObject, GymObservable):
         # For all remaining DOFs not controlled, we assume these are free DOFs (e.g.: virtual joints representing free
         # motion wrt a specific axis), so explicitly set kp / kd to 0 to avoid silent bugs when
         # joint positions / velocities are set
+        passive_base_kd = m.BACKEND_PASSIVE_BASE_DOF_KD.get(gm.PHYSICS_BACKEND)
+        passive_base_dofs = (
+            set(self.base_idx.tolist()) - set(self.base_control_idx.tolist())
+            if passive_base_kd is not None and self.is_holonomic_base
+            else set()
+        )
         for unused_dof in unused_dofs:
             unused_joint = self._joints[self.dof_names_ordered[unused_dof]]
             assert not unused_joint.driven, (
@@ -663,6 +688,8 @@ class Robot(USDObject, GymObservable):
                 kp=None,
                 kd=None,
             )
+            if unused_dof in passive_base_dofs:
+                unused_joint.damping = passive_base_kd
 
     def _generate_controller_config(self, custom_config=None):
         """

@@ -187,6 +187,9 @@ gm.PHYSICS_BACKEND = "physx"
 # separate choices, even though Kit is currently the only implementation of either.
 gm.RENDER_BACKEND = "kit"
 
+# Whether the Newton backend replays its physics substep from a captured CUDA graph (GPU only)
+gm.USE_NEWTON_STEP_GRAPH = os.getenv("OMNIGIBSON_NEWTON_STEP_GRAPH", "True").lower() in ("true", "1", "t")
+
 # Whether to use omni's GPU dynamics
 # This is necessary for certain features; e.g. particles (fluids / cloth)
 gm.USE_GPU_DYNAMICS = False

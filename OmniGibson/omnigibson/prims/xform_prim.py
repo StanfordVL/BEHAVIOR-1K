@@ -85,7 +85,7 @@ class XFormPrim(BasePrim):
         self.original_scale = th.tensor(self.get_attribute("xformOp:scale"), device=og.sim.device)
 
         # Grab the attached material if it exists. Materials are a rendering-only concern (no physics
-        if self.has_material():
+        if og.sim.render_backend.supports_materials and self.has_material():
             material_prim_path = self._binding_api.GetDirectBinding().GetMaterialPath().pathString
             material_name = f"{self.name}:material"
             material = MaterialPrim.get_material(scene=self.scene, prim_path=material_prim_path, name=material_name)
