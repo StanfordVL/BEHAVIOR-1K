@@ -75,6 +75,45 @@ def _bind_variable(scope, param_label, obj_name):
     return new_scope
 
 
+#################### MATCHING HELPERS ####################
+
+
+def _maximum_matching_size(satisfaction_matrix):
+    """Size of a maximum bipartite matching in a boolean satisfaction matrix.
+
+    ``satisfaction_matrix[i][j]`` is truthy when row instance *i* may be
+    paired with column instance *j*.  Returns the largest number of true
+    entries that can be chosen such that no two share a row or a column,
+    via Kuhn's augmenting-path algorithm.
+
+    Counting rows and columns that hold at least one true entry is *not*
+    equivalent: several rows can share a single column and still keep both
+    counts high, which would accept a state that admits no such pairing.
+    """
+    matrix = np.asarray(satisfaction_matrix, dtype=bool)
+    if matrix.ndim != 2 or matrix.size == 0:
+        return 0
+    n_rows, n_cols = matrix.shape
+    # For each column, the row it is currently matched to (-1 if free).
+    match_for_col = [-1] * n_cols
+
+    def _try_augment(row, visited):
+        for col in range(n_cols):
+            if not matrix[row][col] or visited[col]:
+                continue
+            visited[col] = True
+            if match_for_col[col] == -1 or _try_augment(match_for_col[col], visited):
+                match_for_col[col] = row
+                return True
+        return False
+
+    matching_size = 0
+    for row in range(n_rows):
+        if _try_augment(row, [False] * n_cols):
+            matching_size += 1
+    return matching_size
+
+
 #################### RECURSIVE PREDICATES ####################
 
 # -JUNCTIONS
@@ -371,9 +410,7 @@ class ForPairs(Expression):
         )
 
         L = min(len(self.children), len(self.children[0]))
-        return (np.sum(np.any(self.child_values, axis=1), axis=0) >= L) and (
-            np.sum(np.any(self.child_values, axis=0), axis=0) >= L
-        )
+        return _maximum_matching_size(self.child_values) >= L
 
     def get_ground_options(self):
         self.flattened_condition_options = []
@@ -451,9 +488,7 @@ class ForNPairs(Expression):
                 for child in self.children
             ]
         )
-        return (np.sum(np.any(self.child_values, axis=1), axis=0) >= self.N) and (
-            np.sum(np.any(self.child_values, axis=0), axis=0) >= self.N
-        )
+        return _maximum_matching_size(self.child_values) >= self.N
 
     def get_ground_options(self):
         self.flattened_condition_options = []
