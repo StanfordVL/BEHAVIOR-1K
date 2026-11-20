@@ -1,20 +1,15 @@
 """
 Newton-viewer implementation of the RenderBackend interface: gives VisionSensor ``rgb`` capture through
-Newton's own standalone ``ViewerGL`` (no live Kit application at all, no Replicator) -- one headless GL
-window per active camera resource, its camera synced to that camera prim's own live world pose/FOV on
-every capture.
+Newton's own standalone ``ViewerGL`` or ``ViewerRTX`` -- headless viewers shared between camera resources,
+synced to a camera prim's world pose on capture.
 
-Only ``rgb`` is supported: ``ViewerGL`` has no equivalent to Replicator's
+Only ``rgb`` is supported: neither viewer has an equivalent to Replicator's
 depth/segmentation/bbox/optical-flow/pointcloud annotators, so ``create_annotator()`` raises for any
-other raw modality name -- ``VisionSensor`` never reaches this backend for those anyway once a caller
-adds unsupported-modality guards on top of ``supports_camera_capture`` (not yet done as of this writing;
-today, requesting e.g. ``depth`` under this backend surfaces this class's own ``NotImplementedError``
-instead of a cleaner up-front check).
+other raw modality name.
 
-Uses ``ViewerGL`` specifically, not ``ViewerRTX`` -- confirmed empirically (see
-``newton_viewer_recording.py``'s module history) that ``ViewerRTX`` renders this codebase's baked visual
-shapes as near-black regardless of lighting/sample-count settings, while ``ViewerGL`` renders them
-correctly.
+``ViewerRTX`` bakes its camera's FOV into the renderer when it initializes, so under RTX cameras only share a
+viewer when both their resolution and their FOV match. The scene's UsdLux lights are copied into the RTX stage
+once, when the viewer is built (see ``_build_viewer()``).
 """
 
 import math
@@ -25,6 +20,7 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
+from omnigibson.macros import gm
 from omnigibson.render_backends.base import RenderBackend
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import get_world_pose
@@ -34,22 +30,89 @@ log = create_module_logger(module_name=__name__)
 _SUPPORTED_RAW_MODALITIES = {"rgb"}
 # UsdGeom.Camera's universal convention: a camera looks down its own local -Z axis, +Y up.
 _LOCAL_FORWARD = th.tensor([0.0, 0.0, -1.0])
+# UsdLux light prim types copied into the RTX viewer's stage (see _copy_scene_lights_into_rtx_viewer)
+_USD_LIGHT_TYPES = ("SphereLight", "RectLight", "DiskLight", "DistantLight", "DomeLight", "CylinderLight")
+
+
+def _copy_scene_lights_into_rtx_viewer(viewer):
+    """
+    Copy every visible UsdLux light on the OmniGibson stage into ``viewer``'s own USD stage (under
+    ``/root/_OGSceneLights/``), baking each light's world transform onto the copy.
+
+    The Newton model carries only geometry, so without the scene's own lights an enclosed interior renders near-black
+    under RTX (its default dome + sun rig is blocked by walls and ceilings). Lights are copied once, before the first
+    frame: OVRTX serializes its stage at init and crashes on later light edits.
+
+    Args:
+        viewer (ViewerRTX): Viewer whose stage receives the lights
+
+    Returns:
+        int: Number of lights copied
+    """
+    from pxr import Gf, Usd, UsdGeom
+
+    copied = 0
+    for prim in og.sim.stage.Traverse():
+        if prim.GetTypeName() not in _USD_LIGHT_TYPES:
+            continue
+        if UsdGeom.Imageable(prim).ComputeVisibility() == UsdGeom.Tokens.invisible:
+            continue
+
+        dst = viewer.stage.DefinePrim(f"/root/_OGSceneLights/light_{copied}", prim.GetTypeName())
+        for attr in prim.GetAttributes():
+            name = attr.GetName()
+            if not name.startswith("inputs:"):
+                continue
+            value = attr.Get()
+            if value is None:
+                continue
+            dst.CreateAttribute(name, attr.GetTypeName()).Set(value)
+
+        world = UsdGeom.Xformable(prim).ComputeLocalToWorldTransform(Usd.TimeCode.Default())
+        dst_xf = UsdGeom.Xformable(dst)
+        dst_xf.ClearXformOpOrder()
+        dst_xf.AddTransformOp().Set(Gf.Matrix4d(world))
+        copied += 1
+
+    log.info(f"Copied {copied} scene light(s) into the RTX viewer stage")
+    return copied
+
+
+def _build_viewer(renderer, model, width, height):
+    """
+    Build a headless Newton viewer bound to ``model``. Its camera is posed by the caller before every capture.
+
+    Args:
+        renderer (str): "gl" or "rtx"
+        model (newton.Model): Finalized Newton model to render
+        width (int): Viewer width in pixels
+        height (int): Viewer height in pixels
+
+    Returns:
+        ViewerGL or ViewerRTX: The new viewer
+    """
+    import newton
+
+    if renderer == "gl":
+        viewer = newton.viewer.ViewerGL(width=width, height=height, headless=True)
+    elif renderer == "rtx":
+        # Default environment, not "studio": mutating the studio rig's light prims after construction crashed OVRTX
+        viewer = newton.viewer.ViewerRTX(width=width, height=height, headless=True)
+        _copy_scene_lights_into_rtx_viewer(viewer)
+    else:
+        raise ValueError(f"Unknown renderer {renderer!r}, expected 'rtx' or 'gl'.")
+
+    viewer.set_model(model)
+    # Collision shapes are non-visual; the model's baked-in visual shapes (physics_backends/newton_visuals.py) render
+    viewer.show_collision = False
+    viewer.show_visual = True
+    return viewer
 
 
 class _NewtonCameraResource:
-    """One USD camera prim's live world pose/FOV, rendered through a headless ``ViewerGL``.
+    """One USD camera prim's live world pose, rendered through a headless ``ViewerGL``.
 
-    The viewer is NOT private to this resource: every resource of the same resolution shares one (see
-    NewtonRenderBackend._acquire_viewer), because each ``ViewerGL`` owns its own GL context and
-    therefore uploads its own private copy of every visual mesh in the scene -- measured at ~5 GB per
-    viewer on a full household scene, so one viewer per camera exhausted a 32 GB card at the 4th
-    camera. Sharing is safe precisely because _sync_camera() re-points the shared viewer at this
-    resource's own prim immediately before every capture, and the frame is read back before control
-    returns, so no state carries between two resources' captures.
-
-    Acquired lazily on first capture (not at construction time) since it needs the physics backend's
-    finalized Newton model, which may not exist yet when ``create_camera_resource()`` is called (mirrors
-    ``newton_viewer_recording.build_viewer()``'s own callers, which all build the model first).
+    The viewer is NOT private to this resource: every resource of the same resolution shares a viewer.
     """
 
     def __init__(self, backend, prim_path, resolution):
@@ -60,37 +123,42 @@ class _NewtonCameraResource:
         self._viewer = None
 
     def _ensure_viewer(self):
-        # Re-fetched every capture rather than cached on the resource: the backend rebinds the shared
-        # viewer when the physics model is rebuilt, and a cached reference would keep rendering the
-        # old model's geometry.
-        self._viewer = self.backend._get_viewer(self.width, self.height)
+        # Re-fetched every capture since the backend rebinds the shared viewer when the physics model is rebuilt.
+        self._viewer = self.backend._get_viewer(self.width, self.height, self._vertical_fov())
+
+    def _vertical_fov(self):
+        """
+        Returns:
+            None or float: vertical FOV in degrees matching the prim's authored intrinsics, or None if unauthored
+        """
+        # Best-effort FOV match against the tracked prim's camera attributes. This is an
+        # approximation since Newton's Camera takes one scalar `fov`, not separate horizontal/vertical/
+        # aperture-based intrinsics like a real USD camera.
+        usd_camera = lazy.pxr.UsdGeom.Camera(og.sim.stage.GetPrimAtPath(self.prim_path))
+        focal_length = usd_camera.GetFocalLengthAttr().Get()
+        horizontal_aperture = usd_camera.GetHorizontalApertureAttr().Get()
+        if focal_length and horizontal_aperture:
+            # Newton's `fov` is the VERTICAL field of view , while the horizontal aperture is the
+            # authoritative one on the USD side -- OmniGibson only ever authors horizontalAperture and
+            # lets the vertical extent follow the output aspect ratio.
+            horizontal_fov = 2.0 * math.atan(horizontal_aperture / (2.0 * focal_length))
+            aspect = self.width / self.height
+            return math.degrees(2.0 * math.atan(math.tan(horizontal_fov / 2.0) / aspect))
+        return None
 
     def _sync_camera(self):
         from pyglet.math import Vec3 as PyVec3
 
         pos, quat = get_world_pose(self.prim_path)
         forward = T.quat_apply(quat, _LOCAL_FORWARD.to(quat.device))
-        pos_list = pos.tolist()
-        look_at = (pos + forward).tolist()
+        self._viewer.camera.pos = PyVec3(*pos.tolist())
+        self._viewer.camera.look_at((pos + forward).tolist())
+        # ViewerRTX only pushes the camera to the renderer when it is flagged dirty
+        self._viewer._camera_dirty = True
 
-        self._viewer.camera.pos = PyVec3(*pos_list)
-        self._viewer.camera.look_at(look_at)
-
-        # Best-effort FOV match against the tracked prim's own authored camera attributes -- an
-        # approximation (Newton's Camera takes one scalar `fov`, not separate horizontal/vertical/
-        # aperture-based intrinsics like a real USD camera), not exact intrinsics parity.
-        usd_camera = lazy.pxr.UsdGeom.Camera(og.sim.stage.GetPrimAtPath(self.prim_path))
-        focal_length = usd_camera.GetFocalLengthAttr().Get()
-        horizontal_aperture = usd_camera.GetHorizontalApertureAttr().Get()
-        if focal_length and horizontal_aperture:
-            # Newton's `fov` is the VERTICAL field of view (it feeds pyglet's perspective_projection,
-            # whose fov argument sets the vertical extent), while the horizontal aperture is the
-            # authoritative one on the USD side -- OmniGibson only ever authors horizontalAperture and
-            # lets the vertical extent follow the output aspect ratio. So convert through this
-            # camera's aspect; the two only coincide for a square capture resolution.
-            horizontal_fov = 2.0 * math.atan(horizontal_aperture / (2.0 * focal_length))
-            aspect = self.width / self.height
-            self._viewer.camera.fov = math.degrees(2.0 * math.atan(math.tan(horizontal_fov / 2.0) / aspect))
+        fov = self._vertical_fov()
+        if gm.NEWTON_RENDERER == "gl" and fov is not None:
+            self._viewer.camera.fov = fov
 
     def capture_rgb(self, device):
         self._ensure_viewer()
@@ -101,11 +169,9 @@ class _NewtonCameraResource:
         self._viewer.log_state(backend._state_0)
         self._viewer.end_frame()
 
-        # (H, W, 3) uint8, host copy regardless of the GL viewer's own rendering device.
+        # (H, W, 3) uint8, host copy regardless of the viewer's own rendering device.
         rgb = self._viewer.get_frame().numpy()
-        # Match Replicator's "rgb" annotator convention (RGBA, not RGB) -- VisionSensor's observation
-        # space is built assuming a 4th (alpha) channel exists. Newton's GL viewer has no transparency
-        # concept for the final composited frame, so this is always fully opaque (255).
+        # Match Replicator's "rgb" annotator convention (RGBA, not RGB). The end frame is always opaque in Newton.
         h, w, _ = rgb.shape
         rgba = np.empty((h, w, 4), dtype=np.uint8)
         rgba[..., :3] = rgb
@@ -116,14 +182,12 @@ class _NewtonCameraResource:
         return lazy.warp.array(rgba, dtype=lazy.warp.uint8, device=device)
 
     def destroy(self):
-        # The shared viewer stays open for the next resource of this size (see NewtonRenderBackend._get_viewer)
         self._viewer = None
 
 
 class _NewtonAnnotator:
     """Trivial stand-in for a Replicator annotator: just tracks which modality and which camera
-    resource it's attached to. NewtonRenderBackend has no separate annotator-graph concept of its own --
-    ``get_modality_data()`` captures on demand straight from ``camera_resource``."""
+    resource it's attached to."""
 
     def __init__(self, modality):
         self.modality = modality
@@ -132,60 +196,53 @@ class _NewtonAnnotator:
 
 class NewtonRenderBackend(RenderBackend):
     """
-    Renders through Newton's own standalone ``ViewerGL`` -- no Kit application, no Replicator. Only
-    supports the ``rgb`` modality (see module docstring).
+    Renders through Newton's own standalone ``ViewerGL`` or ``ViewerRTX``. Only supports ``rgb``.
     """
 
     supports_camera_capture = True
 
     def __init__(self, sim=None):
         super().__init__(sim=sim)
-        # Offscreen ViewerGLs shared by every camera resource of the same resolution: (width, height) -> viewer.
-        # See _get_viewer() for why they are shared rather than one per camera.
+        # Offscreen viewers shared between camera resources, keyed by _get_viewer()'s viewer key.
         self._shared_viewers = {}
 
-    def _get_viewer(self, width, height):
+    def _get_viewer(self, width, height, fov=None):
         """
-        The headless ViewerGL shared by every camera resource of this size, built on first use and
-        rebound when the physics model is rebuilt.
+        The headless viewer shared by every camera resource of this size (and, under RTX, this FOV), built on
+        first use and rebound when the physics model is rebuilt.
 
-        Shared rather than one-per-camera because a ViewerGL owns its own GL context and so uploads a
-        private copy of every visual mesh in the scene into it: measured at ~5 GB apiece on a full
-        household scene (house_double_floor_lower), so a main view plus 6 camera panels asked for
-        ~35 GB on a 32 GB card and died of GPU OOM partway through building the 4th viewer. Sharing is
-        safe because every caller re-points the camera at its own prim (_sync_camera) immediately
-        before rendering and reads the frame back before returning, so no state carries across two
-        resources' captures.
+        Shared rather than one-per-camera because a ViewerGL owns its own GL context and uploads a
+        private copy of every visual mesh in the scene into it: up to ~5 GB on house_double_floor_lower).
+        Every caller re-points the camera at its own prim (_sync_camera) immediately before rendering.
 
         Args:
             width (int): Viewer width in pixels
             height (int): Viewer height in pixels
+            fov (None or float): Vertical FOV in degrees. Fixed at build time under RTX, so part of the key there
 
         Returns:
-            ViewerGL: Shared viewer for this resolution, bound to the current Newton model
+            ViewerGL or ViewerRTX: Shared viewer for this key, bound to the current Newton model
         """
-        from omnigibson.utils.newton_viewer_recording import build_viewer
-
+        renderer = gm.NEWTON_RENDERER
+        assert renderer in ("gl", "rtx"), f"gm.NEWTON_RENDERER must be 'gl' or 'rtx', got {renderer!r}"
+        key = (width, height, None if fov is None else round(fov, 3)) if renderer == "rtx" else (width, height)
         model = self.sim.physics_backend._model
-        viewer = self._shared_viewers.get((width, height))
+        viewer = self._shared_viewers.get(key)
         if viewer is not None and viewer.model is not model:
             # Model was rebuilt (dynamic object add/remove): a viewer still bound to the
-            # old one renders stale geometry. Rebind rather than close and rebuild -- once a process's first ViewerGL
-            # is closed, every ViewerGL built after it renders all-black frames, with no error.
-            viewer.set_model(model)
+            # old one renders stale geometry.
+            if renderer == "rtx":
+                viewer.close()
+                viewer = None
+            else:
+                viewer.set_model(model)
         if viewer is None:
-            # cam_pos/look_at are throwaway placeholders -- _sync_camera() overwrites them from the
-            # tracked prim's own live pose before every capture.
-            viewer = build_viewer(
-                "gl",
-                model,
-                cam_pos=(1.0, 0.0, 0.0),
-                look_at=(0.0, 0.0, 0.0),
-                width=width,
-                height=height,
-                headless=True,
-            )
-            self._shared_viewers[(width, height)] = viewer
+            # _sync_camera() poses the camera from the tracked prim before every capture
+            viewer = _build_viewer(renderer, model, width=width, height=height)
+            if fov is not None:
+                # ViewerRTX reads this once, when it initializes on the first end_frame()
+                viewer.camera.fov = fov
+            self._shared_viewers[key] = viewer
         return viewer
 
     def render(self):

@@ -1391,6 +1391,10 @@ class NewtonBackend(PhysicsBackend):
         import newton
         import warp as wp
 
+        # Every joint target here is indexed by DOF (qd). newton>=1.7 defaults to coordinate-shaped targets, which shifts
+        # every target after a free joint (7 coords, 6 DOFs) by one slot.
+        newton.use_coord_layout_targets = False
+
         self._joints_dirty = False
         self._step_graphs = {}
         self._step_graph_substeps = 0

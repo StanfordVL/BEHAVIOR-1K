@@ -66,27 +66,23 @@ def main(
     short_exec=False,
     quickstart=False,
     renderer="kit",
-    output=None,
-    num_steps=100,
 ):
     """
     Robot control demo with selection
     Queries the user to select a robot, the controllers, a scene and a type of input (random actions or teleop)
 
-    :param renderer: "kit" for Omniverse or "rtx"/"gl" to run on Newton
-    :param output: for renderer "rtx"/"gl": if given, runs headless and writes a recorded video to
-        this path. If omitted, opens a live on-screen window instead.
-    :param num_steps: number of steps to run when renderer is "rtx" or "gl".
+    :param renderer: "kit" for Omniverse, or "rtx"/"gl" to run Newton physics and render the robot's cameras through
+        Newton's headless ray-traced/OpenGL viewer. Newton has no keyboard input, so it always uses random actions
     """
     og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
     if renderer != "kit":
-        if renderer == "gl" and output:
-            import pyglet
+        import pyglet
 
-            pyglet.options["headless"] = True
+        pyglet.options["headless"] = True
         gm.PHYSICS_BACKEND = "newton"
-        gm.RENDER_BACKEND = "none"
+        gm.RENDER_BACKEND = "newton"
+        gm.NEWTON_RENDERER = renderer
 
     # Choose scene to load
     scene_model = "Rs_int"
@@ -110,7 +106,7 @@ def main(
     # Add the robot we want to load
     robot0_cfg = dict()
     robot0_cfg["model"] = robot_name
-    robot0_cfg["obs_modalities"] = ["rgb"] if gm.RENDER_BACKEND != "none" else []
+    robot0_cfg["obs_modalities"] = ["rgb"]
     robot0_cfg["action_type"] = "continuous"
     robot0_cfg["action_normalize"] = True
 
@@ -134,7 +130,9 @@ def main(
         controller_choices = choose_controllers(robot=robot, random_selection=random_selection)
 
     # Choose control mode
-    if random_selection:
+    if renderer != "kit":
+        control_mode = "random"
+    elif random_selection:
         control_mode = "random"
     elif quickstart:
         control_mode = "teleop"
@@ -160,15 +158,17 @@ def main(
     env.reset()
     robot.reset()
 
-    # Create teleop controller
-    action_generator = KeyboardRobotController(robot=robot)
+    # Create teleop controller (keyboard input needs Kit)
+    action_generator = None
+    if renderer == "kit":
+        action_generator = KeyboardRobotController(robot=robot)
 
-    # Register custom binding to reset the environment
-    action_generator.register_custom_keymapping(
-        key=lazy.carb.input.KeyboardInput.R,
-        description="Reset the robot",
-        callback_fn=lambda: env.reset(),
-    )
+        # Register custom binding to reset the environment
+        action_generator.register_custom_keymapping(
+            key=lazy.carb.input.KeyboardInput.R,
+            description="Reset the robot",
+            callback_fn=lambda: env.reset(),
+        )
 
     # Print out relevant keyboard info if using keyboard teleop
     if control_mode == "teleop":
@@ -187,7 +187,7 @@ def main(
         if control_mode == "random":
             # Sample new random action every 30 steps
             if step % 30 == 0:
-                random_action = action_generator.get_random_action() * 0.05
+                random_action = (th.rand(robot.action_dim, device=og.sim.device) * 2 - 1) * 0.05
             action = random_action
         else:
             action = action_generator.get_teleop_action()
@@ -215,16 +215,9 @@ if __name__ == "__main__":
         default="kit",
         help=(
             "'kit' (default) is the interactive Omniverse Kit viewport. 'rtx' and 'gl' run physics "
-            "on Newton through Newton's own ray-traced or OpenGL viewer instead, using "
-            "random actions."
+            "on Newton and render the robot's cameras headlessly through Newton's ray-traced or OpenGL "
+            "viewer, using random actions."
         ),
     )
-    parser.add_argument(
-        "--output",
-        type=str,
-        default=None,
-        help="Video output path for --renderer rtx/gl (headless recording). Omit for a live window.",
-    )
-    parser.add_argument("--num-steps", type=int, default=100, help="Number of steps to run for --renderer rtx/gl.")
     args = parser.parse_args()
-    main(quickstart=args.quickstart, renderer=args.renderer, output=args.output, num_steps=args.num_steps)
+    main(quickstart=args.quickstart, renderer=args.renderer)

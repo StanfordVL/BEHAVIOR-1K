@@ -280,12 +280,9 @@ def _launch_simulator(*args, **kwargs):
             # Store stage ID
             self._stage_id = lazy.pxr.UsdUtils.StageCache.Get().GetId(self.stage).ToLongInt()
 
-            # Set the viewer camera
-            if gm.RENDER_VIEWER_CAMERA:
-                self._render_backend.setup_viewer_camera(
-                    viewer_width=viewer_width,
-                    viewer_height=viewer_height,
-                )
+            # Set the viewer camera, on any render backend that can render cameras
+            if gm.RENDER_VIEWER_CAMERA and self._render_backend.supports_camera_capture:
+                self._set_viewer_camera(viewer_width=viewer_width, viewer_height=viewer_height)
 
             # Enable the USD edit guard - from now on, any USD edits outside editing_usd() will crash
             self._enable_usd_guard()
@@ -447,7 +444,7 @@ def _launch_simulator(*args, **kwargs):
             Returns:
                 bool: Whether the viewer is visible or not
             """
-            return self._viewer_camera.viewer_visibility
+            return False if self._viewer_camera is None else self._viewer_camera.viewer_visibility
 
         @viewer_visibility.setter
         def viewer_visibility(self, visible):
@@ -457,7 +454,8 @@ def _launch_simulator(*args, **kwargs):
             Args:
                 visible (bool): Whether the viewer should be visible or not
             """
-            self._viewer_camera.viewer_visibility = visible
+            if self._viewer_camera is not None:
+                self._viewer_camera.viewer_visibility = visible
 
         @property
         def viewer_height(self):
@@ -583,6 +581,8 @@ def _launch_simulator(*args, **kwargs):
             Enables keyboard control of the active viewer camera for this simulation
             """
             assert gm.RENDER_VIEWER_CAMERA, "Viewer camera must be enabled to enable teleoperation!"
+            # CameraMover reads the keyboard through Kit's input system
+            assert self._render_backend.supports_viewport, "Viewer camera teleoperation requires a Kit viewport!"
             self._camera_mover = CameraMover(cam=self._viewer_camera)
             self._camera_mover.print_info()
             return self._camera_mover
@@ -1642,7 +1642,8 @@ def _launch_simulator(*args, **kwargs):
         def viewer_camera(self):
             """
             Returns:
-                VisionSensor: Active camera sensor corresponding to the active viewport window instance shown in the omni UI
+                None or VisionSensor: Free camera sensor, also shown in the omni UI's viewport window under Kit. None
+                    if gm.RENDER_VIEWER_CAMERA is False or the render backend cannot render cameras
             """
             return self._viewer_camera
 

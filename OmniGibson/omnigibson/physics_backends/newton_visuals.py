@@ -22,10 +22,7 @@ class VisualImportResult:
 
 
 def add_usd_visual_shapes(newton, builder, stage, root_path, path_body_map, *, label_prefix=None):
-    """Add visible-only USD meshes (under ``root_path`` on the already-open ``stage``) as render-only
-    shapes on the bodies already imported into ``builder`` for this same object (via ``add_usd()``,
-    whose returned ``path_body_map`` is passed in here).
-    """
+    """Add USD meshes (under ``root_path`` on the current stage) as render-only shapes."""
     visual_shape_indices = []
     visual_body_indices = []
     visual_mesh_sources = []
@@ -35,9 +32,6 @@ def add_usd_visual_shapes(newton, builder, stage, root_path, path_body_map, *, l
         has_particle_collision=False,
         is_visible=True,
         is_solid=True,
-        # Render-only shapes must not contribute mass: the ShapeConfig default density (1000) would
-        # silently add each visual mesh's volume in kilograms to its body, inflating every object and
-        # robot in the scene (feat/newton's docs/other/newton_migration.md workaround W13).
         density=0.0,
     )
 
@@ -54,14 +48,7 @@ def add_usd_visual_shapes(newton, builder, stage, root_path, path_body_map, *, l
 
         body_idx = path_body_map[body_path]
         xform, scale = _mesh_xform_relative_to_body(prim, body_idx, body_path)
-        # Bake scale into the mesh's own points rather than passing it to add_shape_mesh()'s
-        # separate `scale` argument -- confirmed empirically (a door rendering flat/horizontal
-        # instead of upright) that add_shape_mesh composes `xform` (rotation) and `scale` in a
-        # different order than expected for non-uniform scale + non-trivial rotation together (the
-        # near-identity-rotation cases -- walls, floors, windows -- looked fine regardless, since
-        # rotation order doesn't matter when the rotation is ~identity). Baking scale into the raw
-        # points removes the ambiguity entirely, matching this same codebase's prior workaround for
-        # anisotropic per-instance Cube scales corrupting unrelated meshes under ViewerRTX.
+        # Bake scale into the mesh points
         meshes = _load_render_meshes(newton, prim, scale)
         if not meshes:
             continue
@@ -158,9 +145,6 @@ def _make_render_mesh(newton, points, indices, faces, corner_indices, uvs, mater
     texture = material_props.get("texture") if uvs is not None else None
     color = None if texture is not None else material_props.get("color")
     extra = {}
-    # newton gained per-mesh opacity (and a transparent render pass) in 1.6.0; before that a glass
-    # link renders as an opaque solid -- e.g. the balustrade under a staircase shows up as a large
-    # white block. Forward it only where the installed newton accepts it.
     if _mesh_supports_opacity(newton):
         opacity = material_props.get("opacity")
         if opacity is not None:
@@ -216,9 +200,7 @@ def _material_subsets(usd_utils, prim, face_count):
 
 
 # OmniGibson's dataset assets express glass with Omniverse's MDL ``OmniGlass`` shader rather than a
-# USD Preview Surface ``opacity`` input, so neither newton's material resolver nor anything reading
-# UsdPreviewSurface ever sees a transparency value -- the mesh then renders as an opaque solid (the
-# balustrade under a staircase becomes a large white block). Map the shader itself to an opacity.
+# USD Preview Surface ``opacity`` input, so newton renders the objects as opaque. Map the shader itself to an opacity.
 _OMNI_GLASS_OPACITY = 0.25
 
 
@@ -251,9 +233,8 @@ def _with_glass_opacity(props, prim):
 
 
 # OmniGibson's dataset assets mostly bind the MDL ``OmniGibsonVRayMtl``, which keeps a material's specular look
-# in separate reflection / glossiness maps. newton's resolver reads only its ``diffuse_texture``, and steel is
-# authored as a near-black diffuse under a bright reflection layer, so shelves, steel tables and racks render
-# almost black. Bake the reflection layer into the albedo, and derive the scalar metallic/roughness from the maps.
+# in separate reflection / glossiness maps. newton's resolver reads only its ``diffuse_texture``.
+# Bake the reflection layer into the albedo, and derive the scalar metallic/roughness from the maps.
 _VRAY_MIN_REFLECTION = 0.05
 
 
@@ -431,28 +412,7 @@ def _nearest_imported_body_path(prim, body_path_map):
 def _mesh_xform_relative_to_body(prim, body_idx, body_path):
     """Mesh-to-body local transform.
 
-    Deliberately does NOT use ``builder.body_q[body_idx]`` (feat/newton's own approach) as the body's
-    world reference, unlike the rest of this port: ``add_usd()``'s up-axis handling applies a spurious
-    rotation to each floating-base object's synthetic free joint that only gets corrected, for the
-    ROOT joint specifically, by ``physics_backends/newton_backend.py`` AFTER ``builder.finalize()`` (by
-    overwriting ``model.joint_q``/``model.joint_X_p`` from raw USD ground truth) -- forward kinematics
-    then propagates that correction to every DOWNSTREAM child body once the model actually starts
-    simulating. At the point this function runs (mid-import, well before that finalize()+correction
-    step), ``builder.body_q`` for any body reached through the affected chain is still stale/wrong.
-
-    Also deliberately does the actual matrix algebra via ``pxr.Gf`` (``Gf.Matrix4d``/``Gf.Transform``),
-    not Warp's ``wp.transform_compose``/``wp.inverse``/``wp.transform_decompose`` -- confirmed
-    empirically, for a door object, that composing the SAME (position, quaternion) via
-    ``wp.transform_compose`` produced a DIFFERENT rotation matrix (rows 1 and 2 permuted) depending on
-    calling context, even with byte-for-byte identical inputs -- a genuine Warp-level
-    non-determinism/context-dependence this function has no way to work around directly.
-
-    Uses :func:`raw_world_transform` for BOTH the mesh and the body reference (not
-    ``get_world_pose()``): the two sides of this division must come from the SAME ground-truth source
-    for the result to be meaningful, and ``physics_backends/newton_backend.py``'s own joint-anchor
-    correction (which this pairs with) is written using that same raw source -- so once that correction
-    lands, the live simulated body pose used at render time matches this function's ``body_world``
-    exactly, and the render composes back out to the true mesh position.
+    Uses :func:`raw_world_transform` for BOTH the mesh and the body reference.
     """
     from pxr import Gf
 
@@ -466,16 +426,6 @@ def _mesh_xform_relative_to_body(prim, body_idx, body_path):
         body_prim = prim.GetStage().GetPrimAtPath(body_path)
         body_world = raw_world_transform(body_prim)
         rel_mat = mesh_world * body_world.GetInverse()
-        # Newton's body_q is a pure rigid transform (position + orientation) -- it has no scale slot
-        # at all, so any scale the body prim ITSELF carries (e.g. these dataset objects commonly
-        # author their bounding-box-fit object scale as an xformOp:scale directly on the body/link
-        # prim, not on the mesh) cancels out of `rel_mat` above (mesh_world and body_world both
-        # inherit it identically as a shared ancestor) and would otherwise be silently dropped at
-        # render time -- confirmed empirically: a straight_chair with base_link xformOp:scale
-        # (1.32, 1.32, 1.27) rendered at its native unscaled mesh size, correctly centered on its
-        # true position but ~25% short, leaving its legs visibly floating above the true floor
-        # contact point. Reintroduce it here since this is the only place that scale can still be
-        # captured and baked into the mesh's own points (see _load_render_meshes).
         body_world_scale = Gf.Transform(body_world).GetScale()
 
     gf_xf = Gf.Transform(rel_mat)
@@ -485,7 +435,7 @@ def _mesh_xform_relative_to_body(prim, body_idx, body_path):
     if body_world_scale is not None:
         s = (s[0] * body_world_scale[0], s[1] * body_world_scale[1], s[2] * body_world_scale[2])
         # rel_mat's translation is in the body's unscaled frame too, so the mesh's offset from its
-        # body needs the same scale (else e.g. a scaled fridge door's frame renders off its hinge)
+        # body needs the same scale
         t = (t[0] * body_world_scale[0], t[1] * body_world_scale[1], t[2] * body_world_scale[2])
     pos = wp.vec3(t[0], t[1], t[2])
     rot = wp.quat(*q.GetImaginary(), q.GetReal())
@@ -508,11 +458,6 @@ def _is_effectively_visible(prim):
 
 def _has_render_purpose(prim):
     # Some BEHAVIOR-1K assets carry a normally-hidden duplicate/proxy mesh with a huge world-space
-    # extent, authored with purpose="proxy" rather than being marked invisible -- confirmed
-    # empirically (via omnigibson/utils/newton_viewer_recording.py's earlier, now-removed manual
-    # registration path) that including one of these produced a giant dark artifact dominating every
-    # camera angle, and that it's excluded from Kit's own "render" traversal purely by purpose, not
-    # visibility. ``_is_effectively_visible`` alone does not catch this (a proxy-purposed mesh is not
-    # necessarily "invisible" per USD's Imageable visibility opinion).
+    # extent, authored with purpose="proxy".
     purpose = UsdGeom.Imageable(prim).GetPurposeAttr().Get()
     return purpose in ("default", "render", "", None)

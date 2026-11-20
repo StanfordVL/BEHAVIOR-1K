@@ -184,8 +184,11 @@ gm.PHYSICS_BACKEND = "physx"
 
 # Which render backend to use. Must be a key in omnigibson.render_backends.RENDER_BACKENDS. An
 # independent axis from PHYSICS_BACKEND: which engine simulates and what turns that into pixels are
-# separate choices. "newton" renders rgb through Newton's ViewerGL and requires Newton physics.
+# separate choices. "newton" renders rgb through Newton's own viewer and requires Newton physics.
 gm.RENDER_BACKEND = "kit"
+
+# Which Newton viewer gm.RENDER_BACKEND = "newton" renders with: "gl" (rasterized) or "rtx" (ray-traced)
+gm.NEWTON_RENDERER = os.getenv("OMNIGIBSON_NEWTON_RENDERER", "gl")
 
 # Whether the Newton backend replays its physics substep from a captured CUDA graph (GPU only)
 gm.USE_NEWTON_STEP_GRAPH = os.getenv("OMNIGIBSON_NEWTON_STEP_GRAPH", "True").lower() in ("true", "1", "t")
