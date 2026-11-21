@@ -19,7 +19,7 @@ from omnigibson.object_states.tensorized_state import TensorizedState
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.objects.light_object import LightObject
 from omnigibson.physics_backends import PHYSICS_BACKENDS
-from omnigibson.render_backends import RENDER_BACKENDS
+from omnigibson.render_backends import RENDER_BACKENDS, SUPPORTED_BACKEND_COMBINATIONS
 from omnigibson.objects.usd_object import USDObject
 from omnigibson.prims import XFormPrim
 from omnigibson.prims.material_prim import MaterialPrim
@@ -97,6 +97,12 @@ def _launch_app():
     # ensure that the omnigibson robot assets are up to date
     ensure_omnigibson_robot_assets_version()
 
+    if (gm.PHYSICS_BACKEND, gm.RENDER_BACKEND) not in SUPPORTED_BACKEND_COMBINATIONS:
+        supported = ", ".join(f"{physics} + {render}" for physics, render in SUPPORTED_BACKEND_COMBINATIONS)
+        raise ValueError(
+            f"Unsupported backend combination: gm.PHYSICS_BACKEND = {gm.PHYSICS_BACKEND!r} with "
+            f"gm.RENDER_BACKEND = {gm.RENDER_BACKEND!r}. Supported (physics + render): {supported}."
+        )
     physics_backend_cls = PHYSICS_BACKENDS[gm.PHYSICS_BACKEND]
     render_backend_cls = RENDER_BACKENDS[gm.RENDER_BACKEND]
 

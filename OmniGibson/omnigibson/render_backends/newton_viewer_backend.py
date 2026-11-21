@@ -1,15 +1,19 @@
 """
-Newton-viewer implementation of the RenderBackend interface: gives VisionSensor ``rgb`` capture through
-Newton's own standalone ``ViewerGL`` or ``ViewerRTX`` -- headless viewers shared between camera resources,
-synced to a camera prim's world pose on capture.
+Render backends built on Newton's standalone viewers, for Newton physics without Kit:
+
+- ``GLRenderBackend`` (``gm.RENDER_BACKEND = "gl"``): rasterized, through ``newton.viewer.ViewerGL``
+- ``OVRTXRenderBackend`` (``gm.RENDER_BACKEND = "ovrtx"``): ray-traced, through ``newton.viewer.ViewerRTX`` (ovrtx)
+
+Both give VisionSensor ``rgb`` capture through headless viewers shared between camera resources, synced to a camera
+prim's world pose on capture.
 
 Only ``rgb`` is supported: neither viewer has an equivalent to Replicator's
 depth/segmentation/bbox/optical-flow/pointcloud annotators, so ``create_annotator()`` raises for any
 other raw modality name.
 
-``ViewerRTX`` bakes its camera's FOV into the renderer when it initializes, so under RTX cameras only share a
+``ViewerRTX`` bakes its camera's FOV into the renderer when it initializes, so under OVRTX cameras only share a
 viewer when both their resolution and their FOV match. The scene's UsdLux lights are copied into the RTX stage
-once, when the viewer is built (see ``_build_viewer()``).
+once, when the viewer is built (see ``OVRTXRenderBackend._create_viewer()``).
 """
 
 import math
@@ -20,7 +24,6 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import gm
 from omnigibson.render_backends.base import RenderBackend
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import get_world_pose
@@ -78,39 +81,8 @@ def _copy_scene_lights_into_rtx_viewer(viewer):
     return copied
 
 
-def _build_viewer(renderer, model, width, height):
-    """
-    Build a headless Newton viewer bound to ``model``. Its camera is posed by the caller before every capture.
-
-    Args:
-        renderer (str): "gl" or "rtx"
-        model (newton.Model): Finalized Newton model to render
-        width (int): Viewer width in pixels
-        height (int): Viewer height in pixels
-
-    Returns:
-        ViewerGL or ViewerRTX: The new viewer
-    """
-    import newton
-
-    if renderer == "gl":
-        viewer = newton.viewer.ViewerGL(width=width, height=height, headless=True)
-    elif renderer == "rtx":
-        # Default environment, not "studio": mutating the studio rig's light prims after construction crashed OVRTX
-        viewer = newton.viewer.ViewerRTX(width=width, height=height, headless=True)
-        _copy_scene_lights_into_rtx_viewer(viewer)
-    else:
-        raise ValueError(f"Unknown renderer {renderer!r}, expected 'rtx' or 'gl'.")
-
-    viewer.set_model(model)
-    # Collision shapes are non-visual; the model's baked-in visual shapes (physics_backends/newton_visuals.py) render
-    viewer.show_collision = False
-    viewer.show_visual = True
-    return viewer
-
-
 class _NewtonCameraResource:
-    """One USD camera prim's live world pose, rendered through a headless ``ViewerGL``.
+    """One USD camera prim's live world pose, rendered through its backend's headless viewer.
 
     The viewer is NOT private to this resource: every resource of the same resolution shares a viewer.
     """
@@ -157,7 +129,7 @@ class _NewtonCameraResource:
         self._viewer._camera_dirty = True
 
         fov = self._vertical_fov()
-        if gm.NEWTON_RENDERER == "gl" and fov is not None:
+        if not self.backend.fov_fixed_at_build and fov is not None:
             self._viewer.camera.fov = fov
 
     def capture_rgb(self, device):
@@ -194,12 +166,14 @@ class _NewtonAnnotator:
         self.camera_resource = None
 
 
-class NewtonRenderBackend(RenderBackend):
+class NewtonViewerRenderBackend(RenderBackend):
     """
-    Renders through Newton's own standalone ``ViewerGL`` or ``ViewerRTX``. Only supports ``rgb``.
+    Shared base for render backends built on a Newton viewer. Only supports ``rgb``, and requires Newton physics.
     """
 
     supports_camera_capture = True
+    # Whether the viewer's FOV is fixed when it is built, so viewers can only be shared between cameras with one FOV
+    fov_fixed_at_build = False
 
     def __init__(self, sim=None):
         super().__init__(sim=sim)
@@ -223,27 +197,47 @@ class NewtonRenderBackend(RenderBackend):
         Returns:
             ViewerGL or ViewerRTX: Shared viewer for this key, bound to the current Newton model
         """
-        renderer = gm.NEWTON_RENDERER
-        assert renderer in ("gl", "rtx"), f"gm.NEWTON_RENDERER must be 'gl' or 'rtx', got {renderer!r}"
-        key = (width, height, None if fov is None else round(fov, 3)) if renderer == "rtx" else (width, height)
+        key = (width, height, None if fov is None else round(fov, 3)) if self.fov_fixed_at_build else (width, height)
         model = self.sim.physics_backend._model
         viewer = self._shared_viewers.get(key)
         if viewer is not None and viewer.model is not model:
             # Model was rebuilt (dynamic object add/remove): a viewer still bound to the
             # old one renders stale geometry.
-            if renderer == "rtx":
-                viewer.close()
-                viewer = None
-            else:
-                viewer.set_model(model)
+            viewer = self._rebind_viewer(viewer, model)
         if viewer is None:
             # _sync_camera() poses the camera from the tracked prim before every capture
-            viewer = _build_viewer(renderer, model, width=width, height=height)
+            viewer = self._create_viewer(width=width, height=height)
+            viewer.set_model(model)
+            # Render the model's baked-in visual shapes (physics_backends/newton_visuals.py), not its collision shapes
+            viewer.show_collision = False
+            viewer.show_visual = True
             if fov is not None:
                 # ViewerRTX reads this once, when it initializes on the first end_frame()
                 viewer.camera.fov = fov
             self._shared_viewers[key] = viewer
         return viewer
+
+    def _create_viewer(self, width, height):
+        """
+        Args:
+            width (int): Viewer width in pixels
+            height (int): Viewer height in pixels
+
+        Returns:
+            ViewerGL or ViewerRTX: New headless viewer, not yet bound to a model
+        """
+        raise NotImplementedError()
+
+    def _rebind_viewer(self, viewer, model):
+        """
+        Args:
+            viewer (ViewerGL or ViewerRTX): Shared viewer still bound to an old Newton model
+            model (newton.Model): The rebuilt model
+
+        Returns:
+            None or ViewerGL or ViewerRTX: @viewer bound to @model, or None if it was closed and must be rebuilt
+        """
+        raise NotImplementedError()
 
     def render(self):
         # Nothing to tick globally: each camera resource renders on-demand in get_modality_data().
@@ -258,7 +252,7 @@ class NewtonRenderBackend(RenderBackend):
     def create_annotator(self, raw_modality_name):
         if raw_modality_name not in _SUPPORTED_RAW_MODALITIES:
             raise NotImplementedError(
-                f"NewtonRenderBackend only supports {sorted(_SUPPORTED_RAW_MODALITIES)} modalities, got "
+                f"{type(self).__name__} only supports {sorted(_SUPPORTED_RAW_MODALITIES)} modalities, got "
                 f"{raw_modality_name!r}."
             )
         return _NewtonAnnotator(raw_modality_name)
@@ -273,3 +267,41 @@ class NewtonRenderBackend(RenderBackend):
         if annotator.camera_resource is None:
             raise RuntimeError("Annotator is not attached to a camera resource.")
         return annotator.camera_resource.capture_rgb(device)
+
+
+class GLRenderBackend(NewtonViewerRenderBackend):
+    """
+    Rasterized rendering through Newton's headless ``ViewerGL``.
+    """
+
+    def _create_viewer(self, width, height):
+        import newton
+
+        return newton.viewer.ViewerGL(width=width, height=height, headless=True)
+
+    def _rebind_viewer(self, viewer, model):
+        # Rebind rather than close and rebuild: once a process's first ViewerGL is closed, every ViewerGL built after
+        # it renders all-black frames, with no error.
+        viewer.set_model(model)
+        return viewer
+
+
+class OVRTXRenderBackend(NewtonViewerRenderBackend):
+    """
+    Ray-traced rendering through Newton's headless ``ViewerRTX`` (ovrtx), lit by the scene's own UsdLux lights.
+    """
+
+    fov_fixed_at_build = True
+
+    def _create_viewer(self, width, height):
+        import newton
+
+        # Default environment, not "studio": mutating the studio rig's light prims after construction crashed OVRTX
+        viewer = newton.viewer.ViewerRTX(width=width, height=height, headless=True)
+        _copy_scene_lights_into_rtx_viewer(viewer)
+        return viewer
+
+    def _rebind_viewer(self, viewer, model):
+        # ViewerRTX serializes its stage once at init, so set_model() on a live one renders black
+        viewer.close()
+        return None

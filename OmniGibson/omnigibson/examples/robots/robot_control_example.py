@@ -71,8 +71,8 @@ def main(
     Robot control demo with selection
     Queries the user to select a robot, the controllers, a scene and a type of input (random actions or teleop)
 
-    :param renderer: "kit" for Omniverse, or "rtx"/"gl" to run Newton physics and render the robot's cameras through
-        Newton's headless ray-traced/OpenGL viewer. Newton has no keyboard input, so it always uses random actions
+    :param renderer: "kit" for Omniverse, or "gl"/"ovrtx" to run Newton physics and render the robot's cameras through
+        Newton's headless OpenGL/ray-traced viewer. Newton has no keyboard input, so it always uses random actions
     """
     og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
@@ -81,8 +81,7 @@ def main(
 
         pyglet.options["headless"] = True
         gm.PHYSICS_BACKEND = "newton"
-        gm.RENDER_BACKEND = "newton"
-        gm.NEWTON_RENDERER = renderer
+        gm.RENDER_BACKEND = renderer
 
     # Choose scene to load
     scene_model = "Rs_int"
@@ -211,11 +210,11 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--renderer",
-        choices=["kit", "rtx", "gl"],
+        choices=["kit", "gl", "ovrtx"],
         default="kit",
         help=(
-            "'kit' (default) is the interactive Omniverse Kit viewport. 'rtx' and 'gl' run physics "
-            "on Newton and render the robot's cameras headlessly through Newton's ray-traced or OpenGL "
+            "'kit' (default) is the interactive Omniverse Kit viewport. 'gl' and 'ovrtx' run physics "
+            "on Newton and render the robot's cameras headlessly through Newton's OpenGL or ray-traced "
             "viewer, using random actions."
         ),
     )

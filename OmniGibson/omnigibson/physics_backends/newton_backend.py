@@ -1068,8 +1068,6 @@ class NewtonBackend(PhysicsBackend):
 
     @classmethod
     def create_app(cls):
-        if gm.RENDER_BACKEND == "kit":
-            raise ValueError("Newton physics does not support gm.RENDER_BACKEND = 'kit'; use 'newton' or 'none'.")
         from omnigibson.simulator import _StandaloneApp
 
         return _StandaloneApp()
