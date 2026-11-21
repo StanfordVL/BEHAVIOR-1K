@@ -1,6 +1,7 @@
 from omnigibson.render_backends.kit_backend import KitRenderBackend
-from omnigibson.render_backends.newton_viewer_backend import GLRenderBackend, OVRTXRenderBackend
+from omnigibson.render_backends.gl_backend import GLRenderBackend
 from omnigibson.render_backends.null_backend import NullRenderBackend
+from omnigibson.render_backends.ovrtx_backend import OVRTXRenderBackend
 
 RENDER_BACKENDS = {
     "none": NullRenderBackend,

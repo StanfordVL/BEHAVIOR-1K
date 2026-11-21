@@ -1,8 +1,9 @@
 """
-Render backends built on Newton's standalone viewers, for Newton physics without Kit:
+Shared base for render backends built on Newton's standalone viewers, for Newton physics without Kit:
 
-- ``GLRenderBackend`` (``gm.RENDER_BACKEND = "gl"``): rasterized, through ``newton.viewer.ViewerGL``
-- ``OVRTXRenderBackend`` (``gm.RENDER_BACKEND = "ovrtx"``): ray-traced, through ``newton.viewer.ViewerRTX`` (ovrtx)
+- ``GLRenderBackend`` (``gm.RENDER_BACKEND = "gl"``, gl_backend.py): rasterized, through ``newton.viewer.ViewerGL``
+- ``OVRTXRenderBackend`` (``gm.RENDER_BACKEND = "ovrtx"``, ovrtx_backend.py): ray-traced, through
+  ``newton.viewer.ViewerRTX`` (ovrtx)
 
 Both give VisionSensor ``rgb`` capture through headless viewers shared between camera resources, synced to a camera
 prim's world pose on capture.
@@ -10,10 +11,6 @@ prim's world pose on capture.
 Only ``rgb`` is supported: neither viewer has an equivalent to Replicator's
 depth/segmentation/bbox/optical-flow/pointcloud annotators, so ``create_annotator()`` raises for any
 other raw modality name.
-
-``ViewerRTX`` bakes its camera's FOV into the renderer when it initializes, so under OVRTX cameras only share a
-viewer when both their resolution and their FOV match. The scene's UsdLux lights are copied into the RTX stage
-once, when the viewer is built (see ``OVRTXRenderBackend._create_viewer()``).
 """
 
 import math
@@ -33,52 +30,6 @@ log = create_module_logger(module_name=__name__)
 _SUPPORTED_RAW_MODALITIES = {"rgb"}
 # UsdGeom.Camera's universal convention: a camera looks down its own local -Z axis, +Y up.
 _LOCAL_FORWARD = th.tensor([0.0, 0.0, -1.0])
-# UsdLux light prim types copied into the RTX viewer's stage (see _copy_scene_lights_into_rtx_viewer)
-_USD_LIGHT_TYPES = ("SphereLight", "RectLight", "DiskLight", "DistantLight", "DomeLight", "CylinderLight")
-
-
-def _copy_scene_lights_into_rtx_viewer(viewer):
-    """
-    Copy every visible UsdLux light on the OmniGibson stage into ``viewer``'s own USD stage (under
-    ``/root/_OGSceneLights/``), baking each light's world transform onto the copy.
-
-    The Newton model carries only geometry, so without the scene's own lights an enclosed interior renders near-black
-    under RTX (its default dome + sun rig is blocked by walls and ceilings). Lights are copied once, before the first
-    frame: OVRTX serializes its stage at init and crashes on later light edits.
-
-    Args:
-        viewer (ViewerRTX): Viewer whose stage receives the lights
-
-    Returns:
-        int: Number of lights copied
-    """
-    from pxr import Gf, Usd, UsdGeom
-
-    copied = 0
-    for prim in og.sim.stage.Traverse():
-        if prim.GetTypeName() not in _USD_LIGHT_TYPES:
-            continue
-        if UsdGeom.Imageable(prim).ComputeVisibility() == UsdGeom.Tokens.invisible:
-            continue
-
-        dst = viewer.stage.DefinePrim(f"/root/_OGSceneLights/light_{copied}", prim.GetTypeName())
-        for attr in prim.GetAttributes():
-            name = attr.GetName()
-            if not name.startswith("inputs:"):
-                continue
-            value = attr.Get()
-            if value is None:
-                continue
-            dst.CreateAttribute(name, attr.GetTypeName()).Set(value)
-
-        world = UsdGeom.Xformable(prim).ComputeLocalToWorldTransform(Usd.TimeCode.Default())
-        dst_xf = UsdGeom.Xformable(dst)
-        dst_xf.ClearXformOpOrder()
-        dst_xf.AddTransformOp().Set(Gf.Matrix4d(world))
-        copied += 1
-
-    log.info(f"Copied {copied} scene light(s) into the RTX viewer stage")
-    return copied
 
 
 class _NewtonCameraResource:
@@ -267,41 +218,3 @@ class NewtonViewerRenderBackend(RenderBackend):
         if annotator.camera_resource is None:
             raise RuntimeError("Annotator is not attached to a camera resource.")
         return annotator.camera_resource.capture_rgb(device)
-
-
-class GLRenderBackend(NewtonViewerRenderBackend):
-    """
-    Rasterized rendering through Newton's headless ``ViewerGL``.
-    """
-
-    def _create_viewer(self, width, height):
-        import newton
-
-        return newton.viewer.ViewerGL(width=width, height=height, headless=True)
-
-    def _rebind_viewer(self, viewer, model):
-        # Rebind rather than close and rebuild: once a process's first ViewerGL is closed, every ViewerGL built after
-        # it renders all-black frames, with no error.
-        viewer.set_model(model)
-        return viewer
-
-
-class OVRTXRenderBackend(NewtonViewerRenderBackend):
-    """
-    Ray-traced rendering through Newton's headless ``ViewerRTX`` (ovrtx), lit by the scene's own UsdLux lights.
-    """
-
-    fov_fixed_at_build = True
-
-    def _create_viewer(self, width, height):
-        import newton
-
-        # Default environment, not "studio": mutating the studio rig's light prims after construction crashed OVRTX
-        viewer = newton.viewer.ViewerRTX(width=width, height=height, headless=True)
-        _copy_scene_lights_into_rtx_viewer(viewer)
-        return viewer
-
-    def _rebind_viewer(self, viewer, model):
-        # ViewerRTX serializes its stage once at init, so set_model() on a live one renders black
-        viewer.close()
-        return None
