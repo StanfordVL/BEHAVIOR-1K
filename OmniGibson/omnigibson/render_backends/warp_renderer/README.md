@@ -42,6 +42,14 @@ Robot keyboard control still needs an example's controller; choosing a renderer 
   `OIDN_LIBRARY` to `libOpenImageDenoise.so.2`. No Kit application or RT cores are needed.
 - Default rendering is `pt1_oidn`: one sample per pixel, eight bounces, high-quality OIDN, fixed
   seed, ambient 160, exposure 0.0007717915155850135.
+- Lights are sampled, not all evaluated: 4 power-weighted picks at the first diffuse/glossy vertex and
+  1 at later bounces (`light_samples`, `light_samples_bounce`; 0 = every light). Shadow rays use
+  any-hit queries on an opaque/transmissive grouped BVH. The render kernel is capped at 80 registers
+  (otherwise it takes all 255 and runs at ~16% occupancy) and built with `fast_math`. On an RTX 5090
+  at 1080p, Rs_int renders in ~25 ms (was 129 ms), with SSIM against a 1024-spp reference within
+  0.002 of evaluating every light; the full robot_control_example loop (physics + render) runs at
+  ~22 fps, on par with `--renderer rtx` (~21 fps). Two samples per pixel (`spp=2`, ~46 ms) is higher
+  quality than the old default.
 - Currently supports Newton rigid geometry and RGB cameras (opaque RGBA observations). Other
   sensor modalities raise `NotImplementedError`; tiled rendering is not supported.
 - Geometry is re-extracted when the physics model changes, including object additions/removals.

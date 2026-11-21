@@ -25,6 +25,9 @@ import time
 import numpy as np
 import warp as wp
 
+# Fast (approximate) division/sqrt/transcendentals: ~8% faster, no measurable image change (SSIM/PSNR identical).
+wp.set_module_options({"fast_math": True})
+
 PI = wp.constant(math.pi)
 GEOM_STATIC = wp.constant(0)
 GEOM_DYNAMIC = wp.constant(1)
@@ -33,6 +36,11 @@ MAX_LIGHTS = 64
 LIGHT_RECT = wp.constant(0)
 LIGHT_DISK = wp.constant(1)
 LIGHT_SPHERE = wp.constant(2)
+# Measured on Rs_int (RTX 5090): the megakernel is register-bound, so small blocks keep more SMs busy (-11% vs
+# 256), and 2-triangle BVH leaves trace ~7% faster than the default 4.
+RENDER_BLOCK_DIM = 64
+RENDER_MAX_REGISTERS = 80
+BVH_LEAF_SIZE = 2
 
 
 # ----------------------------------------------------------------------------------------------------------
@@ -93,6 +101,7 @@ class LightSet:
     radius: wp.array(dtype=wp.float32)  # disk, sphere
     radiance: wp.array(dtype=wp.vec3)
     area: wp.array(dtype=wp.float32)  # sampled area: rect, disk, and a sphere's facing disk (pi r^2)
+    power: wp.array(dtype=wp.float32)  # luminance x area, for light selection
     dome: wp.vec3
     ambient: wp.vec3  # constant ambient radiance for the 'direct' preset
 
@@ -120,6 +129,8 @@ class Settings:
     exposure: wp.float32
     lights_visible: wp.int32
     clamp: wp.float32  # per-sample luminance clamp (fireflies)
+    light_samples: wp.int32  # 0: every light at every vertex; k >= 1: k power-weighted light picks
+    light_samples_bounce: wp.int32  # the same after the first diffuse/glossy vertex (indirect light)
 
 
 @wp.struct
@@ -469,23 +480,127 @@ def shade_surface(geo: Geometry, mats: Materials, hit: Hit, o: wp.vec3, d: wp.ve
 
 @wp.func
 def shadow_transmittance(geo: Geometry, mats: Materials, o: wp.vec3, d: wp.vec3, dist: wp.float32) -> wp.vec3:
-    """Visibility along a shadow ray; clear dielectrics attenuate (tinted) instead of blocking."""
+    """Visibility along a shadow ray; clear dielectrics attenuate (tinted) instead of blocking.
+
+    The static and dynamic BVHs are grouped (0: opaque, 1: transmissive triangles), so opacity is one any-hit
+    query that stops at the first blocker; only transmissive triangles (and water) need closest-hit stepping."""
+    for g in range(2):
+        mid = geo.mesh[g]
+        if mid != wp.uint64(0):
+            root = wp.mesh_get_group_root(mid, 0)
+            if root >= 0:
+                if wp.mesh_query_ray_anyhit(mid, o, d, dist, root):
+                    return wp.vec3(0.0)
     tr = wp.vec3(1.0)
-    start = o
-    remaining = dist
-    for _ in range(6):
-        hit = trace(geo, start, d, remaining)
-        if hit.geom < 0:
-            return tr
-        m = material_of(geo, hit)
-        if mats.trans[m] <= 0.0:
-            return wp.vec3(0.0)
-        tr = wp.cw_mul(tr, mats.base[m]) * 0.92
-        start = start + d * (hit.t + 1.0e-3)
-        remaining = remaining - hit.t - 1.0e-3
-        if remaining <= 0.0:
-            return tr
+    for g in range(3):
+        mid = geo.mesh[g]
+        if mid == wp.uint64(0):
+            continue
+        root = int(-1)  # water: its own mesh, all transmissive
+        if g < 2:
+            root = wp.mesh_get_group_root(mid, 1)
+            if root < 0:
+                continue
+        start = o
+        remaining = dist
+        for _ in range(6):
+            q = wp.mesh_query_ray(mid, start, d, remaining, root)
+            if not q.result:
+                break
+            m = geo.water_mat
+            if g == GEOM_STATIC:
+                m = geo.s_mat[q.face]
+            elif g == GEOM_DYNAMIC:
+                m = geo.d_mat[q.face]
+            tr = wp.cw_mul(tr, mats.base[m]) * 0.92
+            start = start + d * (q.t + 1.0e-3)
+            remaining = remaining - q.t - 1.0e-3
+            if remaining <= 0.0:
+                break
     return tr
+
+
+@wp.func
+def light_contrib(
+    geo: Geometry,
+    mats: Materials,
+    lights: LightSet,
+    li: wp.int32,
+    s: Surface,
+    wo: wp.vec3,
+    o: wp.vec3,
+    soft: wp.int32,
+    r1: wp.float32,
+    r2: wp.float32,
+) -> wp.vec3:
+    """Shadowed direct light from light ``li``. soft: 0 = light centre (hard shadow), 1 = one random point
+    (noisy, unbiased), n >= 2 = fixed n x n stratified grid of points (n*n shadow rays), each point at offset
+    (r1, r2) inside its cell (0.5 = cell centre; shifted per AA sample)."""
+    out = wp.vec3(0.0)
+    grid_n = wp.max(soft, 1)
+    inv_n = 1.0 / wp.float32(grid_n)
+    kind = lights.kind[li]
+    c = lights.center[li]
+    nrm = lights.normal[li]
+    uu = lights.u[li]
+    vv = lights.v[li]
+    if kind == LIGHT_SPHERE:
+        # a small sphere seen from o: sample the disk of the same radius facing o (same solid angle)
+        nrm = wp.normalize(o - c)
+        uu = onb_u(nrm) * lights.radius[li]
+        vv = onb_v(nrm) * lights.radius[li]
+    for k in range(grid_n * grid_n):
+        # sample offset in [-1, 1]^2: light centre, one random point, or a stratified grid cell
+        sa = float(0.0)
+        sb = float(0.0)
+        if soft == 1:
+            sa = 2.0 * r1 - 1.0
+            sb = 2.0 * r2 - 1.0
+        elif soft >= 2:
+            sa = 2.0 * (wp.float32(k % grid_n) + r1) * inv_n - 1.0
+            sb = 2.0 * (wp.float32(k // grid_n) + r2) * inv_n - 1.0
+        if kind != LIGHT_RECT:
+            # Shirley-Chiu concentric square -> disk mapping (keeps the strata)
+            rr = float(0.0)
+            phi = float(0.0)
+            if sa * sa > sb * sb:
+                rr = sa
+                phi = (PI / 4.0) * (sb / sa)
+            elif sb != 0.0:
+                rr = sb
+                phi = (PI / 2.0) - (PI / 4.0) * (sa / sb)
+            sa = rr * wp.cos(phi)
+            sb = rr * wp.sin(phi)
+        lp = c + uu * sa + vv * sb
+        to_l = lp - o
+        dist2 = wp.dot(to_l, to_l)
+        dist = wp.sqrt(dist2)
+        wi = to_l / dist
+        cos_l = wp.dot(nrm, -wi)
+        if cos_l <= 0.0:
+            continue
+        f = eval_brdf_cos(s, wo, wi)
+        if f[0] + f[1] + f[2] <= 0.0:
+            continue
+        vis = shadow_transmittance(geo, mats, o, wi, dist - 1.0e-3)
+        g = cos_l * lights.area[li] / dist2 * inv_n * inv_n
+        out = out + wp.cw_mul(wp.cw_mul(f, lights.radiance[li]), vis) * g
+    return out
+
+
+@wp.func
+def light_weight(lights: LightSet, li: wp.int32, s: Surface, o: wp.vec3) -> wp.float32:
+    """Unshadowed contribution estimate of light ``li`` at ``o`` (power / distance^2 x both cosines at the light
+    centre), the light-selection pdf. The cosine floors keep every light selectable, so selection stays unbiased."""
+    to_c = lights.center[li] - o
+    r = lights.radius[li]
+    d2 = wp.max(wp.dot(to_c, to_c), r * r + 1.0e-4)
+    wi = to_c / wp.sqrt(wp.dot(to_c, to_c) + 1.0e-12)
+    cos_s = wp.max(wp.dot(s.n, wi), 0.0)
+    cos_l = float(1.0)
+    if lights.kind[li] != LIGHT_SPHERE:
+        cos_l = wp.max(wp.dot(lights.normal[li], -wi), 0.0)
+    return lights.power[li] / d2 * (0.02 + cos_s) * (0.02 + cos_l)
 
 
 @wp.func
@@ -498,61 +613,44 @@ def direct_light(
     soft: wp.int32,
     r1: wp.float32,
     r2: wp.float32,
+    n_samples: wp.int32,
+    r_sel: wp.float32,
 ) -> wp.vec3:
-    """Area-light direct lighting. soft: 0 = light centre (hard shadow), 1 = one random point (noisy, unbiased),
-    n >= 2 = fixed n x n stratified grid of points (deterministic soft shadows, n*n shadow rays per light), each
-    point at offset (r1, r2) inside its cell (0.5 = cell centre; shifted per AA sample)."""
+    """Area-light direct lighting (see ``light_contrib`` for ``soft``). n_samples = 0 evaluates every light;
+    n_samples = k >= 1 picks k lights (stratified, with replacement) in proportion to ``light_weight`` and
+    divides by the selection pdf, so the cost no longer grows with the number of lights."""
     out = wp.vec3(0.0)
     o = s.p + s.ng * 2.0e-4
-    grid_n = wp.max(soft, 1)
-    inv_n = 1.0 / wp.float32(grid_n)
+    if n_samples <= 0 or lights.count <= n_samples:
+        for li in range(lights.count):
+            out = out + light_contrib(geo, mats, lights, li, s, wo, o, soft, r1, r2)
+        return out
+    total = float(0.0)
     for li in range(lights.count):
-        kind = lights.kind[li]
-        c = lights.center[li]
-        nrm = lights.normal[li]
-        uu = lights.u[li]
-        vv = lights.v[li]
-        if kind == LIGHT_SPHERE:
-            # a small sphere seen from o: sample the disk of the same radius facing o (same solid angle)
-            nrm = wp.normalize(o - c)
-            uu = onb_u(nrm) * lights.radius[li]
-            vv = onb_v(nrm) * lights.radius[li]
-        for k in range(grid_n * grid_n):
-            # sample offset in [-1, 1]^2: light centre, one random point, or a stratified grid cell
-            sa = float(0.0)
-            sb = float(0.0)
-            if soft == 1:
-                sa = 2.0 * r1 - 1.0
-                sb = 2.0 * r2 - 1.0
-            elif soft >= 2:
-                sa = 2.0 * (wp.float32(k % grid_n) + r1) * inv_n - 1.0
-                sb = 2.0 * (wp.float32(k // grid_n) + r2) * inv_n - 1.0
-            if kind != LIGHT_RECT:
-                # Shirley-Chiu concentric square -> disk mapping (keeps the strata)
-                rr = float(0.0)
-                phi = float(0.0)
-                if sa * sa > sb * sb:
-                    rr = sa
-                    phi = (PI / 4.0) * (sb / sa)
-                elif sb != 0.0:
-                    rr = sb
-                    phi = (PI / 2.0) - (PI / 4.0) * (sa / sb)
-                sa = rr * wp.cos(phi)
-                sb = rr * wp.sin(phi)
-            lp = c + uu * sa + vv * sb
-            to_l = lp - o
-            dist2 = wp.dot(to_l, to_l)
-            dist = wp.sqrt(dist2)
-            wi = to_l / dist
-            cos_l = wp.dot(nrm, -wi)
-            if cos_l <= 0.0:
-                continue
-            f = eval_brdf_cos(s, wo, wi)
-            if f[0] + f[1] + f[2] <= 0.0:
-                continue
-            vis = shadow_transmittance(geo, mats, o, wi, dist - 1.0e-3)
-            g = cos_l * lights.area[li] / dist2 * inv_n * inv_n
-            out = out + wp.cw_mul(wp.cw_mul(f, lights.radiance[li]), vis) * g
+        total = total + light_weight(lights, li, s, o)
+    if total <= 0.0:
+        return out
+    inv_k = 1.0 / wp.float32(n_samples)
+    for j in range(n_samples):
+        target = (wp.float32(j) + r_sel) * inv_k * total
+        acc = float(0.0)
+        pick = lights.count - 1
+        w = float(0.0)
+        for li in range(lights.count):
+            w = light_weight(lights, li, s, o)
+            acc = acc + w
+            if acc >= target:
+                pick = li
+                break
+        w = light_weight(lights, pick, s, o)
+        if w <= 0.0:
+            continue
+        # decorrelate the point on the light between the k picks
+        q1 = r1 + wp.float32(j) * 0.7548777
+        q2 = r2 + wp.float32(j) * 0.5698403
+        q1 = q1 - wp.floor(q1)
+        q2 = q2 - wp.floor(q2)
+        out = out + light_contrib(geo, mats, lights, pick, s, wo, o, soft, q1, q2) * (total / w * inv_k)
     return out
 
 
@@ -646,7 +744,9 @@ def hit_light(lights: LightSet, o: wp.vec3, d: wp.vec3, tmax: wp.float32) -> wp.
 # ----------------------------------------------------------------------------------------------------------
 
 
-@wp.kernel
+# The megakernel otherwise takes all 255 registers (plus stack spills), leaving ~16% occupancy for a latency-bound
+# BVH traversal; capping at 80 trades a few spills for ~3x the resident warps (Rs_int 1080p: 45 -> 28 ms, same image).
+@wp.kernel(enable_backward=False, cuda_max_registers=RENDER_MAX_REGISTERS)
 def render_kernel(
     geo: Geometry,
     mats: Materials,
@@ -770,8 +870,9 @@ def render_kernel(
                 l2 = wp.float32(0.5) + wp.float32(sample) * 0.5698403
                 l1 = l1 - wp.floor(l1)
                 l2 = l2 - wp.floor(l2)
+            n_lights = wp.where(specular_path == 1, cfg.light_samples, cfg.light_samples_bounce)
             radiance = radiance + wp.cw_mul(
-                throughput, direct_light(geo, mats, lights, s, wo, cfg.soft_shadows, l1, l2)
+                throughput, direct_light(geo, mats, lights, s, wo, cfg.soft_shadows, l1, l2, n_lights, wp.randf(rng))
             )
 
             ndv = wp.max(wp.dot(s.n, wo), 1.0e-4)
@@ -911,7 +1012,7 @@ def bake_probes_kernel(
         # diffuse-only outgoing radiance at the hit: direct + previous-bounce indirect
         s.metal = 0.0
         s.spec = 0.0
-        lo = direct_light(geo, mats, lights, s, wo, 1, wp.randf(rng), wp.randf(rng))
+        lo = direct_light(geo, mats, lights, s, wo, 1, wp.randf(rng), wp.randf(rng), 0, 0.5)
         if use_prev != 0:
             lo = lo + wp.cw_mul(s.albedo, probe_irradiance(prev, s.p, s.n))
         acc = acc + lo
@@ -1069,9 +1170,38 @@ PRESETS = {
     "probe": dict(spp=1, max_depth=10, soft_shadows=0, indirect=1, glossy_sampling=0, denoise=0),
     "probe_soft": dict(spp=1, max_depth=10, soft_shadows=2, indirect=1, glossy_sampling=0, denoise=0),
     "probe_aa4": dict(spp=4, max_depth=10, soft_shadows=2, indirect=1, glossy_sampling=0, denoise=0),
-    "pt4": dict(spp=4, max_depth=8, soft_shadows=1, indirect=2, glossy_sampling=1, denoise=5),
-    "pt16": dict(spp=16, max_depth=10, soft_shadows=1, indirect=2, glossy_sampling=1, denoise=5),
-    "pt64": dict(spp=64, max_depth=12, soft_shadows=1, indirect=2, glossy_sampling=1, denoise=4),
+    # pt*: 4 power-weighted light picks at the first diffuse/glossy vertex, 1 at later bounces (per-light cost no
+    # longer scales with the light count; pt1024, the reference, still evaluates every light).
+    "pt4": dict(
+        spp=4,
+        max_depth=8,
+        soft_shadows=1,
+        indirect=2,
+        glossy_sampling=1,
+        denoise=5,
+        light_samples=4,
+        light_samples_bounce=1,
+    ),
+    "pt16": dict(
+        spp=16,
+        max_depth=10,
+        soft_shadows=1,
+        indirect=2,
+        glossy_sampling=1,
+        denoise=5,
+        light_samples=4,
+        light_samples_bounce=1,
+    ),
+    "pt64": dict(
+        spp=64,
+        max_depth=12,
+        soft_shadows=1,
+        indirect=2,
+        glossy_sampling=1,
+        denoise=4,
+        light_samples=4,
+        light_samples_bounce=1,
+    ),
     "pt1024": dict(spp=1024, max_depth=16, soft_shadows=1, indirect=2, glossy_sampling=1, denoise=0),
 }
 
@@ -1176,6 +1306,10 @@ class WarpRenderer:
         lights.normal, lights.radiance = arr("normal"), arr("radiance")
         lights.radius = wp.array(np.array([r.get("radius", 0.0) for r in rects] or [0], np.float32), device=dev)
         lights.area = wp.array(np.array([area(r) for r in rects] or [0], np.float32), device=dev)
+        power = [
+            area(r) * (0.2126 * r["radiance"][0] + 0.7152 * r["radiance"][1] + 0.0722 * r["radiance"][2]) for r in rects
+        ]
+        lights.power = wp.array(np.array(power or [0], np.float32), device=dev)
         lights.dome = wp.vec3(*scene.lights.dome)
         lights.ambient = wp.vec3(ambient, ambient, ambient)
         self.lights = lights
@@ -1195,8 +1329,15 @@ class WarpRenderer:
             # keep one degenerate triangle far away
             sp = np.full((3, 3), 1.0e6, np.float32)
         self.s_pts = wp.array(sp, dtype=wp.vec3, device=dev)
+        # BVH groups: 0 opaque, 1 transmissive (glass), so shadow rays can use any-hit queries on the opaque group
+        trans = np.array([m.transmission > 0.0 for m in scene.materials] + [True], np.int32)
+        s_groups = trans[scene.s_mat] if len(scene.s_pos) else np.zeros(len(sp) // 3, np.int32)
         self.s_mesh = wp.Mesh(
-            points=self.s_pts, indices=wp.array(np.arange(len(sp), dtype=np.int32), device=dev), bvh_constructor="sah"
+            points=self.s_pts,
+            indices=wp.array(np.arange(len(sp), dtype=np.int32), device=dev),
+            bvh_constructor="sah",
+            bvh_leaf_size=BVH_LEAF_SIZE,
+            groups=wp.array(s_groups.astype(np.int32), dtype=wp.int32, device=dev),
         )
         g.s_pts = self.s_pts
         n_static = len(sp) // 3
@@ -1244,10 +1385,13 @@ class WarpRenderer:
             device=self.device,
         )
         if self.d_mesh is None:
+            trans = np.array([m.transmission > 0.0 for m in self.scene.materials] + [True], np.int32)
             self.d_mesh = wp.Mesh(
                 points=self.d_pts,
                 indices=wp.array(np.arange(n, dtype=np.int32), device=self.device),
                 bvh_constructor="sah",
+                bvh_leaf_size=BVH_LEAF_SIZE,
+                groups=wp.array(trans[self.scene.d_mat].astype(np.int32), dtype=wp.int32, device=self.device),
             )
             self._mesh_ids[1] = self.d_mesh.id
             self.geo.mesh = wp.array(self._mesh_ids, dtype=wp.uint64, device=self.device)
@@ -1358,6 +1502,8 @@ class WarpRenderer:
         cfg.soft_shadows, cfg.indirect, cfg.glossy_sampling = p["soft_shadows"], p["indirect"], p["glossy_sampling"]
         cfg.seed, cfg.exposure, cfg.lights_visible = seed, exposure, int(self.lights_visible)
         cfg.clamp = float(p.get("clamp", self.max_light_luminance))
+        cfg.light_samples = int(p.get("light_samples", 0))
+        cfg.light_samples_bounce = int(p.get("light_samples_bounce", cfg.light_samples))
         n = len(cameras)
         dev = self.device
         cam_pos = wp.array(np.array([c["pos"] for c in cameras], np.float32), dtype=wp.vec3, device=dev)
@@ -1378,6 +1524,7 @@ class WarpRenderer:
             inputs=[self.geo, self.mats, self.lights, self.grid, cfg, cam_pos, cam_rot, cam_tan, width, height],
             outputs=[radiance, albedo, normal, depth],
             device=dev,
+            block_dim=RENDER_BLOCK_DIM,
         )
         color = radiance
         if p["denoise"] > 0:
