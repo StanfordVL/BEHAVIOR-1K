@@ -388,10 +388,6 @@ class KitRenderBackend(RenderBackend):
             usdrt_stage.GetFabricId(), usdrt_stage.GetStageIdAsStageId()
         )
 
-    def setup_viewer_camera(self, viewer_width, viewer_height):
-        # _set_viewer_camera() also applies the default viewer pose -- see its own implementation.
-        self.sim._set_viewer_camera(viewer_width=viewer_width, viewer_height=viewer_height)
-
     def before_play(self, sim):
         # Kit's RTX renderer only actually draws new frames for a render product while its own
         # timeline is playing (a separate, Kit-global concept from any physics backend's own play/pause

@@ -380,6 +380,7 @@ class NewtonArticulationHandle:
             _assign(model.joint_target_ke, idx, kps)
         if kds is not None:
             _assign(model.joint_target_kd, idx, kds)
+        self._backend._apply_robot_effort_limits(idx)
         self._backend._notify_dof_properties_changed()
 
     def get_max_velocities(self, joint_indices=None):
@@ -1034,6 +1035,8 @@ class NewtonBackend(PhysicsBackend):
         super().__init__(sim)
         self._sim_context = None
         self._model = None
+        # Per-DOF authored drive effort limit for robot DOFs (NaN elsewhere), see _apply_robot_effort_limits()
+        self._robot_authored_effort_limit = None
         self._state_0 = None
         self._state_1 = None
         self._control = None
@@ -1068,8 +1071,6 @@ class NewtonBackend(PhysicsBackend):
 
     @classmethod
     def create_app(cls):
-        if gm.RENDER_BACKEND == "kit":
-            raise ValueError("Newton physics does not support gm.RENDER_BACKEND = 'kit'; use 'newton' or 'none'.")
         from omnigibson.simulator import _StandaloneApp
 
         return _StandaloneApp()
@@ -1391,6 +1392,10 @@ class NewtonBackend(PhysicsBackend):
         import newton
         import warp as wp
 
+        # Every joint target here is indexed by DOF (qd). newton>=1.7 defaults to coordinate-shaped targets, which shifts
+        # every target after a free joint (7 coords, 6 DOFs) by one slot.
+        newton.use_coord_layout_targets = False
+
         self._joints_dirty = False
         self._step_graphs = {}
         self._step_graph_substeps = 0
@@ -1510,6 +1515,8 @@ class NewtonBackend(PhysicsBackend):
     def _rebuild_impl(self, newton, wp):
         from pxr import Gf
 
+        from omnigibson.physics_backends.newton_visuals import add_usd_visual_shapes
+
         captured_state = self._capture_state()
         self._already_broken_joints = set()
 
@@ -1561,6 +1568,8 @@ class NewtonBackend(PhysicsBackend):
                 hide_collision_shapes=True,
                 ignore_paths=ignore_paths_by_obj.get(obj),
             )
+            # add_usd()'s own visual import is off; bake textured render-only shapes for Newton's viewers instead
+            add_usd_visual_shapes(newton, builder, self.sim.stage, obj.prim_path, info["path_body_map"])
 
             path_body_map.update(info["path_body_map"])
             path_joint_map.update(info["path_joint_map"])
@@ -1640,6 +1649,7 @@ class NewtonBackend(PhysicsBackend):
         self._path_joint_map = path_joint_map
 
         joint_qd_start = builder.joint_qd_start
+        robot_authored_effort = {}
         for joint_path, joint_idx in path_joint_map.items():
             qd_start = joint_qd_start[joint_idx]
             next_qd_start = (
@@ -1678,6 +1688,7 @@ class NewtonBackend(PhysicsBackend):
             builder.joint_target_mode[qd_start] = int(newton.JointTargetMode.POSITION_VELOCITY)
 
             if joint_path in robot_joint_paths:
+                robot_authored_effort[qd_start] = float(builder.joint_effort_limit[qd_start])
                 builder.joint_effort_limit[qd_start] = float("inf")
 
             if (
@@ -1710,6 +1721,11 @@ class NewtonBackend(PhysicsBackend):
                         )
 
         self._model = builder.finalize(device=self._sim_context.device or "cpu")
+        self._robot_authored_effort_limit = th.full(
+            (self._model.joint_dof_count,), float("nan"), device=_wp_to_torch(self._model.joint_effort_limit).device
+        )
+        for dof_idx, effort in robot_authored_effort.items():
+            self._robot_authored_effort_limit[dof_idx] = effort
         if self._model.device.is_cpu and wp.is_cuda_available() and not self._warned_cpu_device:
             self._warned_cpu_device = True
             log.warning(
@@ -2033,6 +2049,31 @@ class NewtonBackend(PhysicsBackend):
             self._solver.notify_model_changed(newton.ModelFlags.BODY_INERTIAL_PROPERTIES)
             self._step_graphs = {}
 
+    def _apply_robot_effort_limits(self, idx):
+        """
+        Sets the effort limit of the robot DOFs in @idx from their current drive gains. Position-driven DOFs are
+        unlimited, matching PhysX, whose position drives track like constraints. Velocity-driven DOFs (kp == 0, kd > 0,
+        e.g. diff-drive wheels) keep their authored limit: unlimited, a stiff velocity servo puts ~kd * error of torque
+        through the wheel contacts and launches the robot on the first drive command.
+
+        Args:
+            idx (th.Tensor): Global DOF indices whose gains just changed
+        """
+        authored = self._robot_authored_effort_limit
+        if authored is None:
+            return
+        authored = authored[idx]
+        is_robot = ~th.isnan(authored)
+        if not is_robot.any():
+            return
+        model = self._model
+        ke = _wp_to_torch(model.joint_target_ke)[idx]
+        kd = _wp_to_torch(model.joint_target_kd)[idx]
+        current = _wp_to_torch(model.joint_effort_limit)[idx]
+        velocity_driven = (ke == 0) & (kd > 0)
+        limit = th.where(velocity_driven, authored, th.full_like(authored, float("inf")))
+        _assign(model.joint_effort_limit, idx, th.where(is_robot, limit, current))
+
     def _notify_dof_properties_changed(self):
         if self._solver is not None:
             import newton
@@ -2100,8 +2141,12 @@ class NewtonBackend(PhysicsBackend):
         model = self._model
         if model is None or model.shape_count == 0:
             return None
+        import newton
+
         shape_body = _wp_to_torch(model.shape_body)
-        valid = shape_body >= 0
+        # Only collision shapes count, not render-only visual shapes
+        collides = (_wp_to_torch(model.shape_flags) & int(newton.ShapeFlags.COLLIDE_SHAPES)) != 0
+        valid = (shape_body >= 0) & collides
         if not bool(valid.any()):
             return None
         body_q = _wp_to_torch(self._state_0.body_q)

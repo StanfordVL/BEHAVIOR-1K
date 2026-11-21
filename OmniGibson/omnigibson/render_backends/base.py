@@ -56,11 +56,6 @@ class RenderBackend(ABC):
         """
         return None, None
 
-    def setup_viewer_camera(self, viewer_width, viewer_height):
-        """
-        Creates the interactive viewer camera at the given resolution, if this backend has a viewport.
-        """
-
     # ---- Stage / application services ----
 
     def create_default_pbr_material(self, scope_path, material_path, target_prim_path):

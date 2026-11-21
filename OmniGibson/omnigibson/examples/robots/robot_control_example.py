@@ -60,12 +60,28 @@ def choose_controllers(robot, random_selection=False):
     return controller_choices
 
 
-def main(random_selection=False, headless=False, short_exec=False, quickstart=False):
+def main(
+    random_selection=False,
+    headless=False,
+    short_exec=False,
+    quickstart=False,
+    renderer="kit",
+):
     """
     Robot control demo with selection
     Queries the user to select a robot, the controllers, a scene and a type of input (random actions or teleop)
+
+    :param renderer: "kit" for Omniverse, or "gl"/"ovrtx" to run Newton physics and render the robot's cameras through
+        Newton's headless OpenGL/ray-traced viewer. Newton has no keyboard input, so it always uses random actions
     """
     og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
+
+    if renderer != "kit":
+        import pyglet
+
+        pyglet.options["headless"] = True
+        gm.PHYSICS_BACKEND = "newton"
+        gm.RENDER_BACKEND = renderer
 
     # Choose scene to load
     scene_model = "Rs_int"
@@ -95,6 +111,8 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
 
     # Compile config
     cfg = dict(scene=scene_cfg, robots=[robot0_cfg])
+    if renderer != "kit":
+        cfg["env"] = {"device": "cuda:0"}
 
     # Create the environment
     env = og.Environment(configs=cfg)
@@ -111,7 +129,9 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
         controller_choices = choose_controllers(robot=robot, random_selection=random_selection)
 
     # Choose control mode
-    if random_selection:
+    if renderer != "kit":
+        control_mode = "random"
+    elif random_selection:
         control_mode = "random"
     elif quickstart:
         control_mode = "teleop"
@@ -126,25 +146,28 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
     # is preserved
     env.scene.update_initial_file()
 
-    # Update the simulator's viewer camera's pose so it points towards the robot
-    og.sim.viewer_camera.set_position_orientation(
-        position=th.tensor([1.46949, -3.97358, 2.21529]),
-        orientation=th.tensor([0.56829048, 0.09569975, 0.13571846, 0.80589577]),
-    )
+    # Update the simulator's viewer camera's pose so it points towards the robot.
+    if og.sim.viewer_camera is not None:
+        og.sim.viewer_camera.set_position_orientation(
+            position=th.tensor([1.46949, -3.97358, 2.21529]),
+            orientation=th.tensor([0.56829048, 0.09569975, 0.13571846, 0.80589577]),
+        )
 
     # Reset environment and robot
     env.reset()
     robot.reset()
 
-    # Create teleop controller
-    action_generator = KeyboardRobotController(robot=robot)
+    # Create teleop controller (keyboard input needs Kit)
+    action_generator = None
+    if renderer == "kit":
+        action_generator = KeyboardRobotController(robot=robot)
 
-    # Register custom binding to reset the environment
-    action_generator.register_custom_keymapping(
-        key=lazy.carb.input.KeyboardInput.R,
-        description="Reset the robot",
-        callback_fn=lambda: env.reset(),
-    )
+        # Register custom binding to reset the environment
+        action_generator.register_custom_keymapping(
+            key=lazy.carb.input.KeyboardInput.R,
+            description="Reset the robot",
+            callback_fn=lambda: env.reset(),
+        )
 
     # Print out relevant keyboard info if using keyboard teleop
     if control_mode == "teleop":
@@ -163,7 +186,7 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
         if control_mode == "random":
             # Sample new random action every 30 steps
             if step % 30 == 0:
-                random_action = action_generator.get_random_action() * 0.05
+                random_action = (th.rand(robot.action_dim, device=og.sim.device) * 2 - 1) * 0.05
             action = random_action
         else:
             action = action_generator.get_teleop_action()
@@ -185,5 +208,15 @@ if __name__ == "__main__":
         action="store_true",
         help="Whether the example should be loaded with default settings for a quick start.",
     )
+    parser.add_argument(
+        "--renderer",
+        choices=["kit", "gl", "ovrtx"],
+        default="kit",
+        help=(
+            "'kit' (default) is the interactive Omniverse Kit viewport. 'gl' and 'ovrtx' run physics "
+            "on Newton and render the robot's cameras headlessly through Newton's OpenGL or ray-traced "
+            "viewer, using random actions."
+        ),
+    )
     args = parser.parse_args()
-    main(quickstart=args.quickstart)
+    main(quickstart=args.quickstart, renderer=args.renderer)
