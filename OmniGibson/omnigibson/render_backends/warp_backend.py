@@ -31,6 +31,25 @@ class WarpRenderBackend(NullRenderBackend):
     def setup_viewer_camera(self, viewer_width, viewer_height):
         # A real VisionSensor keeps existing examples' viewer-camera pose API working.
         self.sim._set_viewer_camera(viewer_width=viewer_width, viewer_height=viewer_height)
+        # Widen only the navigation camera to a 60-degree vertical field of view.
+        self.sim.viewer_camera.focal_length = (
+            self.sim.viewer_camera.horizontal_aperture * viewer_height / viewer_width / (2 * math.tan(math.radians(30)))
+        )
+
+    def focus_viewer_camera(self, target):
+        """Aim the navigation camera at a world-space target and use it as the orbit pivot."""
+        from omnigibson.render_backends.warp_renderer.renderer import look_at_rotation
+        from omnigibson.utils.transform_utils import mat2quat
+
+        sensor = self.sim.viewer_camera
+        position, _ = sensor.get_position_orientation()
+        target = th.as_tensor(target, dtype=position.dtype, device=position.device)
+        self._view_distance = float(th.linalg.vector_norm(position - target))
+        rotation = look_at_rotation(position.cpu().numpy(), target.cpu().numpy())
+        sensor.set_position_orientation(
+            position=position,
+            orientation=mat2quat(th.as_tensor(rotation, dtype=position.dtype, device=position.device)),
+        )
 
     def _ensure_renderer(self):
         from omnigibson.render_backends.warp_renderer.extract import extract_scene
@@ -134,20 +153,11 @@ class WarpRenderBackend(NullRenderBackend):
                 orientation=mat2quat(th.as_tensor(rotation, dtype=th.float32, device=self.sim.device)),
             )
             camera["up"] = rotation[:, 1]
-        started = time.monotonic()
         frame = self._capture(camera, width, height)
         now = time.monotonic()
         fps = 0 if self._last_frame_time is None else 1 / max(now - self._last_frame_time, 1e-6)
         self._last_frame_time = now
-        robots = [robot for scene in self.sim.scenes for robot in scene.robots]
-        self._viewer.draw(
-            frame,
-            robots[0] if robots else None,
-            self.sim.current_time_step_index,
-            fps,
-            None,
-            (now - started) * 1000,
-        )
+        self._viewer.draw(frame, fps, self.sim.physics_backend._model)
 
     def create_camera_resource(self, prim_path, resolution, force_new=False):
         return SimpleNamespace(prim_path=prim_path, resolution=resolution)

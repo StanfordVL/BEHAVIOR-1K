@@ -6,7 +6,7 @@ Options for random actions, as well as selection of robot action space
 Standalone Warp viewer (Newton environment, CUDA path tracing + OIDN):
     python -m omnigibson.examples.robots.robot_control_example --quickstart --renderer warp
 Mouse controls: left-drag orbit, right-drag look around, middle-drag pan, scroll dolly.
-The sidebar displays timing and pose information; keyboard input remains reserved for robot control.
+The sidebar displays FPS and model counts; keyboard input remains reserved for robot control.
 Add --output /tmp/robot_control.mp4 --num-steps 100 for headless random-action recording.
 Requires pyglet, OpenEXR and CUDA-enabled OIDN 2.5.1 extracted under $CONDA_PREFIX/opt;
 alternatively set OIDN_LIBRARY to the installed libOpenImageDenoise.so.2 path.
@@ -130,7 +130,7 @@ def main(
     if renderer != "kit":
         cfg["env"] = {"device": "cuda:0"}
     if renderer == "warp":
-        cfg["render"] = {"viewer_width": 960, "viewer_height": 540}
+        cfg["render"] = {"viewer_width": 1920, "viewer_height": 1080}
 
     # Create the environment
     env = og.Environment(configs=cfg)
@@ -173,9 +173,15 @@ def main(
     env.reset()
     robot.reset()
 
+    if renderer in ("warp", "rtx", "gl"):
+        # Share the original Warp viewpoint without relocating the robot.
+        camera_pose = ((1.46949, -3.97358, 2.21529), robot.aabb_center.tolist())
+
     if renderer == "warp":
         from omnigibson.utils.warp_viewer_recording import run_with_warp_viewer
 
+        og.sim.viewer_camera.set_position_orientation(position=th.tensor(camera_pose[0], device=env.device))
+        og.sim.render_backend.focus_viewer_camera(camera_pose[1])
         try:
             run_with_warp_viewer(
                 env,
@@ -185,6 +191,21 @@ def main(
                 headless=headless,
                 control_mode=control_mode,
             )
+        finally:
+            og.shutdown()
+        return
+
+    if renderer in ("rtx", "gl"):
+        from omnigibson.utils.newton_viewer_recording import (
+            record_with_newton_viewer,
+            run_teleop_with_newton_viewer,
+        )
+
+        try:
+            if output is None and control_mode == "teleop":
+                run_teleop_with_newton_viewer(env, robot, renderer, camera_pose)
+            else:
+                record_with_newton_viewer(env, robot, renderer, camera_pose, output_path=output, num_steps=num_steps)
         finally:
             og.shutdown()
         return

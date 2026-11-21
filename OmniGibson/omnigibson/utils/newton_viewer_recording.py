@@ -288,10 +288,12 @@ def capture_frame(viewer, renderer):
     return np.array(viewer._capture_screenshot_pixels())[..., :3]
 
 
-def record_with_newton_viewer(env, robot, renderer, output_path=None, num_steps=100, fps=30):
+def record_with_newton_viewer(env, robot, renderer, camera_pose, output_path=None, num_steps=100, fps=30):
     """Step the environment with a random action (resampled every 30 steps, matching
     ``robot_control_example.py``'s ``control_mode="random"`` behavior), driving it through the given
     Newton viewer.
+
+    ``camera_pose`` is the caller-prepared (position, look_at) pair shared with the Warp viewer.
 
     If ``output_path`` is given, runs headless and writes the recorded frames there as an mp4 (the
     only mode that works without a real display). If ``output_path`` is ``None``, opens a live,
@@ -305,13 +307,12 @@ def record_with_newton_viewer(env, robot, renderer, output_path=None, num_steps=
     """
     headless = output_path is not None
 
-    reposition_robot_into_furnished_room(env, robot)
-
     backend = og.sim.physics_backend
     model = backend._model
 
-    cam_pos, look_at = _pick_camera_pose(env, robot)
-    viewer = build_viewer(renderer, model, cam_pos, look_at, headless=headless)
+    cam_pos, look_at = camera_pose
+    viewer = build_viewer(renderer, model, cam_pos, look_at, width=1920, height=1080, headless=headless)
+    viewer.camera.fov = 60.0
 
     action_dim = robot.action_dim
     frames = [] if headless else None
@@ -591,10 +592,12 @@ def attach_teleop_keyboard(viewer, renderer, kb_controller):
         raise ValueError(f"Unknown renderer {renderer!r}, expected 'rtx' or 'gl'.")
 
 
-def run_teleop_with_newton_viewer(env, robot, renderer, fps=30):
+def run_teleop_with_newton_viewer(env, robot, renderer, camera_pose, fps=30):
     """Interactively teleoperate ``robot`` through a live, on-screen Newton viewer (``"rtx"`` or
     ``"gl"``), using the same keyboard scheme as the Kit-renderer path's
     :class:`~omnigibson.utils.ui_utils.KeyboardRobotController` (see :class:`_PygletTeleopController`).
+
+    ``camera_pose`` is the caller-prepared (position, look_at) pair shared with the Warp viewer.
 
     Always opens a live window (``headless=False``) since teleop is inherently interactive; there's no
     headless/recording variant of this function (see :func:`record_with_newton_viewer` for that). Runs
@@ -603,13 +606,12 @@ def run_teleop_with_newton_viewer(env, robot, renderer, fps=30):
     Requires ``gm.PHYSICS_BACKEND == "newton"`` and ``gm.RENDER_BACKEND == "none"`` to already be in
     effect (set before ``omnigibson`` was imported), same as :func:`record_with_newton_viewer`.
     """
-    reposition_robot_into_furnished_room(env, robot)
-
     backend = og.sim.physics_backend
     model = backend._model
 
-    cam_pos, look_at = _pick_camera_pose(env, robot)
-    viewer = build_viewer(renderer, model, cam_pos, look_at, headless=False)
+    cam_pos, look_at = camera_pose
+    viewer = build_viewer(renderer, model, cam_pos, look_at, width=1920, height=1080, headless=False)
+    viewer.camera.fov = 60.0
 
     # ViewerRTX defers creating its pyglet window until the first end_frame() call
     # (_init_ovrtx()) -- prime one frame here so `viewer._window` exists before

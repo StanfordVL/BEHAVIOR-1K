@@ -449,8 +449,11 @@ def shade_surface(geo: Geometry, mats: Materials, hit: Hit, o: wp.vec3, d: wp.ve
     if s.front == 0:
         ng = -ng
         n = -n
-    if wp.dot(n, -d) < 0.0:
-        n = wp.normalize(n + ng * (0.01 - wp.dot(n, -d)))
+    view_cos = wp.dot(n, -d)
+    if view_cos < 0.01:
+        # Project along the geometric normal far enough to face the viewer. Without the
+        # denominator, smoothed normals can remain back-facing at grazing angles and shade black.
+        n = wp.normalize(n + ng * ((0.01 - view_cos) / wp.max(wp.dot(ng, -d), 1.0e-6)))
     s.ng = ng
     s.n = n
     s.albedo = albedo

@@ -26,7 +26,13 @@ The global viewer appears as ordinary `env.step()`, `og.sim.step()`, or `og.sim.
 tick the renderer. Existing `og.sim.viewer_camera.set_position_orientation()` calls still work.
 Left-drag orbits, right-drag looks around, middle-drag pans, and scrolling dollies. Resize the
 window or double-click its title bar to maximize; the image scales without changing the camera's
-render resolution. Escape / closing the window exits the process. No camera WASD bindings are added.
+render resolution. The robot-control example renders at 1920 x 1080, initially focuses on the robot,
+and opens a window sized to fit the desktop. The navigation camera uses a 60-degree vertical FOV;
+robot camera intrinsics are unchanged. Mouse drag sensitivity scales with the displayed image size.
+The sidebar shows only viewer FPS and the active Newton model's world, body, shape, and joint counts.
+The example's `rtx` and `gl` options use the same fixed starting camera position aimed at the robot,
+1920 x 1080 resolution, and 60-degree vertical FOV. The robot is not relocated for viewing.
+Escape / closing the window exits the process. No camera WASD bindings are added.
 Robot keyboard control still needs an example's controller; choosing a renderer does not create one.
 
 ## Requirements and limits

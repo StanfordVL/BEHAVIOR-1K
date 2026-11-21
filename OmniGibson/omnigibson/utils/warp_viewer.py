@@ -10,9 +10,12 @@ class _WarpViewer:
         import pyglet
 
         self.camera = camera
+        self.aspect = width / height
+        screen = pyglet.display.get_display().get_default_screen()
+        scale = min(1, (screen.width * 0.9 - 280) / width, screen.height * 0.9 / height)
+        width, height = int(width * scale), int(height * scale)
         self.width, self.height = width, height
         self.dragging_view = False
-        self.control_hint = "Esc: quit"
         self.window = pyglet.window.Window(width + 280, height, caption="OmniGibson — Warp pt1_oidn", resizable=True)
         self.window.set_minimum_size(640, 540)
         self.window.push_handlers(self.on_mouse_press, self.on_mouse_release, self.on_mouse_drag, self.on_mouse_scroll)
@@ -51,17 +54,19 @@ class _WarpViewer:
         target = np.asarray(self.camera["look_at"], dtype=float)
         offset = pos - target
         distance = np.linalg.norm(offset)
+        view_height = min(self.height, self.width / self.aspect)
+        view_width = view_height * self.aspect
         if buttons & mouse.MIDDLE:
             forward = -offset / distance
             right = np.cross(forward, [0, 0, 1])
             right /= np.linalg.norm(right)
             up = np.cross(right, forward)
-            scale = 2 * distance * np.tan(np.radians(self.camera["fov"]) / 2) / self.height
+            scale = 2 * distance * np.tan(np.radians(self.camera["fov"]) / 2) / view_height
             delta = (-dx * right - dy * up) * scale
             pos, target = pos + delta, target + delta
         elif buttons & (mouse.LEFT | mouse.RIGHT):
-            yaw = np.arctan2(offset[1], offset[0]) - dx * 0.005
-            pitch = np.clip(np.arcsin(offset[2] / distance) + dy * 0.005, -1.5, 1.5)
+            yaw = np.arctan2(offset[1], offset[0]) - dx / view_width * np.pi
+            pitch = np.clip(np.arcsin(offset[2] / distance) - dy / view_height * np.pi, -1.5, 1.5)
             offset = distance * np.array(
                 [
                     np.cos(pitch) * np.cos(yaw),
@@ -84,7 +89,7 @@ class _WarpViewer:
         new_distance = np.clip(distance * np.exp(np.clip(-scroll_y * 0.12, -10, 10)), 0.1, 100)
         self.camera["pos"] = target + offset * (new_distance / distance)
 
-    def draw(self, frame, robot, step, fps, step_ms, render_ms):
+    def draw(self, frame, fps, model):
         import pyglet
 
         self.window.clear()
@@ -98,20 +103,12 @@ class _WarpViewer:
             height=display_height,
         )
         self.background.draw()
-        camera_xyz = ", ".join(f"{v:.2f}" for v in self.camera["pos"])
-        robot_xyz = ", ".join(f"{v:.2f}" for v in robot.get_position_orientation()[0]) if robot else "n/a"
-        step_timing = f"{step_ms:.1f} ms" if step_ms is not None else "n/a"
         self.label.text = (
-            "WARP VIEWER\n"
-            "Physics: Newton\nRenderer: pt1_oidn\nOIDN: high | 1 sample/pixel\n"
-            f"Render resolution: {frame_width} x {frame_height}\n"
-            f"Viewer: {fps:.1f} FPS\nEnvironment step: {step_timing}\n"
-            f"Render + denoise: {render_ms:.1f} ms\nStep: {step}\n"
-            f"Robot: {robot.name if robot else 'none'}\nXYZ: {robot_xyz}\nCamera: {camera_xyz}\n\n"
-            "MOUSE (over scene)\nLeft drag: orbit\nRight drag: look around\n"
-            "Middle drag: pan\nScroll: dolly in / out\n\n"
-            "KEYBOARD\nReserved for robot teleop\nSee terminal for robot bindings\n"
-            f"{self.control_hint}"
+            f"FPS: {fps:.1f}\n\n"
+            f"Worlds: {model.world_count}\n"
+            f"Bodies: {model.body_count}\n"
+            f"Shapes: {model.shape_count}\n"
+            f"Joints: {model.joint_count}"
         )
         self.label.draw()
         self.window.flip()

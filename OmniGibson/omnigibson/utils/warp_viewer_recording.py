@@ -24,7 +24,6 @@ def run_with_warp_viewer(env, robot, output=None, num_steps=100, headless=False,
 
             og.sim.render()
             window = backend._viewer.window
-            backend._viewer.control_hint = "R: reset | Esc: quit"
             controller = _PygletTeleopController(robot)
             window.push_handlers(controller.on_key_press, controller.on_key_release)
 
