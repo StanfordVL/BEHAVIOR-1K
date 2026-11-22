@@ -1,10 +1,12 @@
 import math
+from types import SimpleNamespace
 
 import torch as th
 import trimesh
 
 import omnigibson as og
 import omnigibson.lazy as lazy
+import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.prims.material_prim import OmniPBRMaterialPrim, OmniSurfaceMaterialPrim
@@ -17,6 +19,7 @@ from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import (
     absolute_prim_path_to_scene_relative,
     create_primitive_mesh,
+    copy_mesh_prim_to_path,
     scene_relative_prim_path_to_absolute,
 )
 from omnigibson.utils.vision_utils import add_semantic_label
@@ -381,6 +384,10 @@ class PhysxParticleInstancer(BasePrim):
             setattr(self, key, val)
 
     def serialize(self, state):
+        return self.pack_state(state)
+
+    @staticmethod
+    def pack_state(state):
         # Compress into a 1D array
         device = state["particle_positions"].device
         return th.cat(
@@ -404,7 +411,10 @@ class PhysxParticleInstancer(BasePrim):
             f"Got mismatch in particle group for this particle "
             f"instancer when deserializing state! Should be: {self.particle_group}, got: {state[1]}."
         )
+        return self.unpack_state(state)
 
+    @staticmethod
+    def unpack_state(state):
         # De-compress from 1D array
         n_particles = int(state[2])
         state_dict = dict(
@@ -457,6 +467,13 @@ class MicroParticleSystem(BaseSystem):
         # Run super first
         super().initialize(scene)
 
+        # No PhysX particle-system prim or PBD material infrastructure exists standalone -- neither has
+        # a Newton equivalent, and Newton's own particle/cloth authoring happens per-object at
+        # model-build time instead (see NewtonBackend._rebuild()), not via a shared system prim. Leave
+        # system_prim/_material unset (None) for this backend.
+        if gm.PHYSICS_BACKEND != "physx":
+            return
+
         # Run sanity checks
         if not gm.USE_GPU_DYNAMICS:
             raise ValueError(f"Failed to initialize {self.name} system. Please set gm.USE_GPU_DYNAMICS=True.")
@@ -480,7 +497,8 @@ class MicroParticleSystem(BaseSystem):
         self._customize_particle_material() if self._customize_particle_material is not None else None
 
     def _clear(self):
-        self._material.remove_user(self)
+        if self._material is not None:
+            self._material.remove_user(self)
 
         super()._clear()
 
@@ -697,6 +715,13 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
 
     @property
     def n_particles(self):
+        # Newton particles live directly in the backend's own model, not in a PhysxParticleInstancer
+        # (self.particle_instancers stays empty for this backend), so query the backend directly.
+        # object_states (Filled/Covered/Contains/particle_modifier) and transition_rules all read this
+        # to decide whether a system has any particles, so it must reflect the live backend state.
+        if self.initialized and gm.PHYSICS_BACKEND != "physx":
+            og.sim.physics_backend.create_particle_system(self.name)
+            return len(og.sim.physics_backend.get_particle_positions(self.name))
         return sum([instancer.n_particles for instancer in self.particle_instancers.values()])
 
     @property
@@ -753,6 +778,14 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         )
 
     def _clear(self):
+        if gm.PHYSICS_BACKEND != "physx":
+            # Backend-side particles live directly in the model, not in a PhysxParticleInstancer, so
+            # there's nothing in self.particle_instancers to clean up -- clear the backend's copy instead.
+            og.sim.physics_backend.create_particle_system(self.name)
+            n = len(og.sim.physics_backend.get_particle_positions(self.name))
+            if n > 0:
+                og.sim.physics_backend.remove_particles(self.name, list(range(n)))
+
         for prototype in self.particle_prototypes:
             og.sim.remove_prim(prototype)
 
@@ -782,6 +815,10 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         # We have the number of particle instancers (1), the instancer groups, particle groups, and,
         # number of particles in each instancer (3n),
         # and the corresponding states in each instancer (X)
+        if gm.PHYSICS_BACKEND != "physx":
+            # A single default instancer's worth, see _dump_backend_state()
+            n_particles = self.n_particles
+            return 1 if n_particles == 0 else 1 + 3 + 3 + 14 * n_particles
         return (
             1 + 3 * len(self.particle_instancers) + sum(inst.state_size for inst in self.particle_instancers.values())
         )
@@ -844,6 +881,14 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             instancer_idn (None or int): Unique identification number of the particle instancer to delete the particles
                 from. If None, this system will delete particles from the default particle instancer
         """
+        # No PhysxParticleInstancer equivalent standalone -- Newton particles live directly in the
+        # backend's own model, with only a single global instancer's worth of concept needed (multiple
+        # instancers per system are already unsupported today, see generate_particle_instancer's own
+        # n_instancers == 0 assertion), so instancer_idn is ignored for this backend.
+        if gm.PHYSICS_BACKEND != "physx":
+            og.sim.physics_backend.remove_particles(self.name, idxs)
+            return
+
         # Create a new particle instancer if a new idn is requested, otherwise use the pre-existing one
         inst = (
             self.default_particle_instancer
@@ -893,6 +938,16 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         """
         if not isinstance(positions, th.Tensor):
             positions = th.tensor(positions, dtype=th.float32)
+
+        # No PhysxParticleInstancer equivalent standalone -- Newton particles live directly in the
+        # backend's own model, with only a single global instancer's worth of concept needed (multiple
+        # instancers per system are already unsupported today, see generate_particle_instancer's own
+        # n_instancers == 0 assertion), so instancer_idn/particle_group/orientations/scales/
+        # prototype_indices are ignored for this backend (no physical meaning for pointlike particles).
+        if gm.PHYSICS_BACKEND != "physx":
+            og.sim.physics_backend.create_particle_system(self.name)
+            og.sim.physics_backend.generate_particles(self.name, positions, velocities=velocities)
+            return None
 
         # Create a new particle instancer if a new idn is requested, otherwise use the pre-existing one
         inst = (
@@ -1155,6 +1210,16 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         return f"{self.name}Instancer{idn}"
 
     def get_particles_position_orientation(self):
+        # Newton particles live directly in the backend's own model, not in a PhysxParticleInstancer.
+        # Orientations have no physical meaning for MPM's pointlike particles (see generate_particles());
+        # report canonical orientation for every particle so shape-matched callers (e.g. ContactParticles'
+        # AABB pre-filter, ParticleRemover's visual/cloth-path particle selection) don't break.
+        if self.initialized and gm.PHYSICS_BACKEND != "physx":
+            og.sim.physics_backend.create_particle_system(self.name)
+            positions = og.sim.physics_backend.get_particle_positions(self.name)
+            orientations = th.zeros((len(positions), 4))
+            orientations[:, -1] = 1.0
+            return positions, orientations
         return self.default_particle_instancer.particle_positions, self.default_particle_instancer.particle_orientations
 
     def get_particles_local_pose(self):
@@ -1168,6 +1233,11 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         return self.get_particle_position_orientation(idx=idx)
 
     def set_particles_position_orientation(self, positions=None, orientations=None):
+        if self.initialized and gm.PHYSICS_BACKEND != "physx":
+            # orientations are ignored -- no physical meaning for Newton's pointlike particles.
+            if positions is not None:
+                og.sim.physics_backend.set_particle_positions(self.name, positions)
+            return
         if positions is not None:
             self.default_particle_instancer.particle_positions = positions
         if orientations is not None:
@@ -1177,6 +1247,12 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         self.set_particles_position_orientation(positions=positions, orientations=orientations)
 
     def set_particle_position_orientation(self, idx, position=None, orientation=None):
+        if self.initialized and gm.PHYSICS_BACKEND != "physx":
+            # orientation is ignored -- no physical meaning for Newton's pointlike particles, matching
+            # set_particles_position_orientation()'s bulk convention.
+            if position is not None:
+                og.sim.physics_backend.set_particle_positions(self.name, position, idxs=[idx])
+            return
         if position is not None:
             positions = self.default_particle_instancer.particle_positions
             positions[idx] = position
@@ -1237,6 +1313,8 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             self.generate_particle_instancer(idn=idn, particle_group=info["group"], n_particles=info["count"])
 
     def _dump_state(self):
+        if gm.PHYSICS_BACKEND != "physx":
+            return self._dump_backend_state()
         return dict(
             n_instancers=self.n_instancers,
             instancer_idns=self.instancer_idns,
@@ -1248,6 +1326,10 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         )
 
     def _load_state(self, state):
+        if gm.PHYSICS_BACKEND != "physx":
+            self._load_backend_state(state)
+            return
+
         # Synchronize the particle instancers
         self._sync_particle_instancers(
             idns=(
@@ -1271,6 +1353,73 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         for name, inst_state in state["particle_states"].items():
             self.particle_instancers[name].load_state(inst_state, serialized=False)
 
+    def _dump_backend_state(self):
+        """
+        Non-PhysX backends keep this system's particles in the backend itself, not in PhysxParticleInstancers.
+        Dump them as one default instancer's state, scene-relative like PhysxParticleInstancer._dump_state(), so
+        states stay interchangeable across backends.
+        """
+        backend = og.sim.physics_backend
+        backend.create_particle_system(self.name)
+        positions = backend.get_particle_positions(self.name)
+        n_particles = len(positions)
+        if n_particles == 0:
+            return dict(
+                n_instancers=0,
+                instancer_idns=[],
+                instancer_particle_groups=[],
+                instancer_particle_counts=[],
+                particle_states=dict(),
+            )
+        device = positions.device
+        pose_inv = self.scene.pose_inv.to(device)
+        # Pointlike particles have no orientation of their own; store the world-identity one in the scene frame
+        local_orientation = T.mat2quat(pose_inv[:3, :3])
+        inst_state = dict(
+            idn=self.default_instancer_idn,
+            particle_group=0,
+            n_particles=n_particles,
+            particle_positions=positions @ pose_inv[:3, :3].T + pose_inv[:3, 3],
+            # clone(): the backend returns a view into its live state
+            particle_velocities=backend.get_particle_velocities(self.name).clone(),
+            particle_orientations=local_orientation.repeat(n_particles, 1),
+            particle_scales=th.ones((n_particles, 3), device=device),
+            particle_prototype_ids=th.zeros(n_particles, device=device),
+        )
+        return dict(
+            n_instancers=1,
+            instancer_idns=[self.default_instancer_idn],
+            instancer_particle_groups=[0],
+            instancer_particle_counts=[n_particles],
+            particle_states={self.particle_instancer_idn_to_name(idn=self.default_instancer_idn): inst_state},
+        )
+
+    def _load_backend_state(self, state):
+        """Loads a (PhysX- or backend-dumped) state into the backend's particles; see _dump_backend_state()"""
+        positions, velocities = [], []
+        for inst_state in state["particle_states"].values():
+            local_positions = th.as_tensor(inst_state["particle_positions"], dtype=th.float32).reshape(-1, 3)
+            if len(local_positions) == 0:
+                continue
+            pose = self.scene.pose.to(local_positions.device)
+            positions.append(local_positions @ pose[:3, :3].T + pose[:3, 3])
+            velocities.append(th.as_tensor(inst_state["particle_velocities"], dtype=th.float32).reshape(-1, 3))
+        positions = th.cat(positions) if positions else th.zeros((0, 3))
+        velocities = th.cat([v.to(positions.device) for v in velocities]) if velocities else th.zeros((0, 3))
+
+        backend = og.sim.physics_backend
+        backend.create_particle_system(self.name)
+        n_particles = len(backend.get_particle_positions(self.name))
+        if n_particles != len(positions):
+            # A count change is structural (a model rebuild); otherwise just overwrite the live state
+            if n_particles > 0:
+                backend.remove_particles(self.name, list(range(n_particles)))
+            if len(positions) > 0:
+                backend.generate_particles(self.name, positions, velocities=velocities)
+        elif n_particles > 0:
+            backend.set_particle_positions(self.name, positions)
+            backend.set_particle_velocities(self.name, velocities)
+
     def serialize(self, state):
         # Array is number of particle instancers, then the corresponding states for each particle instancer
         return th.cat(
@@ -1279,10 +1428,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
                 th.tensor(state["instancer_idns"], device=og.sim.device),
                 th.tensor(state["instancer_particle_groups"], device=og.sim.device),
                 th.tensor(state["instancer_particle_counts"], device=og.sim.device),
-                *[
-                    self.particle_instancers[name].serialize(inst_state)
-                    for name, inst_state in state["particle_states"].items()
-                ],
+                *[PhysxParticleInstancer.pack_state(inst_state) for inst_state in state["particle_states"].values()],
             ]
         )
 
@@ -1295,19 +1441,24 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             instancer_info[info_name] = state[idx : idx + n_instancers].int().tolist()
             idx += n_instancers
 
-        # Syncing is needed so that each particle instancer can further deserialize its own state
-        log.debug(f"Syncing {self.name} particles with {n_instancers} instancers...")
-        self._sync_particle_instancers(
-            idns=instancer_info["instancer_idns"],
-            particle_groups=instancer_info["instancer_particle_groups"],
-            particle_counts=instancer_info["instancer_particle_counts"],
-        )
+        # Syncing is needed so that each particle instancer can further deserialize its own state. Other backends
+        # have no instancers (see _dump_backend_state()), so their states are only unpacked here
+        if gm.PHYSICS_BACKEND == "physx":
+            log.debug(f"Syncing {self.name} particles with {n_instancers} instancers...")
+            self._sync_particle_instancers(
+                idns=instancer_info["instancer_idns"],
+                particle_groups=instancer_info["instancer_particle_groups"],
+                particle_counts=instancer_info["instancer_particle_counts"],
+            )
 
         # Procedurally deserialize the particle states
         particle_states = dict()
         for idn in instancer_info["instancer_idns"]:
             name = self.particle_instancer_idn_to_name(idn=idn)
-            particle_states[name], deserialized_items = self.particle_instancers[name].deserialize(state[idx:])
+            if gm.PHYSICS_BACKEND == "physx":
+                particle_states[name], deserialized_items = self.particle_instancers[name].deserialize(state[idx:])
+            else:
+                particle_states[name], deserialized_items = PhysxParticleInstancer.unpack_state(state[idx:])
             idx += deserialized_items
 
         return (
@@ -1320,6 +1471,14 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         )
 
     def remove_all_particles(self):
+        if gm.PHYSICS_BACKEND != "physx":
+            # Backend-side particles live directly in the model, not in a PhysxParticleInstancer (which
+            # stays empty under Newton) -- clear the backend's copy instead, matching _clear()'s gating.
+            og.sim.physics_backend.create_particle_system(self.name)
+            n = len(og.sim.physics_backend.get_particle_positions(self.name))
+            if n > 0:
+                og.sim.physics_backend.remove_particles(self.name, list(range(n)))
+            return
         self._sync_particle_instancers(idns=[], particle_groups=[], particle_counts=[])
 
 
@@ -1365,6 +1524,10 @@ class FluidSystem(MicroPhysicalParticleSystem):
             if customize_particle_material is not None:
                 customize_particle_material(self._material)
 
+        # Kept raw so the color can be computed without a material on non-PhysX backends (see initialize())
+        self._customize_fluid_material = customize_particle_material
+        self._render_opacity = None
+
         # Create and return the class
         return super().__init__(
             name=name,
@@ -1379,6 +1542,23 @@ class FluidSystem(MicroPhysicalParticleSystem):
     def initialize(self, scene):
         # Run super first
         super().initialize(scene)
+
+        # No PhysX particle-system material/isosurface infrastructure exists standalone (see
+        # MicroParticleSystem.initialize(), which already leaves self._material unset for this backend). Compute the
+        # color the material would have from its preset's inputs plus this fluid's overrides instead, and an opacity
+        # from how see-through it is (clear water vs. milk), for backends that render the fluid as a flat surface.
+        if gm.PHYSICS_BACKEND != "physx":
+            preset = OmniSurfaceMaterialPrim.FLUID_PRESET_COLOR_INPUTS.get(self._material_mtl_name)
+            if preset is not None:
+                inputs = SimpleNamespace(**dict(zip(OmniSurfaceMaterialPrim.COLOR_INPUT_NAMES, preset)))
+                if self._customize_fluid_material is not None:
+                    self._customize_fluid_material(inputs)
+                color, transmission = OmniSurfaceMaterialPrim.average_color_and_transmission(
+                    *(getattr(inputs, name) for name in OmniSurfaceMaterialPrim.COLOR_INPUT_NAMES)
+                )
+                self._color = color.float()
+                self._render_opacity = 1.0 - 0.65 * transmission
+            return
 
         # Assert that the material is an OmniSurface material.
         assert isinstance(
@@ -1406,6 +1586,15 @@ class FluidSystem(MicroPhysicalParticleSystem):
             with og.sim.editing_usd():
                 # Modify the grid smoothing radius to avoid "blobby" appearances
                 self.system_prim.GetAttribute("physxParticleIsosurface:gridSmoothingRadius").Set(0.0001)
+
+    @property
+    def render_opacity(self):
+        """
+        Returns:
+            None or float: Opacity to draw this fluid's surface with on non-PhysX backends (Kit renders its material
+                directly instead), or None if its material preset is unknown
+        """
+        return self._render_opacity
 
     @property
     def is_fluid(self):
@@ -1530,7 +1719,10 @@ class GranularSystem(MicroPhysicalParticleSystem):
         # Copy it to the standardized prim path
         prototype_path = f"{self.prim_path}/prototype0"
         with og.sim.editing_usd():
-            lazy.omni.kit.commands.execute("CopyPrim", path_from=visual_geom.prim_path, path_to=prototype_path)
+            if gm.PHYSICS_BACKEND == "physx":
+                lazy.omni.kit.commands.execute("CopyPrim", path_from=visual_geom.prim_path, path_to=prototype_path)
+            else:
+                copy_mesh_prim_to_path(visual_geom.prim_path, prototype_path)
 
         # Wrap it with GeomPrim with the correct scale
         relative_prototype_path = absolute_prim_path_to_scene_relative(self._scene, prototype_path)
@@ -1597,6 +1789,13 @@ class Cloth(MicroParticleSystem):
         Args:
             mesh_prim (Usd.Prim): Mesh prim to clothify
         """
+        # No PhysxAutoParticleClothAPI equivalent standalone -- Newton's cloth import instead happens
+        # per-object, structurally, in NewtonBackend._rebuild() (it detects PrimType.CLOTH objects and
+        # calls builder.add_cloth_mesh() directly against the mesh's raw USD geometry), not via this
+        # PhysX-particle-system-authoring call at object-load time.
+        if gm.PHYSICS_BACKEND != "physx":
+            return
+
         with og.sim.editing_usd():
             # Convert into particle cloth
             lazy.omni.physx.scripts.particleUtils.add_physx_particle_cloth(

@@ -715,6 +715,25 @@ class _NewtonBatchArticulationView:
             target[self._handles[row]._global_qd_idx] = data[row]
 
 
+class _ParticleImportRoot:
+    """
+    Stands in for a scene object in _rebuild_impl()'s import loop, for a macro particle system. Imported from the
+    system prim  while ignoring every other child, e.g. the particle template.
+    """
+
+    prim_type = PrimType.RIGID
+    fixed_base = False
+    is_particle_root = True
+
+    def __init__(self, system_prim):
+        self.prim_path = str(system_prim.GetPath())
+        self.ignore_paths = [
+            str(child.GetPath())
+            for child in system_prim.GetChildren()
+            if child.GetName() != "particles" and not child.IsA(lazy.pxr.UsdShade.Material)
+        ]
+
+
 def _match_body_paths(backend, pattern):
     matched = set(_match_paths(pattern, backend._path_body_map))
     matched = [(path, idx) for path, idx in backend._path_body_map.items() if path in matched]
@@ -746,6 +765,10 @@ class _NewtonRigidBodyBatchView:
         if self._pattern is None:
             return
         backend = self._backend
+        # Only a view that would actually see the pending particles forces the deferred rebuild -- scene-wide views
+        # (RigidBodyViewAPI, RigidContactAPI) are re-created on every update_handles().
+        if backend._macro_particles_dirty and _match_paths(self._pattern, backend._macro_particle_roots()):
+            backend.ensure_model_current()
         if self._generation != backend._model_generation:
             self._generation = self._backend._model_generation
             paths, idxs = _match_body_paths(self._backend, self._pattern)
@@ -1030,6 +1053,13 @@ class NewtonBackend(PhysicsBackend):
     # Arm joints need more: 1e-2 let held objects slip in the hand and go NaN.
     _ARM_JOINT_ARMATURE_FLOOR = 1.0e-1
     _JOINT_FRICTION_FLOOR = 2.0e-1
+    # Critically damped finger contacts, with MuJoCo's timestep safety clamp enabled. The
+    # scene-wide soft contacts allow centimeter-scale penetration during gripper closure.
+    _FINGER_CONTACT_SOLREF = (0.01, 1.0)
+    _FINGER_CONTACT_SOLMIX = 1000.0
+    # Disabled WELD equality slots preallocated on every rebuild for create_attachment_constraint() (by default two
+    # arms' worth of assisted grasps for two robots). Can be increased but requires a rebuild of the graph.
+    _MIN_ATTACHMENT_SLOTS = 4
 
     def __init__(self, sim=None):
         super().__init__(sim)
@@ -1042,7 +1072,10 @@ class NewtonBackend(PhysicsBackend):
         self._control = None
         self._contacts = None
         self._solver = None
+        self._collision_pipeline = None
+        # Newton collision pipeline feeding the plain (rigid-only) SolverMuJoCo path -- see _rebuild()
         self._rigid_collision_pipeline = None
+        self._mpm_in_place = False
         self._pre_step_cb = None
         self._post_step_cb = None
         self._joint_break_cb = None
@@ -1053,6 +1086,14 @@ class NewtonBackend(PhysicsBackend):
         self._contacts_dirty = True
         self._rebuilding = False
         self._path_joint_map = {}
+        self._path_cloth_particle_map = {}  # cloth entity prim_path -> (particle_start, particle_end)
+        # Fluid/granular particle systems (MicroPhysicalParticleSystem, e.g. "water") -- unlike cloth,
+        # particle count changes at runtime (generate_particles()/remove_particles()), so the
+        # authoritative current state lives here (synced from the live model before each mutation),
+        # not just derived from a fixed USD mesh.
+        self._fluid_systems = {}  # system_name -> {"pos": (N, 3) tensor, "vel": (N, 3) tensor}
+        self._path_fluid_particle_map = {}  # system_name -> (particle_start, particle_end) in the CURRENT model
+        self._fluid_surface_cache = {}  # see get_fluid_surface_meshes()
         self._articulation_handles = {}
         self._rigid_body_handles = {}
         self._gravity = 9.81
@@ -1065,8 +1106,18 @@ class NewtonBackend(PhysicsBackend):
         self._breakable_joints = {}
         self._already_broken_joints = set()
         self._joints_settle_steps_remaining = 0
+        self._attachment_constraints = {}
+        self._attachment_slots = []
+        # Set when a body's density (or a zero mass, meaning "derive from density") is authored on a live
+        # model.
         self._mass_properties_dirty = False
+        # MacroPhysicalParticleSystem particles are individual rigid-body prims under their system (not scene
+        # objects), imported by _rebuild_impl() after every object so object body indices stay stable.
+        self._known_macro_particle_paths = frozenset()
+        self._macro_particles_dirty = False
+        self._ensuring_model_current = False
         self._model_generation = 0
+        self._attachment_slot_count = self._MIN_ATTACHMENT_SLOTS
         self._warned_cpu_device = False
 
     @classmethod
@@ -1168,6 +1219,8 @@ class NewtonBackend(PhysicsBackend):
         self._sim_context.render()
 
     def step(self, render):
+        # Apply any deferred particle-set change before physics runs.
+        self.ensure_model_current()
         self._sim_context.step(render=render)
 
     # MuJoCo rejects even a -1e-10 deficit, so this margin only has to cover float32 rounding.
@@ -1255,8 +1308,9 @@ class NewtonBackend(PhysicsBackend):
         return graph
 
     def step_physics_once(self, current_time):
-        if self._mass_properties_dirty:
+        if self._mass_properties_dirty or self._macro_particles_dirty:
             self._mass_properties_dirty = False
+            self._macro_particles_dirty = False
             self._joints_dirty = True
         if self._joints_dirty:
             self._joints_dirty = False
@@ -1266,17 +1320,36 @@ class NewtonBackend(PhysicsBackend):
             self._pre_step_cb()
 
         if self._solver is not None:
-            step_dt = self.get_physics_dt()
-            if self._rigid_collision_pipeline is not None:
-                self._rigid_collision_pipeline.collide(self._state_0, self._contacts)
-            graph = self._step_graph(step_dt)
-            if graph is not None:
-                import warp as wp
-
-                wp.capture_launch(graph)
+            if self._mpm_in_place:
+                applied_body_f = self._applied_body_forces()
+                self._state_0.clear_forces()
+                self._restore_applied_body_forces(applied_body_f)
+                if self._collision_pipeline is not None:
+                    self._collision_pipeline.collide(self._state_0, self._contacts)
+                self._solver.step(self._state_0, self._state_0, self._control, self._contacts, self.get_physics_dt())
+            elif self._collision_pipeline is not None:
+                substep_dt = self.get_physics_dt() / self._PARTICLE_SUBSTEPS
+                # Hold an applied force through every substep, so it delivers one full physics step's impulse
+                applied_body_f = self._applied_body_forces()
+                for _ in range(self._PARTICLE_SUBSTEPS):
+                    self._state_0.clear_forces()
+                    self._restore_applied_body_forces(applied_body_f)
+                    self._collision_pipeline.collide(self._state_0, self._contacts)
+                    self._solver.step(self._state_0, self._state_1, self._control, self._contacts, substep_dt)
+                    self._state_0, self._state_1 = self._state_1, self._state_0
             else:
-                self._solver.step(self._state_0, self._state_1, self._control, self._contacts, step_dt)
-            self._state_0, self._state_1 = self._state_1, self._state_0
+                # Replay this substep from a CUDA graph when one is available.
+                step_dt = self.get_physics_dt()
+                if self._rigid_collision_pipeline is not None:
+                    self._rigid_collision_pipeline.collide(self._state_0, self._contacts)
+                graph = self._step_graph(step_dt)
+                if graph is not None:
+                    import warp as wp
+
+                    wp.capture_launch(graph)
+                else:
+                    self._solver.step(self._state_0, self._state_1, self._control, self._contacts, step_dt)
+                self._state_0, self._state_1 = self._state_1, self._state_0
             self._state_0.clear_forces()
 
             self._bvh_dirty = True
@@ -1285,6 +1358,15 @@ class NewtonBackend(PhysicsBackend):
 
         if self._post_step_cb is not None:
             self._post_step_cb()
+
+    def _applied_body_forces(self):
+        """Copy of the apply_force_at_pos()/apply_torque() wrenches pending on state_0, or None."""
+        body_f = self._state_0.body_f
+        return None if body_f is None else _wp_to_torch(body_f).clone()
+
+    def _restore_applied_body_forces(self, applied_body_f):
+        if applied_body_f is not None:
+            _wp_to_torch(self._state_0.body_f).copy_(applied_body_f)
 
     def _compute_mass_matrix(self, handle):
         import newton
@@ -1328,9 +1410,47 @@ class NewtonBackend(PhysicsBackend):
     def physics_sim_view(self):
         return _NewtonPhysicsSimView(self)
 
+    def _macro_particle_roots(self):
+        """{particle prim path: owning system} for every live MacroPhysicalParticleSystem particle."""
+        from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
+
+        paths = {}
+        for scene in self.sim.scenes:
+            for system in scene.active_systems.values():
+                if not isinstance(system, MacroPhysicalParticleSystem) or not system.initialized:
+                    continue
+                root = self.sim.stage.GetPrimAtPath(f"{system.prim_path}/particles")
+                if not root.IsValid():
+                    continue
+                for child in root.GetChildren():
+                    if child.IsActive() and child.HasAPI(lazy.pxr.UsdPhysics.RigidBodyAPI):
+                        paths[str(child.GetPath())] = system
+        return paths
+
+    def ensure_model_current(self):
+        """
+        Applies a lazily-deferred model change (e.g. new macro particles) now, if one is pending and it's safe to.
+        """
+        if (
+            not self._macro_particles_dirty
+            or self._rebuilding
+            or self._ensuring_model_current
+            or self.sim.currently_stepping
+        ):
+            return
+        self._ensuring_model_current = True
+        try:
+            self._macro_particles_dirty = False
+            self._rebuild()
+            self.sim.update_handles()
+        finally:
+            self._ensuring_model_current = False
+
     def refresh_physics_sim_view(self):
         if self._model is None or not self.is_playing():
             return
+        if frozenset(self._macro_particle_roots()) != self._known_macro_particle_paths:
+            self._macro_particles_dirty = True
         current_paths = frozenset(obj.prim_path for scene in self.sim.scenes for obj in scene.objects)
         if current_paths != self._known_object_paths:
             self._rebuild()
@@ -1459,6 +1579,24 @@ class NewtonBackend(PhysicsBackend):
         if changed and getattr(solver, "mjw_model", None) is not None:
             solver.mjw_model.geom_priority.assign(mj_model.geom_priority)
 
+    def _configure_finger_contacts(self, body_idx):
+        """Keep finger contacts firm without stiffening resting contacts throughout the scene."""
+        if not body_idx:
+            return
+        solver = self._get_mujoco_solver()
+        if solver is None:
+            return
+        mj_model = solver.mj_model
+        body_map = solver.mjc_body_to_newton.numpy()[0]
+        for geom_idx, mjc_body in enumerate(mj_model.geom_bodyid):
+            if int(body_map[mjc_body]) in body_idx:
+                mj_model.geom_solref[geom_idx] = self._FINGER_CONTACT_SOLREF
+                # Weight finger contact response over the object's soft settings without changing
+                # geom priority, which would also override friction mixing.
+                mj_model.geom_solmix[geom_idx] = self._FINGER_CONTACT_SOLMIX
+        solver.mjw_model.geom_solref.assign(mj_model.geom_solref)
+        solver.mjw_model.geom_solmix.assign(mj_model.geom_solmix)
+
     def _find_cross_object_joints(self, objects):
         prefixes = [(obj.prim_path + "/", obj) for obj in objects]
 
@@ -1517,6 +1655,8 @@ class NewtonBackend(PhysicsBackend):
 
         from omnigibson.physics_backends.newton_visuals import add_usd_visual_shapes
 
+        for system_name in list(self._path_fluid_particle_map):
+            self._sync_fluid_system_from_model(system_name)
         captured_state = self._capture_state()
         self._already_broken_joints = set()
 
@@ -1531,6 +1671,12 @@ class NewtonBackend(PhysicsBackend):
 
         newton.solvers.SolverMuJoCo.register_custom_attributes(builder)
 
+        if self._fluid_systems:
+            # Must be registered before any particles referencing "mpm:*" custom attributes are added.
+            from newton.solvers import SolverImplicitMPM
+
+            SolverImplicitMPM.register_custom_attributes(builder)
+
         objects = [obj for scene in self.sim.scenes for obj in scene.objects]
 
         from omnigibson.robots import Robot
@@ -1544,11 +1690,19 @@ class NewtonBackend(PhysicsBackend):
 
         path_body_map = {}
         path_joint_map = {}
+        path_cloth_particle_map = {}
         robot_joint_paths = set()
         arm_joint_paths = set()
         low_friction_body_idx = set()
-        for obj in objects:
+        finger_body_idx = set()
+        # Macro-particle roots go last, so object body indices are unaffected by particle changes
+        macro_particle_paths = self._macro_particle_roots()
+        particle_systems = sorted({system.prim_path for system in macro_particle_paths.values()})
+        import_roots = objects + [_ParticleImportRoot(self.sim.stage.GetPrimAtPath(path)) for path in particle_systems]
+        for obj in import_roots:
+            is_particle_root = getattr(obj, "is_particle_root", False)
             if obj.prim_type == PrimType.CLOTH:
+                self._add_cloth_object(builder, obj, path_cloth_particle_map)
                 continue
 
             joint_count_before = len(builder.joint_articulation)
@@ -1558,7 +1712,10 @@ class NewtonBackend(PhysicsBackend):
                 floating=not obj.fixed_base,
                 enable_self_collisions=False,
                 collapse_fixed_joints=False,
-                skip_mesh_approximation=False,
+                # Apply each collider's authored physics:approximation (convexHull on BEHAVIOR assets).
+                # Scenes with fluid keep the raw meshes:
+                # SolverImplicitMPM cannot build a collider from a convex mesh ("Shape type 10 not supported")
+                skip_mesh_approximation=bool(self._fluid_systems),
                 load_visual_shapes=False,
                 schema_resolvers=[
                     newton.usd.SchemaResolverNewton(),
@@ -1566,7 +1723,7 @@ class NewtonBackend(PhysicsBackend):
                     newton.usd.SchemaResolverMjc(),
                 ],
                 hide_collision_shapes=True,
-                ignore_paths=ignore_paths_by_obj.get(obj),
+                ignore_paths=getattr(obj, "ignore_paths", None) or ignore_paths_by_obj.get(obj),
             )
             # add_usd()'s own visual import is off; bake textured render-only shapes for Newton's viewers instead
             add_usd_visual_shapes(newton, builder, self.sim.stage, obj.prim_path, info["path_body_map"])
@@ -1577,6 +1734,11 @@ class NewtonBackend(PhysicsBackend):
                 robot_joint_paths.update(info["path_joint_map"].keys())
                 low_friction_body_idx |= self._apply_floor_contact_friction(builder, obj, info["path_body_map"])
                 if obj.is_manipulation:
+                    for names in obj.finger_link_names.values():
+                        for name in names:
+                            idx = info["path_body_map"].get(f"{obj.prim_path}/{name}")
+                            if idx is not None:
+                                finger_body_idx.add(int(idx))
                     arm_names = {name for names in obj.arm_joint_names.values() for name in names}
                     arm_joint_paths.update(p for p in info["path_joint_map"] if p.rsplit("/", 1)[-1] in arm_names)
 
@@ -1595,6 +1757,11 @@ class NewtonBackend(PhysicsBackend):
                 for idx in range(joint_count_before, len(builder.joint_articulation))
                 if builder.joint_articulation[idx] < 0
             )
+            if is_particle_root:
+                # Each particle is its own free body, not one articulation
+                for idx in unassigned:
+                    builder.add_articulation([idx], label=f"{obj.prim_path}_{idx}")
+                continue
             run_start = None
             for i, idx in enumerate(unassigned):
                 if run_start is None:
@@ -1644,9 +1811,41 @@ class NewtonBackend(PhysicsBackend):
         if self._breakable_joints:
             self._joints_settle_steps_remaining = 1
 
+        # Allocate slots for create_attachment_constraint() so that we don't require a rebuild later.
+        self._attachment_slot_count = max(self._attachment_slot_count, len(self._attachment_constraints))
+        self._attachment_slots = []
+        if builder.body_count > 0:
+            for _ in range(self._attachment_slot_count):
+                slot = builder.add_custom_values(
+                    **{
+                        "mujoco:equality_constraint_type": int(newton.solvers.SolverMuJoCo.EqType.WELD),
+                        "mujoco:equality_constraint_body1": -1,
+                        "mujoco:equality_constraint_body2": 0,
+                        "mujoco:equality_constraint_enabled": False,
+                        "mujoco:equality_constraint_label": "og_attachment_slot",
+                    }
+                )
+                self._attachment_slots.append(slot["mujoco:equality_constraint_type"])
+
         self._path_body_map = path_body_map
         self._body_path_map = {idx: path for path, idx in path_body_map.items()}
         self._path_joint_map = path_joint_map
+        self._path_cloth_particle_map = path_cloth_particle_map
+
+        path_fluid_particle_map = {}
+        for system_name, particles in self._fluid_systems.items():
+            particle_start = builder.particle_count
+            pos = particles["pos"]
+            vel = particles["vel"]
+            builder.add_particles(
+                pos=[wp.vec3(*p) for p in pos.tolist()],
+                vel=[wp.vec3(*v) for v in vel.tolist()],
+                mass=[self._FLUID_DEFAULT_PARTICLE_MASS] * len(pos),
+                radius=[self._FLUID_DEFAULT_PARTICLE_RADIUS] * len(pos),
+                custom_attributes=self._FLUID_MATERIAL_DEFAULTS,
+            )
+            path_fluid_particle_map[system_name] = (particle_start, builder.particle_count)
+        self._path_fluid_particle_map = path_fluid_particle_map
 
         joint_qd_start = builder.joint_qd_start
         robot_authored_effort = {}
@@ -1865,9 +2064,115 @@ class NewtonBackend(PhysicsBackend):
             self._model.bvh_build_shapes(self._state_0, shape_flags=newton.ShapeFlags.COLLIDE_SHAPES)
         self._bvh_dirty = False
 
+        self._mpm_in_place = False
+        has_cloth = bool(path_cloth_particle_map)
+        has_fluid = any(end > start for start, end in path_fluid_particle_map.values())
         has_rigid = self._model.joint_count > 0
         self._rigid_collision_pipeline = None
-        if has_rigid:
+        if has_cloth and has_fluid:
+            # Not yet supported simultaneously
+            log.warning(
+                "Newton backend does not yet support cloth and fluid particles simultaneously in the "
+                "same scene -- only the fluid system(s) will be simulated this rebuild."
+            )
+
+        if has_fluid and has_rigid:
+            from newton.solvers.experimental.coupled import SolverCoupledProxy
+            from newton.solvers import SolverImplicitMPM
+
+            rigid_body_indices = list(range(self._model.body_count))
+            body_flags = self._model.body_flags.numpy()
+            kinematic = int(newton.BodyFlags.KINEMATIC)
+            kinematic_body_indices = [i for i in rigid_body_indices if body_flags[i] & kinematic]
+            dynamic_body_indices = [i for i in rigid_body_indices if not body_flags[i] & kinematic]
+            # One shared factory: SolverCoupledProxy requires every mjc->mpm proxy to use the same one
+            no_proxy_collisions = lambda _model: None
+            mpm_config = self._make_mpm_config()
+            self._solver = SolverCoupledProxy(
+                model=self._model,
+                entries=[
+                    SolverCoupledProxy.Entry(
+                        name="mpm",
+                        solver=lambda v: SolverImplicitMPM(model=v, config=mpm_config),
+                        particles=list(range(self._model.particle_count)),
+                        in_place=True,
+                    ),
+                    SolverCoupledProxy.Entry(
+                        name="mjc",
+                        solver=lambda v: newton.solvers.SolverMuJoCo(model=v, **self._mujoco_solver_kwargs()),
+                        bodies=rigid_body_indices,
+                        joints=list(range(self._model.joint_count)),
+                    ),
+                ],
+                coupling=SolverCoupledProxy.Config(
+                    proxies=[
+                        SolverCoupledProxy.Proxy(
+                            source="mjc",
+                            destination="mpm",
+                            bodies=bodies,
+                            mass_scale=1.0,
+                            mode=mode,
+                            collision_pipeline=no_proxy_collisions,
+                        )
+                        for bodies, mode in ((dynamic_body_indices, "lagged"), (kinematic_body_indices, "staggered"))
+                        if bodies
+                    ],
+                    iterations=1,
+                ),
+            )
+            self._collision_pipeline = newton.CollisionPipeline(self._model, soft_contact_max=0)
+            self._contacts = self._collision_pipeline.contacts()
+            self._mpm_in_place = True
+        elif has_fluid:
+            # Fluid but no rigid bodies.
+            mpm_config = self._make_mpm_config()
+            self._solver = SolverImplicitMPM(model=self._model, config=mpm_config)
+            self._collision_pipeline = None
+            self._mpm_in_place = True
+        elif self._model.particle_count > 0 and has_rigid:
+            # Cloth/particle and rigid bodies
+            from newton.solvers.experimental.coupled import SolverCoupledProxy
+
+            self._model.soft_contact_ke = 1.0e2
+            self._model.soft_contact_kd = 1.0
+            rigid_body_indices = list(range(self._model.body_count))
+            self._solver = SolverCoupledProxy(
+                model=self._model,
+                entries=[
+                    SolverCoupledProxy.Entry(
+                        name="xpbd",
+                        solver=lambda v: newton.solvers.SolverXPBD(model=v, iterations=40),
+                        particles=list(range(self._model.particle_count)),
+                    ),
+                    SolverCoupledProxy.Entry(
+                        name="mjc",
+                        solver=lambda v: newton.solvers.SolverMuJoCo(model=v, **self._mujoco_solver_kwargs()),
+                        bodies=rigid_body_indices,
+                        joints=list(range(self._model.joint_count)),
+                    ),
+                ],
+                coupling=SolverCoupledProxy.Config(
+                    proxies=[
+                        SolverCoupledProxy.Proxy(
+                            source="mjc", destination="xpbd", bodies=rigid_body_indices, mass_scale=1.0
+                        )
+                    ],
+                    iterations=1,
+                ),
+            )
+            self._collision_pipeline = newton.CollisionPipeline(self._model)
+            self._contacts = self._collision_pipeline.contacts()
+            self._mpm_in_place = False
+        elif self._model.particle_count > 0:
+            # Particles/cloth but no rigid bodies
+            self._model.soft_contact_ke = 1.0e2
+            self._model.soft_contact_kd = 1.0
+            self._solver = newton.solvers.SolverXPBD(model=self._model, iterations=40)
+            self._collision_pipeline = newton.CollisionPipeline(self._model)
+            self._contacts = self._collision_pipeline.contacts()
+            self._mpm_in_place = False
+        elif self._model.joint_count > 0:
+            self._collision_pipeline = None
             try:
                 self._solver = newton.solvers.SolverMuJoCo(self._model, **self._mujoco_solver_kwargs())
                 self._rigid_collision_pipeline = newton.CollisionPipeline(
@@ -1887,9 +2192,13 @@ class NewtonBackend(PhysicsBackend):
                     )
                 self._solver = None
         else:
+            self._collision_pipeline = None
             self._solver = None
 
         self._elevate_low_friction_geom_priority(low_friction_body_idx)
+        self._configure_finger_contacts(finger_body_idx)
+        # Re-apply any attachment constraints that were live before this rebuild onto the fresh pool.
+        self._sync_attachment_slots()
         self._fix_cross_object_constraint_frames()
 
         for handle in self._articulation_handles.values():
@@ -1908,8 +2217,34 @@ class NewtonBackend(PhysicsBackend):
         self._contacts_dirty = True
 
         self._known_object_paths = frozenset(obj.prim_path for obj in objects)
+        self._known_macro_particle_paths = frozenset(macro_particle_paths)
         self._model_generation += 1
         self._restore_state(captured_state)
+
+    # Rough starting-point stiffness values for cloth.
+    _CLOTH_DEFAULT_TRI_KE = 1.0e2
+    _CLOTH_DEFAULT_TRI_KA = 1.0e2
+    _CLOTH_DEFAULT_TRI_KD = 1.0e-1
+    _CLOTH_DEFAULT_EDGE_KE = 1.0
+    _CLOTH_DEFAULT_EDGE_KD = 1.0e-2
+    _CLOTH_DEFAULT_SPRING_KE = 1.0
+    _CLOTH_DEFAULT_SPRING_KD = 1.0e-2
+    _CLOTH_DEFAULT_PARTICLE_RADIUS = 0.01
+    _CLOTH_DEFAULT_DENSITY = 200.0
+    # Number of XPBD sub-steps per OmniGibson physics step (see step_physics_once()) -- matches
+    # newton's own example_mujoco_xpbd_coupled_solver.py's substep count.
+    _PARTICLE_SUBSTEPS = 32
+
+    # Fluid (SolverImplicitMPM) defaults: water as in newton's example_mpm_water_dam_break.py -- frictionless, with
+    # newton's own (incompressible) yield defaults.
+    _FLUID_DEFAULT_PARTICLE_RADIUS = 0.01
+    _FLUID_DEFAULT_PARTICLE_MASS = 1000.0 * (2 * _FLUID_DEFAULT_PARTICLE_RADIUS) ** 3
+    _FLUID_MATERIAL_DEFAULTS = {
+        "mpm:friction": 0.0,
+        "mpm:tensile_yield_ratio": 1.0,
+        "mpm:viscosity": 0.0,
+    }
+    _FLUID_VOXEL_SIZE = 0.05
 
     # Must match or exceed every SolverMuJoCo construction's nconmax below.
     _RIGID_CONTACT_MAX = 250_000
@@ -1929,10 +2264,92 @@ class NewtonBackend(PhysicsBackend):
             nconmax=self._RIGID_CONTACT_MAX,
         )
 
+    def _make_mpm_config(self):
+        """SolverImplicitMPM.Config, validated standalone against a water-like blob (settles/spreads
+        flat under gravity, no explosion) -- matches newton's own coupled-MPM example's tuning."""
+        from newton.solvers import SolverImplicitMPM
+
+        config = SolverImplicitMPM.Config()
+        config.voxel_size = self._FLUID_VOXEL_SIZE
+        config.grid_type = "fixed"
+        config.grid_padding = 50
+        config.max_active_cell_count = 1 << 15
+        config.strain_basis = "P0"
+        config.max_iterations = 50
+        config.critical_fraction = 0.0
+        return config
+
+    def _add_cloth_object(self, builder, obj, path_cloth_particle_map):
+        """
+        Imports one cloth object's mesh into `builder` via `add_cloth_mesh()`, and records its particle
+        index range (keyed by the mesh prim's own path -- matching `ClothPrim.prim_path`, since
+        `ClothPrim` is a `GeomPrim` wrapping the promoted mesh itself, not the parent entity) so
+        `get/set_cloth_particle_positions/velocities` can slice `state.particle_q/qd` for it later.
+        """
+        import warp as wp
+
+        mesh_prim = self.sim.stage.GetPrimAtPath(obj.root_link.prim_path)
+        points = mesh_prim.GetAttribute("points").Get()
+        face_vertex_counts = mesh_prim.GetAttribute("faceVertexCounts").Get()
+        face_vertex_indices = mesh_prim.GetAttribute("faceVertexIndices").Get()
+
+        # Fan-triangulate arbitrary polygon faces into a flat triangle index list.
+        indices = []
+        offset = 0
+        for count in face_vertex_counts:
+            face = face_vertex_indices[offset : offset + count]
+            for i in range(1, count - 1):
+                indices.extend([face[0], face[i], face[i + 1]])
+            offset += count
+
+        matrix = lazy.pxr.UsdGeom.Xformable(mesh_prim).ComputeLocalToWorldTransform(lazy.pxr.Usd.TimeCode.Default())
+        transform = lazy.pxr.Gf.Transform(matrix)
+        pos = transform.GetTranslation()
+        rot = transform.GetRotation().GetQuat()
+        # add_cloth_mesh() only accepts a single uniform scale -- bake any (possibly non-uniform)
+        # object scale directly into the vertices instead, and pass scale=1.0 below.
+        scale = transform.GetScale()
+        vertices = [(p[0] * scale[0], p[1] * scale[1], p[2] * scale[2]) for p in points]
+
+        particle_start = builder.particle_count
+        builder.add_cloth_mesh(
+            pos=wp.vec3(pos[0], pos[1], pos[2]),
+            rot=wp.quat(rot.GetImaginary()[0], rot.GetImaginary()[1], rot.GetImaginary()[2], rot.GetReal()),
+            scale=1.0,
+            vel=wp.vec3(0.0, 0.0, 0.0),
+            vertices=vertices,
+            indices=indices,
+            density=self._CLOTH_DEFAULT_DENSITY,
+            tri_ke=self._CLOTH_DEFAULT_TRI_KE,
+            tri_ka=self._CLOTH_DEFAULT_TRI_KA,
+            tri_kd=self._CLOTH_DEFAULT_TRI_KD,
+            edge_ke=self._CLOTH_DEFAULT_EDGE_KE,
+            edge_kd=self._CLOTH_DEFAULT_EDGE_KD,
+            add_springs=True,
+            spring_ke=self._CLOTH_DEFAULT_SPRING_KE,
+            spring_kd=self._CLOTH_DEFAULT_SPRING_KD,
+            particle_radius=self._CLOTH_DEFAULT_PARTICLE_RADIUS,
+        )
+        particle_end = builder.particle_count
+        path_cloth_particle_map[obj.root_link.prim_path] = (particle_start, particle_end)
+
     def _capture_state(self):
         if self._model is None:
             return None
-        captured = {"articulations": {}, "rigid_bodies": {}}
+        captured = {"articulations": {}, "rigid_bodies": {}, "cloth": {}, "macro_particles": {}}
+        # Macro particles have no per-prim handles; snapshot their bodies directly by path
+        if self._known_macro_particle_paths and self._state_0 is not None and self._state_0.body_q is not None:
+            body_q = _wp_to_torch(self._state_0.body_q)
+            body_qd = _wp_to_torch(self._state_0.body_qd)
+            for path in self._known_macro_particle_paths:
+                idx = self._path_body_map.get(path)
+                if idx is not None:
+                    captured["macro_particles"][path] = (body_q[idx].clone(), body_qd[idx].clone())
+        for path in self._path_cloth_particle_map:
+            captured["cloth"][path] = {
+                "particle_q": self.get_cloth_particle_positions(path).clone(),
+                "particle_qd": self.get_cloth_particle_velocities(path).clone(),
+            }
         for path, handle in self._articulation_handles.items():
             if not handle.is_physics_handle_valid():
                 continue
@@ -1969,6 +2386,11 @@ class NewtonBackend(PhysicsBackend):
     def _restore_state(self, captured):
         if captured is None:
             return
+        for path, data in captured["cloth"].items():
+            if path not in self._path_cloth_particle_map:
+                continue
+            self.set_cloth_particle_positions(path, data["particle_q"])
+            self.set_cloth_particle_velocities(path, data["particle_qd"])
         for path, data in captured["articulations"].items():
             handle = self._articulation_handles.get(path)
             if handle is None or not handle.is_physics_handle_valid():
@@ -1980,6 +2402,11 @@ class NewtonBackend(PhysicsBackend):
                 handle.set_gains(kps=data["gains_ke"], kds=data["gains_kd"])
             if data["world_pos"] is not None and self._path_body_map.get(handle._root_link_prim_path) is not None:
                 handle.set_world_poses(data["world_pos"], data["world_quat"])
+        particle_paths = [p for p in captured.get("macro_particles", {}) if p in self._path_body_map]
+        if particle_paths:
+            view = _NewtonRigidBodyBatchView(self, [self._path_body_map[p] for p in particle_paths], particle_paths)
+            view.set_transforms(th.stack([captured["macro_particles"][p][0] for p in particle_paths]))
+            view.set_velocities(th.stack([captured["macro_particles"][p][1] for p in particle_paths]))
         for path, data in captured["rigid_bodies"].items():
             handle = self._rigid_body_handles.get(path)
             if handle is None or not handle.is_physics_handle_valid():
@@ -1988,6 +2415,8 @@ class NewtonBackend(PhysicsBackend):
             handle.set_linear_velocities(data["lin_vel"])
             handle.set_angular_velocities(data["ang_vel"])
 
+    # ---- Cloth particle state I/O ----
+
     def _cloth_world_transform(self, prim):
         matrix = lazy.pxr.UsdGeom.Xformable(prim).ComputeLocalToWorldTransform(lazy.pxr.Usd.TimeCode.Default())
         linear = th.tensor([[matrix[i][j] for j in range(3)] for i in range(3)], dtype=th.float32)
@@ -1995,6 +2424,10 @@ class NewtonBackend(PhysicsBackend):
         return linear, translation
 
     def get_cloth_particle_positions(self, prim_path, idxs=None):
+        if prim_path in self._path_cloth_particle_map:
+            start, end = self._path_cloth_particle_map[prim_path]
+            particle_q = _wp_to_torch(self._state_0.particle_q)[start:end, :3]
+            return particle_q[th.as_tensor(idxs, device=particle_q.device)] if idxs is not None else particle_q
         prim = self.sim.stage.GetPrimAtPath(prim_path)
         p_local = vtarray_to_torch(prim.GetAttribute("points").Get())
         p_local = p_local[idxs] if idxs is not None else p_local
@@ -2002,6 +2435,16 @@ class NewtonBackend(PhysicsBackend):
         return p_local @ linear + translation
 
     def set_cloth_particle_positions(self, prim_path, positions, idxs=None):
+        if prim_path in self._path_cloth_particle_map:
+            start, end = self._path_cloth_particle_map[prim_path]
+            particle_q = _wp_to_torch(self._state_0.particle_q)
+            idx = th.arange(start, end, device=particle_q.device)
+            if idxs is not None:
+                idx = idx[th.as_tensor(idxs, device=particle_q.device)]
+            particle_q[idx, :3] = th.as_tensor(positions, dtype=particle_q.dtype, device=particle_q.device).reshape(
+                -1, 3
+            )
+            return
         prim = self.sim.stage.GetPrimAtPath(prim_path)
         linear, translation = self._cloth_world_transform(prim)
         p_local = (th.as_tensor(positions, dtype=th.float32, device=translation.device) - translation) @ th.linalg.inv(
@@ -2014,16 +2457,199 @@ class NewtonBackend(PhysicsBackend):
         prim.GetAttribute("points").Set(lazy.pxr.Vt.Vec3fArray(p_local.tolist()))
 
     def get_cloth_particle_velocities(self, prim_path):
+        if prim_path in self._path_cloth_particle_map:
+            start, end = self._path_cloth_particle_map[prim_path]
+            return _wp_to_torch(self._state_0.particle_qd)[start:end, :3]
         return th.zeros(len(self.sim.stage.GetPrimAtPath(prim_path).GetAttribute("points").Get()), 3)
 
     def set_cloth_particle_velocities(self, prim_path, velocities):
-        pass
+        if prim_path not in self._path_cloth_particle_map:
+            return
+        start, end = self._path_cloth_particle_map[prim_path]
+        particle_qd = _wp_to_torch(self._state_0.particle_qd)
+        particle_qd[start:end, :3] = th.as_tensor(
+            velocities, dtype=particle_qd.dtype, device=particle_qd.device
+        ).reshape(-1, 3)
 
     def get_cloth_stiffness(self, prim_path):
-        return {"bend": 0.0, "damping": 0.0, "shear": 0.0, "stretch": 0.0}
+        return {
+            "bend": self._CLOTH_DEFAULT_EDGE_KE,
+            "damping": self._CLOTH_DEFAULT_TRI_KD,
+            "shear": self._CLOTH_DEFAULT_TRI_KA,
+            "stretch": self._CLOTH_DEFAULT_TRI_KE,
+        }
 
     def set_cloth_stiffness(self, prim_path, bend=None, damping=None, shear=None, stretch=None):
         pass
+
+    # ---- Fluid/granular particle-system state I/O ----
+
+    def _sync_fluid_system_from_model(self, system_name):
+        """Write the live model's current state for `system_name` back into self._fluid_systems, if built."""
+        if system_name not in self._path_fluid_particle_map:
+            return
+        start, end = self._path_fluid_particle_map[system_name]
+        if end == start:
+            self._fluid_systems[system_name] = {
+                "pos": th.zeros((0, 3), dtype=th.float32, device=self.sim.device),
+                "vel": th.zeros((0, 3), dtype=th.float32, device=self.sim.device),
+            }
+            return
+        self._fluid_systems[system_name] = {
+            "pos": _wp_to_torch(self._state_0.particle_q)[start:end, :3].clone(),
+            "vel": _wp_to_torch(self._state_0.particle_qd)[start:end, :3].clone(),
+        }
+
+    def create_particle_system(self, system_name):
+        if system_name not in self._fluid_systems:
+            self._fluid_systems[system_name] = {
+                "pos": th.zeros((0, 3), device=self.sim.device),
+                "vel": th.zeros((0, 3), device=self.sim.device),
+            }
+
+    def generate_particles(self, system_name, positions, velocities=None):
+        self._sync_fluid_system_from_model(system_name)
+        positions = th.as_tensor(positions, dtype=th.float32, device=self.sim.device).reshape(-1, 3)
+        velocities = (
+            th.zeros_like(positions)
+            if velocities is None
+            else th.as_tensor(velocities, dtype=th.float32, device=self.sim.device).reshape(-1, 3)
+        )
+        system = self._fluid_systems[system_name]
+        system["pos"] = th.cat([system["pos"], positions])
+        system["vel"] = th.cat([system["vel"], velocities])
+        self._path_fluid_particle_map.pop(system_name, None)
+        self._rebuild()
+
+    def remove_particles(self, system_name, idxs):
+        self._sync_fluid_system_from_model(system_name)
+        system = self._fluid_systems[system_name]
+        keep = th.ones(len(system["pos"]), dtype=th.bool, device=system["pos"].device)
+        keep[th.as_tensor(idxs, dtype=th.long, device=system["pos"].device)] = False
+        system["pos"] = system["pos"][keep]
+        system["vel"] = system["vel"][keep]
+        self._path_fluid_particle_map.pop(system_name, None)
+        self._rebuild()
+
+    def get_particle_positions(self, system_name):
+        if system_name in self._path_fluid_particle_map:
+            start, end = self._path_fluid_particle_map[system_name]
+            if end == start:
+                return th.zeros((0, 3), dtype=th.float32, device=self.sim.device)
+            return _wp_to_torch(self._state_0.particle_q)[start:end, :3]
+        return self._fluid_systems[system_name]["pos"]
+
+    def set_particle_positions(self, system_name, positions, idxs=None):
+        positions = th.as_tensor(positions, dtype=th.float32, device=self.sim.device).reshape(-1, 3)
+        if system_name in self._path_fluid_particle_map:
+            start, end = self._path_fluid_particle_map[system_name]
+            if end == start:
+                return
+            particle_q = _wp_to_torch(self._state_0.particle_q)
+            idx = (
+                th.arange(start, end, device=particle_q.device)[idxs]
+                if idxs is not None
+                else th.arange(start, end, device=particle_q.device)
+            )
+            particle_q[idx, :3] = positions
+        else:
+            system = self._fluid_systems[system_name]
+            if idxs is not None:
+                system["pos"][idxs] = positions.to(system["pos"].device)
+            else:
+                system["pos"] = positions
+
+    def get_particle_velocities(self, system_name):
+        if system_name in self._path_fluid_particle_map:
+            start, end = self._path_fluid_particle_map[system_name]
+            if end == start:
+                return th.zeros((0, 3), dtype=th.float32, device=self.sim.device)
+            return _wp_to_torch(self._state_0.particle_qd)[start:end, :3]
+        return self._fluid_systems[system_name]["vel"]
+
+    def set_particle_velocities(self, system_name, velocities, idxs=None):
+        velocities = th.as_tensor(velocities, dtype=th.float32, device=self.sim.device).reshape(-1, 3)
+        if system_name in self._path_fluid_particle_map:
+            start, end = self._path_fluid_particle_map[system_name]
+            if end == start:
+                return
+            particle_qd = _wp_to_torch(self._state_0.particle_qd)
+            idx = (
+                th.arange(start, end, device=particle_qd.device)[idxs]
+                if idxs is not None
+                else th.arange(start, end, device=particle_qd.device)
+            )
+            particle_qd[idx, :3] = velocities
+        else:
+            system = self._fluid_systems[system_name]
+            if idxs is not None:
+                system["vel"][idxs] = velocities.to(system["vel"].device)
+            else:
+                system["vel"] = velocities
+
+    # Surface reconstruction settings from newton's example_mpm_water_dam_break.py, with the voxel and kernel sized
+    # to _FLUID_VOXEL_SIZE and the 2 cm particle spacing
+    _FLUID_SURFACE_VOXEL_SIZE = 0.3 * _FLUID_VOXEL_SIZE
+    _FLUID_SURFACE_KWARGS = dict(
+        kernel_radius=max(6.0 * _FLUID_DEFAULT_PARTICLE_RADIUS, 1.5 * _FLUID_SURFACE_VOXEL_SIZE),
+        threshold=0.25,
+        smooth_lambda=0.0,
+        anisotropic=True,
+        kernel_scale=0.6,
+        anisotropy_ratio=16.0,
+        anisotropy_scale=2.0,
+        anisotropy_min_neighbors=4,
+        anisotropy_binning=True,
+        anisotropy_strength=0.95,
+        field_smooth_iterations=1,
+        field_smooth_radius=2,
+        field_mode="sdf",
+        redistance_iterations=1,
+        mesh_smooth_iterations=1,
+    )
+
+    def get_fluid_surface_meshes(self):
+        """
+        Surface meshes reconstructed from the live MPM particles, for rendering fluid as a liquid instead of beads.
+
+        Returns:
+            dict: system_name -> (vertices, indices, normals) warp arrays, or None if the system has no surface
+                (e.g. a few isolated droplets). Empty if no fluid is currently simulated.
+        """
+        import warp as wp
+
+        if not self._mpm_in_place:
+            return {}
+        mpm = self._solver.solver("mpm") if hasattr(self._solver, "solver") else self._solver
+        if self._fluid_surface_cache.get("solver") is not mpm:
+            # Each rebuild makes a new solver (and particle layout), so the extraction contexts are per solver
+            self._fluid_surface_cache = {"solver": mpm, "surfaces": {}, "flags": {}}
+        cache = self._fluid_surface_cache
+        systems = {name: span for name, span in self._path_fluid_particle_map.items() if span[1] > span[0]}
+        meshes = {}
+        for system_name, (start, end) in systems.items():
+            if system_name not in cache["surfaces"]:
+                cache["surfaces"][system_name] = mpm.create_particle_surface(
+                    voxel_size=self._FLUID_SURFACE_VOXEL_SIZE, **self._FLUID_SURFACE_KWARGS
+                )
+                flags = None
+                if len(systems) > 1:
+                    # Surface only this system's particles, so separate fluids don't merge into one mesh
+                    flags = mpm._mpm_model.particle_flags.numpy().copy()
+                    flags[:start] = 0
+                    flags[end:] = 0
+                    flags = wp.array(flags, dtype=wp.int32, device=self._model.device)
+                cache["flags"][system_name] = flags
+            mesh = mpm.extract_particle_surface(
+                self._state_0,
+                cache["surfaces"][system_name],
+                extrapolate_into_colliders=True,
+                collider_extrapolation_depth=2.0 * self._FLUID_SURFACE_VOXEL_SIZE,
+                particle_flags=cache["flags"][system_name],
+            )
+            vertices, indices, normals = mesh.to_arrays()
+            meshes[system_name] = None if vertices is None else (vertices, indices, normals)
+        return meshes
 
     def _sync_fk(self):
         import newton
@@ -2262,7 +2888,23 @@ class NewtonBackend(PhysicsBackend):
             self._bvh_dirty = False
 
     def _get_mujoco_solver(self):
-        return self._solver
+        """The live SolverMuJoCo instance backing this model's rigid dynamics, or None if there's no
+        rigid content at all (cloth-only/fluid-only scenes).
+        """
+        if self._solver is None:
+            return None
+        import newton
+
+        if isinstance(self._solver, newton.solvers.SolverMuJoCo):
+            return self._solver
+        from newton.solvers.experimental.coupled import SolverCoupledProxy
+
+        if isinstance(self._solver, SolverCoupledProxy):
+            try:
+                return self._solver.solver("mjc")
+            except KeyError:
+                return None
+        return None
 
     def _ensure_contacts_fresh(self):
         if not self._contacts_dirty:
@@ -2282,11 +2924,114 @@ class NewtonBackend(PhysicsBackend):
         force = _wp_to_torch(self._contact_report_contacts.force)[:n, :3]
         return shape0, shape1, force
 
+    def create_attachment_constraint(
+        self,
+        prim_path,
+        joint_type,
+        body0,
+        body1,
+        joint_frame_in_parent_frame_pos,
+        joint_frame_in_parent_frame_quat,
+        joint_frame_in_child_frame_pos,
+        joint_frame_in_child_frame_quat,
+    ):
+        """
+        Assisted grasping attaches and detaches objects many times per episode. The base implementation's
+        USD joint would trigger a full model rebuild each time (see _on_usd_joint_changed()), so instead
+        this uses one of the model's preallocated slots onto (body0, body1).
+
+        Returns @prim_path as the handle; no USD prim is created.
+        """
+        assert joint_type in ("FixedJoint", "SphericalJoint"), f"Unsupported attachment joint type: {joint_type}"
+        # The joint frames follow USD's convention of being expressed in each body's *scaled* local frame,
+        # whereas MuJoCo's weld anchors live in the unscaled body frame.
+        parent_quat = th.as_tensor(joint_frame_in_parent_frame_quat, dtype=th.float32).cpu()
+        child_quat = th.as_tensor(joint_frame_in_child_frame_quat, dtype=th.float32).cpu()
+        self._attachment_constraints[prim_path] = {
+            "body0": body0,
+            "body1": body1,
+            "anchor0": th.as_tensor(joint_frame_in_parent_frame_pos, dtype=th.float32).cpu() * self._body_scale(body0),
+            "anchor1": th.as_tensor(joint_frame_in_child_frame_pos, dtype=th.float32).cpu() * self._body_scale(body1),
+            # Orientation of body1 relative to body0 implied by both sides' joint frames coinciding.
+            "rel_quat": T.quat_multiply(parent_quat, T.quat_inverse(child_quat)),
+            "torquescale": 1.0 if joint_type == "FixedJoint" else 0.0,
+        }
+        if len(self._attachment_constraints) > len(self._attachment_slots):
+            # Pool exhausted -- grow it with a rebuild, which step_physics_once() runs before the next step.
+            self._joints_dirty = True
+        else:
+            self._sync_attachment_slots()
+        return prim_path
+
+    def remove_attachment_constraint(self, handle):
+        if self._attachment_constraints.pop(handle, None) is not None:
+            self._sync_attachment_slots()
+
     def _body_scale(self, prim_path):
         from pxr import Gf
 
         scale = Gf.Transform(raw_world_transform(self.sim.stage.GetPrimAtPath(prim_path))).GetScale()
         return th.tensor(tuple(scale), dtype=th.float32)
+
+    def _sync_attachment_slots(self):
+        """Writes every live attachment constraint onto the current model's slot pool (in insertion order)
+        and disables the rest.
+        """
+        solver = self._get_mujoco_solver()
+        if solver is None or not self._attachment_slots or solver.mjw_model is None:
+            return
+        import newton
+
+        if solver.model is not self._model:
+            # SolverCoupledProxy hands its MuJoCo entry a view model whose equality rows may be re-indexed.
+            if self._attachment_constraints:
+                log.warning("Attachment constraints are not supported alongside cloth/fluid; ignoring them.")
+            return
+
+        eq_map = _wp_to_torch(solver.mjc_eq_to_newton_eq)[0].tolist()
+        newton_to_mjc_eq = {int(n): i for i, n in enumerate(eq_map) if n >= 0}
+        body_map = _wp_to_torch(solver.mjc_body_to_newton)[0].tolist()
+        newton_to_mjc_body = {int(n): i for i, n in enumerate(body_map)}
+        newton_to_mjc_body[-1] = 0
+
+        attrs = self._model.mujoco
+        eq_obj1id = solver.mjw_model.eq_obj1id.numpy()
+        eq_obj2id = solver.mjw_model.eq_obj2id.numpy()
+        anchor = attrs.equality_constraint_anchor.numpy()
+        relpose = attrs.equality_constraint_relpose.numpy()
+        torquescale = attrs.equality_constraint_torquescale.numpy()
+        enabled = attrs.equality_constraint_enabled.numpy()
+
+        specs = list(self._attachment_constraints.items())
+        for i, slot in enumerate(self._attachment_slots):
+            enabled[slot] = False
+            mjc_eq = newton_to_mjc_eq.get(slot)
+            if mjc_eq is None or i >= len(specs):
+                continue
+            handle, spec = specs[i]
+            mjc_body0 = newton_to_mjc_body.get(self._path_body_map.get(spec["body0"], -2))
+            mjc_body1 = newton_to_mjc_body.get(self._path_body_map.get(spec["body1"], -2))
+            if mjc_body0 is None or mjc_body1 is None:
+                log.warning(f"Attachment constraint {handle} references a body missing from the model; skipping.")
+                continue
+            # MuJoCo weld: obj1's anchor is relpose's translation, obj2's anchor is eq anchor, and
+            # relpose's rotation is obj2's orientation in obj1's frame.
+            eq_obj1id[mjc_eq] = mjc_body0
+            eq_obj2id[mjc_eq] = mjc_body1
+            anchor[slot] = spec["anchor1"].numpy()
+            relpose[slot] = th.cat([spec["anchor0"], spec["rel_quat"]]).numpy()
+            torquescale[slot] = spec["torquescale"]
+            enabled[slot] = True
+
+        solver.mjw_model.eq_obj1id.assign(eq_obj1id)
+        solver.mjw_model.eq_obj2id.assign(eq_obj2id)
+        attrs.equality_constraint_anchor.assign(anchor)
+        attrs.equality_constraint_relpose.assign(relpose)
+        attrs.equality_constraint_torquescale.assign(torquescale)
+        attrs.equality_constraint_enabled.assign(enabled)
+        solver.notify_model_changed(newton.ModelFlags.CONSTRAINT_PROPERTIES)
+        # Matches _notify_dof_properties_changed(): don't replay a graph captured before a notify.
+        self._step_graphs = {}
 
     def _fix_cross_object_constraint_frames(self):
         solver = self._get_mujoco_solver()

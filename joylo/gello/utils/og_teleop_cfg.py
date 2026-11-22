@@ -316,6 +316,13 @@ FLASHLIGHT_INTENSITY = 2000.0
 
 # Visualization settings
 RESOLUTION = [1080, 1080]  # [H, W]
+# Newton GL viewer only (see OGRobotServer._setup_newton_viewer_panels): resolution of the docked
+# secondary camera panels that stand in for Kit's docked viewports, and how many viewer ticks pass
+# between panel refreshes.
+PANEL_RESOLUTION = (256, 256)  # (W, H)
+PANEL_EVERY_N_FRAMES = 1
+PANEL_WINDOW_NAME = "robot cameras"
+
 USE_VISUAL_SPHERES = False
 USE_VERTICAL_VISUALIZERS = False
 GHOST_APPEAR_THRESHOLD = 0.1
@@ -398,6 +405,23 @@ EXTERNAL_CAMERA_CONFIGS = {
         "orientation": [0.4164, -0.1929, -0.3737, 0.8060],
     },
 }
+
+# Extra viewpoint cameras docked as panels inside the Newton GL viewer.
+EXTRA_VIEWPOINT_CAMERA_CONFIGS = {
+    "left_gripper": {
+        "arm": "left",
+        "position": [0.08, 0.0, -0.12],
+        "look_at": [0.0, 0.0, 0.2],
+    },
+    "right_gripper": {
+        "arm": "right",
+        "position": [0.08, 0.0, -0.12],
+        "look_at": [0.0, 0.0, 0.2],
+    },
+}
+VIEWPOINT_CAMERA_UP = [0.0, 0.0, 1.0]
+VIEWPOINT_CAMERA_FOCAL_LENGTH = 17.0
+VIEWPOINT_CAMERA_HORIZONTAL_APERTURE = 30.0
 
 # UI visual settings
 UI_SETTINGS = {

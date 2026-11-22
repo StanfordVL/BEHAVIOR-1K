@@ -74,3 +74,20 @@ def test_save_restore_full(env, breakfast_table):
 
     # Make sure we still have an object that existed beforehand
     assert og.sim.scenes[0].object_registry("name", "breakfast_table") is not None
+
+
+def test_dump_load_fluid_particles(env):
+    water = env.scene.get_system("water")
+    water.generate_particles(positions=th.tensor([[0.0, 0.0, 0.5], [0.1, 0.0, 0.5]]))
+    for _ in range(5):
+        og.sim.step()
+    positions = water.get_particles_position_orientation()[0].clone()
+
+    for serialized in (False, True):
+        state = og.sim.dump_state(serialized=serialized)
+        # Move every particle so the load has to bring it back
+        water.set_particles_position_orientation(positions=positions + th.tensor([0.0, 0.0, 1.0]).to(positions.device))
+        og.sim.load_state(state, serialized=serialized)
+        assert th.allclose(water.get_particles_position_orientation()[0], positions, atol=1e-3)
+
+    env.scene.clear_system("water")

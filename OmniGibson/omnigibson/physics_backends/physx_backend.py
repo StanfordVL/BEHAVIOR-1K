@@ -504,6 +504,46 @@ class PhysXBackend(PhysicsBackend):
                 if value is not None:
                     prim.GetAttribute(self._CLOTH_STIFFNESS_ATTRS[key]).Set(value)
 
+    # PhysX particle systems go through MicroPhysicalParticleSystem/PhysxParticleInstancer directly, not these.
+
+    def create_particle_system(self, system_name):
+        raise NotImplementedError(
+            "PhysX particle-system creation goes through MicroPhysicalParticleSystem/"
+            "PhysxParticleInstancer directly, not this abstraction."
+        )
+
+    def generate_particles(self, system_name, positions, velocities=None):
+        raise NotImplementedError(
+            "PhysX particle generation goes through MicroPhysicalParticleSystem.generate_particles() "
+            "directly, not this abstraction."
+        )
+
+    def remove_particles(self, system_name, idxs):
+        raise NotImplementedError(
+            "PhysX particle removal goes through MicroPhysicalParticleSystem.remove_particles() "
+            "directly, not this abstraction."
+        )
+
+    def get_particle_positions(self, system_name):
+        raise NotImplementedError(
+            "PhysX particle positions are read via PhysxParticleInstancer directly, not this abstraction."
+        )
+
+    def set_particle_positions(self, system_name, positions, idxs=None):
+        raise NotImplementedError(
+            "PhysX particle positions are set via PhysxParticleInstancer directly, not this abstraction."
+        )
+
+    def get_particle_velocities(self, system_name):
+        raise NotImplementedError(
+            "PhysX particle velocities are read via PhysxParticleInstancer directly, not this abstraction."
+        )
+
+    def set_particle_velocities(self, system_name, velocities, idxs=None):
+        raise NotImplementedError(
+            "PhysX particle velocities are set via PhysxParticleInstancer directly, not this abstraction."
+        )
+
     # ---- Joint-break events ----
 
     def is_joint_break_event(self, event):

@@ -90,6 +90,7 @@ class _NewtonCameraResource:
         backend = self.sim.physics_backend
         self._viewer.begin_frame(0.0)
         self._viewer.log_state(backend._state_0)
+        _log_fluid_surfaces(self._viewer, backend)
         self._viewer.end_frame()
 
         # (H, W, 3) uint8, host copy regardless of the viewer's own rendering device.
@@ -106,6 +107,46 @@ class _NewtonCameraResource:
 
     def destroy(self):
         self._viewer = None
+
+
+def _log_fluid_surfaces(viewer, backend):
+    """
+    Draws each fluid system as its reconstructed surface instead of as particles. Call after ``viewer.log_state()``.
+
+    MPM particles are ~2 cm beads at the default radius, so log_state()'s particle spheres read as a pile of marbles.
+    """
+    meshes = backend.get_fluid_surface_meshes()
+    viewer.show_particles = not meshes
+    # Last mesh logged per system, re-logged hidden when its surface goes away: the GL viewer can't take an empty mesh
+    logged = getattr(viewer, "_og_fluid_surfaces", {})
+    for system_name, last_mesh in logged.items():
+        if meshes.get(system_name) is None:
+            viewer.log_mesh(f"/fluid/{system_name}", *last_mesh, hidden=True, dynamic=True)
+    for system_name, mesh in meshes.items():
+        if mesh is None:
+            continue
+        color, opacity = _fluid_look(system_name)
+        viewer.log_mesh(
+            f"/fluid/{system_name}",
+            *mesh,
+            dynamic=True,
+            color=color,
+            roughness=0.15,
+            metallic=0.0,
+            opacity=opacity,
+        )
+        logged[system_name] = mesh
+    viewer._og_fluid_surfaces = logged
+
+
+def _fluid_look(system_name):
+    """The fluid system's (color, opacity), or a translucent water blue if its material preset is unknown."""
+    for scene in og.sim.scenes:
+        if scene.is_system_active(system_name):
+            system = scene.get_system(system_name, force_init=False)
+            if getattr(system, "render_opacity", None) is not None:
+                return tuple(float(c) for c in system.color), system.render_opacity
+    return (0.12, 0.42, 0.8), 0.6
 
 
 class _NewtonAnnotator:
@@ -155,6 +196,9 @@ class NewtonViewerRenderBackend(RenderBackend):
             # Model was rebuilt (dynamic object add/remove): a viewer still bound to the
             # old one renders stale geometry.
             viewer = self._rebind_viewer(viewer, model)
+            if viewer is not None:
+                # set_model() destroyed the meshes _log_fluid_surfaces() logged
+                viewer._og_fluid_surfaces = {}
         if viewer is None:
             # _sync_camera() poses the camera from the tracked prim before every capture
             viewer = self._create_viewer(width=width, height=height)
