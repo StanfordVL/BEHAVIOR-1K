@@ -1134,11 +1134,11 @@ def get_orientation_diff_in_radian(orn0, orn1):
     Returns:
         orn_diff (float): orientation difference in radian
     """
-    vec0 = quat2axisangle(orn0)
-    vec0 /= np.linalg.norm(vec0)
-    vec1 = quat2axisangle(orn1)
-    vec1 /= np.linalg.norm(vec1)
-    return np.arccos(np.dot(vec0, vec1))
+    # Compute the difference quaternion
+    diff_quat = quat_distance(orn0, orn1)
+
+    # The magnitude of the axis-angle vector is the rotation angle
+    return np.linalg.norm(quat2axisangle(diff_quat))
 
 
 def get_pose_error(target_pose, current_pose):
