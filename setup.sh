@@ -1,6 +1,10 @@
 #!/bin/bash
 set -e
 
+# Bump whenever a change to this script requires rebuilding existing envs (Python/Isaac Sim/torch/CUDA
+# pins, conda packages, ...). CI rebuilds its env from scratch when this differs from the image's env.
+BEHAVIOR_ENV_VERSION=2
+
 # Parse arguments
 HELP=false
 NEW_ENV=false
@@ -510,6 +514,9 @@ if [ "$DATASET" = true ]; then
         exit 1
     }
 fi
+
+# Record which env version this env was built for (read by CI, see .github/workflows/tests.yml)
+if [ -n "$CONDA_PREFIX" ]; then echo "$BEHAVIOR_ENV_VERSION" > "$CONDA_PREFIX/.behavior_env_version"; fi
 
 echo ""
 echo "=== Installation Complete! ==="
