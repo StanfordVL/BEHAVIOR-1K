@@ -98,9 +98,9 @@ class TestBehaviorTaskLogic:
             # not some other env's robot — this is what guarantees per-env predicate evaluation is isolated.
             agent_entity = scope["agent.n.01_1"]
             assert agent_entity is not None
-            assert (
-                agent_entity is env.scenes[env_idx].robots[0]
-            ), f"agent in scope[{env_idx}] is not scene {env_idx}'s robot"
+            assert agent_entity is env.scenes[env_idx].robots[0], (
+                f"agent in scope[{env_idx}] is not scene {env_idx}'s robot"
+            )
             print(f"  env {env_idx}: scope has {len(scope)} entries, agent={agent_entity.name}")
 
         # Scopes are independent dict objects
@@ -155,9 +155,9 @@ class TestBehaviorTaskLogic:
 
             # Orientation quaternion should be unit length
             ori_norm = ori.norm()
-            assert th.allclose(
-                ori_norm, th.tensor(1.0), atol=1e-2
-            ), f"Robot {env_idx} orientation not unit quaternion: norm={ori_norm:.4f}"
+            assert th.allclose(ori_norm, th.tensor(1.0), atol=1e-2), (
+                f"Robot {env_idx} orientation not unit quaternion: norm={ori_norm:.4f}"
+            )
 
     def test_activity_attributes(self, behavior_env):
         """BehaviorTask has correct activity attributes after construction."""
@@ -345,12 +345,12 @@ class TestBehaviorTaskGoalCompletion:
 
         # env 1 must be untouched by the selective reset: still incomplete, same potential and goal status
         assert not terminateds2[1], "selective reset of env 0 disturbed env 1's termination state"
-        assert (
-            abs(env.task.get_potential(env, 1) - env1_potential_before) < 1e-6
-        ), "selective reset of env 0 changed env 1's potential"
-        assert (
-            len(infos2[1]["done"]["goal_status"]["unsatisfied"]) == env1_unsatisfied_before
-        ), "selective reset of env 0 changed env 1's goal status"
+        assert abs(env.task.get_potential(env, 1) - env1_potential_before) < 1e-6, (
+            "selective reset of env 0 changed env 1's potential"
+        )
+        assert len(infos2[1]["done"]["goal_status"]["unsatisfied"]) == env1_unsatisfied_before, (
+            "selective reset of env 0 changed env 1's goal status"
+        )
 
 
 class TestBehaviorTaskPartialReset:
@@ -374,9 +374,9 @@ class TestBehaviorTaskPartialReset:
         pos_after = env.scenes[0].robots[0].get_position_orientation(frame="scene")[0]
         print(f"  pos_before={pos_before}, pos_after={pos_after}")
         # BehaviorTask scenes have many objects, so physics settling causes more drift than minimal scenes
-        assert th.allclose(
-            pos_before, pos_after, atol=0.15
-        ), f"Scene 0 robot moved after resetting only scene 1: {pos_before} vs {pos_after}"
+        assert th.allclose(pos_before, pos_after, atol=0.15), (
+            f"Scene 0 robot moved after resetting only scene 1: {pos_before} vs {pos_after}"
+        )
 
 
 #  No-presampled-pose variant
