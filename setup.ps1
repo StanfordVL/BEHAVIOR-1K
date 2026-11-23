@@ -423,7 +423,7 @@ if ($extrasList.Count -gt 0) {
             }
             
             Write-Host "Installing Isaac Sim packages..."
-            pip install $wheelFiles
+            pip install $wheelFiles --extra-index-url https://pypi.nvidia.com
             
             # Verify installation
             try {

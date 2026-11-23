@@ -407,7 +407,7 @@ if [ "$OMNIGIBSON" = true ]; then
                 done
 
                 echo "Installing Isaac Sim packages..."
-                python -m pip install "${wheel_files[@]}"
+                python -m pip install "${wheel_files[@]}" --extra-index-url https://pypi.nvidia.com
                 rm -rf "$temp_dir"
 
                 # Verify installation
