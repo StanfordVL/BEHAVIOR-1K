@@ -442,9 +442,10 @@ if [ "$OMNIGIBSON" = true ]; then
     # Force reinstall cffi 1.17.1 to resolve compatibility issues with Isaac Sim extensions
     python -m pip install --force-reinstall cffi==1.17.1
 
-    # isaacsim-kernel 6.2.0 pins llvmlite==0.46 and websockets<15, which break numba (needs llvmlite 0.48)
+    # isaacsim-kernel 6.2.0 pins llvmlite==0.46 and websockets<15, which break numba (needs llvmlite 0.48;
+    # numba pins one llvmlite minor per release, so pin numba alongside it -- 0.66 <-> llvmlite 0.48)
     # and omnigibson.eval (needs websockets>=13 for websockets.asyncio.server). Re-upgrade them.
-    python -m pip install --force-reinstall -U "coverage>=7.5" "llvmlite>=0.48,<0.49" "websockets>=15.0.1"
+    python -m pip install --force-reinstall -U "coverage>=7.5" "llvmlite>=0.48,<0.49" "numba>=0.66,<0.67" "websockets>=15.0.1"
 
     # Override isaacsim-core's older newton pin; keep in sync with extras_require["newton"] in OmniGibson/setup.py
     python -m pip install "newton[sim]==1.7.0"
