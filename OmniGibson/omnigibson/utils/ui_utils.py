@@ -574,13 +574,24 @@ class KeyboardRobotController:
     Simple class for controlling OmniGibson robots using keyboard commands
     """
 
-    def __init__(self, robot):
+    # pyglet key names (pyglet.window.key.symbol_string) that differ from carb.input.KeyboardInput names
+    _PYGLET_TO_CARB_KEY_NAMES = {
+        **{f"_{i}": f"KEY_{i}" for i in range(10)},
+        "BRACKETLEFT": "LEFT_BRACKET",
+        "BRACKETRIGHT": "RIGHT_BRACKET",
+    }
+
+    def __init__(self, robot, window=None):
         """
         Args:
             robot (BaseRobot): robot to control
+            window (None or pyglet.window.Window): If specified, reads keyboard input from this pyglet window (e.g.
+                when running without Kit). The caller is responsible for pumping its events (window.dispatch_events())
+                every step. Otherwise, reads keyboard input from the Kit app window
         """
         # Store relevant info from robot
         self.robot = robot
+        self.window = window
         self.action_dim = robot.action_dim
         self.controller_info = dict()
         self.joint_idx_to_group_key = dict()
@@ -615,7 +626,7 @@ class KeyboardRobotController:
             None  # Persistent gripper commands, per arm controlled by multi-finger binary control
         )
         # i.e.: if using binary gripper control and when no keypress is active, the gripper action should still the last executed gripper action
-        self.keypress_mapping = None  # Maps omni keybindings to information for controlling various parts of the robot
+        self.keypress_mapping = None  # Maps key names (carb.input.KeyboardInput names) to robot control information
         self.current_keypress = None  # Current key that is being pressed
         self.active_action = None  # Current action information based on the current keypress
         self._pending_release_key = None  # Which key has a pending release (to handle batched events)
@@ -630,12 +641,39 @@ class KeyboardRobotController:
 
     def register_keyboard_handler(self):
         """
-        Sets up the keyboard callback functionality with omniverse
+        Sets up the keyboard callback functionality, with either the pyglet window or omniverse
         """
-        appwindow = lazy.omni.appwindow.get_default_app_window()
-        input_interface = lazy.carb.input.acquire_input_interface()
-        keyboard = appwindow.get_keyboard()
-        self._keyboard_sub = input_interface.subscribe_to_keyboard_events(keyboard, self.keyboard_event_handler)
+        if self.window is not None:
+            import pyglet
+
+            def on_key_press(symbol, modifiers):
+                self.handle_key_event(event_type="KEY_PRESS", key=self._pyglet_key_name(symbol))
+                # Consume the event so pyglet's default handler doesn't close the window on ESC
+                return pyglet.event.EVENT_HANDLED
+
+            def on_key_release(symbol, modifiers):
+                self.handle_key_event(event_type="KEY_RELEASE", key=self._pyglet_key_name(symbol))
+                return pyglet.event.EVENT_HANDLED
+
+            self.window.push_handlers(on_key_press=on_key_press, on_key_release=on_key_release)
+        else:
+            appwindow = lazy.omni.appwindow.get_default_app_window()
+            input_interface = lazy.carb.input.acquire_input_interface()
+            keyboard = appwindow.get_keyboard()
+            self._keyboard_sub = input_interface.subscribe_to_keyboard_events(keyboard, self.keyboard_event_handler)
+
+    def _pyglet_key_name(self, symbol):
+        """
+        Args:
+            symbol (int): pyglet key symbol
+
+        Returns:
+            str: Equivalent carb.input.KeyboardInput name for @symbol
+        """
+        import pyglet
+
+        name = pyglet.window.key.symbol_string(symbol)
+        return self._PYGLET_TO_CARB_KEY_NAMES.get(name, name)
 
     def register_custom_keymapping(self, key, description, callback_fn):
         """
@@ -643,12 +681,14 @@ class KeyboardRobotController:
         Note that this will automatically override any pre-existing callback that existed for that key.
 
         Args:
-            key (carb.input.KeyboardInput): Key to map to callback function
+            key (str or carb.input.KeyboardInput): Key (or carb.input.KeyboardInput name, e.g. "R") to map to callback
+                function
             description (str): Description for the callback function
             callback_fn (function): Callback function, should have signature:
 
                 callback_fn() -> None
         """
+        key = key if isinstance(key, str) else str(key).split(".")[-1]
         self.custom_keymapping[key] = {"description": description, "callback": callback_fn}
 
     def generate_ik_keypress_mapping(self, controller_info):
@@ -664,18 +704,18 @@ class KeyboardRobotController:
         """
         mapping = {}
 
-        mapping[lazy.carb.input.KeyboardInput.UP] = {"idx": controller_info["start_idx"] + 0, "val": 0.1}
-        mapping[lazy.carb.input.KeyboardInput.DOWN] = {"idx": controller_info["start_idx"] + 0, "val": -0.1}
-        mapping[lazy.carb.input.KeyboardInput.RIGHT] = {"idx": controller_info["start_idx"] + 1, "val": -0.1}
-        mapping[lazy.carb.input.KeyboardInput.LEFT] = {"idx": controller_info["start_idx"] + 1, "val": 0.1}
-        mapping[lazy.carb.input.KeyboardInput.P] = {"idx": controller_info["start_idx"] + 2, "val": 0.1}
-        mapping[lazy.carb.input.KeyboardInput.SEMICOLON] = {"idx": controller_info["start_idx"] + 2, "val": -0.1}
-        mapping[lazy.carb.input.KeyboardInput.N] = {"idx": controller_info["start_idx"] + 3, "val": 0.1}
-        mapping[lazy.carb.input.KeyboardInput.B] = {"idx": controller_info["start_idx"] + 3, "val": -0.1}
-        mapping[lazy.carb.input.KeyboardInput.O] = {"idx": controller_info["start_idx"] + 4, "val": 0.1}
-        mapping[lazy.carb.input.KeyboardInput.U] = {"idx": controller_info["start_idx"] + 4, "val": -0.1}
-        mapping[lazy.carb.input.KeyboardInput.V] = {"idx": controller_info["start_idx"] + 5, "val": 0.1}
-        mapping[lazy.carb.input.KeyboardInput.C] = {"idx": controller_info["start_idx"] + 5, "val": -0.1}
+        mapping["UP"] = {"idx": controller_info["start_idx"] + 0, "val": 0.1}
+        mapping["DOWN"] = {"idx": controller_info["start_idx"] + 0, "val": -0.1}
+        mapping["RIGHT"] = {"idx": controller_info["start_idx"] + 1, "val": -0.1}
+        mapping["LEFT"] = {"idx": controller_info["start_idx"] + 1, "val": 0.1}
+        mapping["P"] = {"idx": controller_info["start_idx"] + 2, "val": 0.1}
+        mapping["SEMICOLON"] = {"idx": controller_info["start_idx"] + 2, "val": -0.1}
+        mapping["N"] = {"idx": controller_info["start_idx"] + 3, "val": 0.1}
+        mapping["B"] = {"idx": controller_info["start_idx"] + 3, "val": -0.1}
+        mapping["O"] = {"idx": controller_info["start_idx"] + 4, "val": 0.1}
+        mapping["U"] = {"idx": controller_info["start_idx"] + 4, "val": -0.1}
+        mapping["V"] = {"idx": controller_info["start_idx"] + 5, "val": 0.1}
+        mapping["C"] = {"idx": controller_info["start_idx"] + 5, "val": -0.1}
 
         return mapping
 
@@ -692,18 +732,18 @@ class KeyboardRobotController:
         """
         mapping = {}
 
-        mapping[lazy.carb.input.KeyboardInput.UP] = {"idx": controller_info["start_idx"] + 0, "val": 0.25}
-        mapping[lazy.carb.input.KeyboardInput.DOWN] = {"idx": controller_info["start_idx"] + 0, "val": -0.25}
-        mapping[lazy.carb.input.KeyboardInput.RIGHT] = {"idx": controller_info["start_idx"] + 1, "val": -0.25}
-        mapping[lazy.carb.input.KeyboardInput.LEFT] = {"idx": controller_info["start_idx"] + 1, "val": 0.25}
-        mapping[lazy.carb.input.KeyboardInput.P] = {"idx": controller_info["start_idx"] + 2, "val": 0.25}
-        mapping[lazy.carb.input.KeyboardInput.SEMICOLON] = {"idx": controller_info["start_idx"] + 2, "val": -0.25}
-        mapping[lazy.carb.input.KeyboardInput.N] = {"idx": controller_info["start_idx"] + 3, "val": 0.25}
-        mapping[lazy.carb.input.KeyboardInput.B] = {"idx": controller_info["start_idx"] + 3, "val": -0.25}
-        mapping[lazy.carb.input.KeyboardInput.O] = {"idx": controller_info["start_idx"] + 4, "val": 0.25}
-        mapping[lazy.carb.input.KeyboardInput.U] = {"idx": controller_info["start_idx"] + 4, "val": -0.25}
-        mapping[lazy.carb.input.KeyboardInput.V] = {"idx": controller_info["start_idx"] + 5, "val": 0.25}
-        mapping[lazy.carb.input.KeyboardInput.C] = {"idx": controller_info["start_idx"] + 5, "val": -0.25}
+        mapping["UP"] = {"idx": controller_info["start_idx"] + 0, "val": 0.25}
+        mapping["DOWN"] = {"idx": controller_info["start_idx"] + 0, "val": -0.25}
+        mapping["RIGHT"] = {"idx": controller_info["start_idx"] + 1, "val": -0.25}
+        mapping["LEFT"] = {"idx": controller_info["start_idx"] + 1, "val": 0.25}
+        mapping["P"] = {"idx": controller_info["start_idx"] + 2, "val": 0.25}
+        mapping["SEMICOLON"] = {"idx": controller_info["start_idx"] + 2, "val": -0.25}
+        mapping["N"] = {"idx": controller_info["start_idx"] + 3, "val": 0.25}
+        mapping["B"] = {"idx": controller_info["start_idx"] + 3, "val": -0.25}
+        mapping["O"] = {"idx": controller_info["start_idx"] + 4, "val": 0.25}
+        mapping["U"] = {"idx": controller_info["start_idx"] + 4, "val": -0.25}
+        mapping["V"] = {"idx": controller_info["start_idx"] + 5, "val": 0.25}
+        mapping["C"] = {"idx": controller_info["start_idx"] + 5, "val": -0.25}
 
         return mapping
 
@@ -723,8 +763,8 @@ class KeyboardRobotController:
         self.custom_keymapping = {}
 
         # Add mapping for joint control directions (no index because these are inferred at runtime)
-        self.keypress_mapping[lazy.carb.input.KeyboardInput.RIGHT_BRACKET] = {"idx": None, "val": 0.1}
-        self.keypress_mapping[lazy.carb.input.KeyboardInput.LEFT_BRACKET] = {"idx": None, "val": -0.1}
+        self.keypress_mapping["RIGHT_BRACKET"] = {"idx": None, "val": 0.1}
+        self.keypress_mapping["LEFT_BRACKET"] = {"idx": None, "val": -0.1}
 
         # Iterate over all controller info and populate mapping
         for component, info in self.controller_info.items():
@@ -734,10 +774,10 @@ class KeyboardRobotController:
                     self.joint_command_idx.append(cmd_idx)
                 self.joint_control_idx += info["dofs"].tolist()
             elif info["name"] == "DifferentialDriveController":
-                self.keypress_mapping[lazy.carb.input.KeyboardInput.I] = {"idx": info["start_idx"] + 0, "val": 0.4}
-                self.keypress_mapping[lazy.carb.input.KeyboardInput.K] = {"idx": info["start_idx"] + 0, "val": -0.4}
-                self.keypress_mapping[lazy.carb.input.KeyboardInput.L] = {"idx": info["start_idx"] + 1, "val": -0.2}
-                self.keypress_mapping[lazy.carb.input.KeyboardInput.J] = {"idx": info["start_idx"] + 1, "val": 0.2}
+                self.keypress_mapping["I"] = {"idx": info["start_idx"] + 0, "val": 0.4}
+                self.keypress_mapping["K"] = {"idx": info["start_idx"] + 0, "val": -0.4}
+                self.keypress_mapping["L"] = {"idx": info["start_idx"] + 1, "val": -0.2}
+                self.keypress_mapping["J"] = {"idx": info["start_idx"] + 1, "val": 0.2}
             elif info["name"] == "InverseKinematicsController":
                 self.ik_arms.append(component)
                 self.keypress_mapping.update(self.generate_ik_keypress_mapping(controller_info=info))
@@ -751,93 +791,92 @@ class KeyboardRobotController:
                         self.joint_command_idx.append(cmd_idx)
                     self.joint_control_idx += info["dofs"].tolist()
                 else:
-                    self.keypress_mapping[lazy.carb.input.KeyboardInput.T] = {"idx": info["start_idx"], "val": 1.0}
+                    self.keypress_mapping["T"] = {"idx": info["start_idx"], "val": 1.0}
                     self.gripper_direction[component] = 1.0
                     self.persistent_gripper_action[component] = 1.0
                     self.binary_grippers.append(component)
             elif info["name"] == "NullJointController":
                 # We won't send actions if using a null gripper controller
-                self.keypress_mapping[lazy.carb.input.KeyboardInput.T] = {"idx": None, "val": None}
+                self.keypress_mapping["T"] = {"idx": None, "val": None}
             else:
                 raise ValueError("Unknown controller name received: {}".format(info["name"]))
 
     def keyboard_event_handler(self, event, *args, **kwargs):
+        # Omniverse keyboard callback: forward to the backend-agnostic handler using carb's enum names
+        self.handle_key_event(event_type=str(event.type).split(".")[-1], key=str(event.input).split(".")[-1])
+
+        # Callback always needs to return True
+        return True
+
+    def handle_key_event(self, event_type, key):
+        """
+        Processes a single keyboard event
+
+        Args:
+            event_type (str): One of "KEY_PRESS", "KEY_REPEAT", or "KEY_RELEASE"
+            key (str): carb.input.KeyboardInput name of the key, e.g. "UP" or "KEY_1"
+        """
         # Check if we've received a key press or repeat
-        if (
-            event.type == lazy.carb.input.KeyboardEventType.KEY_PRESS
-            or event.type == lazy.carb.input.KeyboardEventType.KEY_REPEAT
-        ):
+        if event_type in {"KEY_PRESS", "KEY_REPEAT"}:
             # Handle special cases
-            if (
-                event.input in {lazy.carb.input.KeyboardInput.KEY_1, lazy.carb.input.KeyboardInput.KEY_2}
-                and len(self.joint_control_idx) > 1
-            ):
+            if key in {"KEY_1", "KEY_2"} and len(self.joint_control_idx) > 1:
                 # Update joint and print out new joint being controlled
                 self.active_joint_command_idx_idx = (
                     max(0, self.active_joint_command_idx_idx - 1)
-                    if event.input == lazy.carb.input.KeyboardInput.KEY_1
+                    if key == "KEY_1"
                     else min(len(self.joint_control_idx) - 1, self.active_joint_command_idx_idx + 1)
                 )
                 print(
                     f"Now controlling joint {self.joint_names[self.joint_control_idx[self.active_joint_command_idx_idx]]}"
                 )
 
-            elif (
-                event.input in {lazy.carb.input.KeyboardInput.KEY_3, lazy.carb.input.KeyboardInput.KEY_4}
-                and len(self.ik_arms) > 1
-            ):
+            elif key in {"KEY_3", "KEY_4"} and len(self.ik_arms) > 1:
                 # Update arm, update keypress mapping, and print out new arm being controlled
                 self.active_arm_idx = (
                     max(0, self.active_arm_idx - 1)
-                    if event.input == lazy.carb.input.KeyboardInput.KEY_3
+                    if key == "KEY_3"
                     else min(len(self.ik_arms) - 1, self.active_arm_idx + 1)
                 )
                 new_arm = self.ik_arms[self.active_arm_idx]
                 self.keypress_mapping.update(self.generate_ik_keypress_mapping(self.controller_info[new_arm]))
                 print(f"Now controlling arm {new_arm} EEF")
 
-            elif (
-                event.input in {lazy.carb.input.KeyboardInput.KEY_5, lazy.carb.input.KeyboardInput.KEY_6}
-                and len(self.binary_grippers) > 1
-            ):
+            elif key in {"KEY_5", "KEY_6"} and len(self.binary_grippers) > 1:
                 # Update gripper, update keypress mapping, and print out new gripper being controlled
                 self.active_gripper_idx = (
                     max(0, self.active_gripper_idx - 1)
-                    if event.input == lazy.carb.input.KeyboardInput.KEY_5
+                    if key == "KEY_5"
                     else min(len(self.binary_grippers) - 1, self.active_gripper_idx + 1)
                 )
                 print(f"Now controlling gripper {self.binary_grippers[self.active_gripper_idx]} with binary toggling")
 
-            elif event.input == lazy.carb.input.KeyboardInput.M:
+            elif key == "M":
                 # Render the sensor modalities from the robot's camera and lidar
                 self.robot.visualize_sensors()
 
-            elif event.input in self.custom_keymapping:
+            elif key in self.custom_keymapping:
                 # Run custom press
-                self.custom_keymapping[event.input]["callback"]()
+                self.custom_keymapping[key]["callback"]()
 
-            elif event.input == lazy.carb.input.KeyboardInput.ESCAPE:
+            elif key == "ESCAPE":
                 # Terminate immediately
                 og.shutdown()
 
             else:
                 # Handle all other actions and update accordingly
-                self.active_action = self.keypress_mapping.get(event.input, None)
+                self.active_action = self.keypress_mapping.get(key, None)
 
-            if event.type == lazy.carb.input.KeyboardEventType.KEY_PRESS:
+            if event_type == "KEY_PRESS":
                 # Store the current keypress
-                self.current_keypress = event.input
+                self.current_keypress = key
 
                 # Also store whether we pressed the key for toggling gripper actions
-                if event.input == lazy.carb.input.KeyboardInput.T:
+                if key == "T":
                     self.toggling_gripper = True
 
         # If we release a key, mark release as pending (don't clear immediately to handle batched events)
-        elif event.type == lazy.carb.input.KeyboardEventType.KEY_RELEASE:
-            self._pending_release_key = event.input
-
-        # Callback always needs to return True
-        return True
+        elif event_type == "KEY_RELEASE":
+            self._pending_release_key = key
 
     def get_random_action(self):
         """
@@ -884,7 +923,7 @@ class KeyboardRobotController:
                     action[idx] = val
 
         # Possibly set the persistent gripper action
-        if len(self.binary_grippers) > 0 and self.keypress_mapping[lazy.carb.input.KeyboardInput.T]["val"] is not None:
+        if len(self.binary_grippers) > 0 and self.keypress_mapping["T"]["val"] is not None:
             for i, binary_gripper in enumerate(self.binary_grippers):
                 # Possibly update the stored value if the toggle gripper key has been pressed and
                 # it's the active gripper being controlled
@@ -892,8 +931,7 @@ class KeyboardRobotController:
                     # We toggle the gripper direction or this gripper
                     self.gripper_direction[binary_gripper] *= -1.0
                     self.persistent_gripper_action[binary_gripper] = (
-                        self.keypress_mapping[lazy.carb.input.KeyboardInput.T]["val"]
-                        * self.gripper_direction[binary_gripper]
+                        self.keypress_mapping["T"]["val"] * self.gripper_direction[binary_gripper]
                     )
 
                     # Clear the toggling gripper flag
