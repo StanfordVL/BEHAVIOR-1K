@@ -159,7 +159,7 @@ def launch_kit_app():
     """
     Launches the Isaac Sim / Omniverse Kit application and returns its `SimulationApp`.
 
-    Called from `PhysXBackend.create_app()` / `KitRenderBackend.create_app()`, so a configuration in
+    Called from `PhysXBackend.create_app()` / `NewtonBackend.create_app()`, so a configuration in
     which no backend needs Kit never reaches any of this code.
 
     Returns:

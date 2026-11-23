@@ -498,6 +498,17 @@ class Robot(USDObject, GymObservable):
 
         return prim
 
+    def _load(self):
+        prim = super()._load()
+        if gm.PHYSICS_BACKEND != "physx":
+            # Kit's lidar raycasts against PhysX's scene, so it can't run on another physics backend. Switch the
+            # robot's lidar prims off, since Kit's lidar plugin still ticks them and logs an error every frame
+            with og.sim.editing_usd():
+                for descendant in lazy.pxr.Usd.PrimRange(prim):
+                    if descendant.GetPrimTypeInfo().GetTypeName() == "Lidar" and descendant.GetAttribute("enabled"):
+                        descendant.GetAttribute("enabled").Set(False)
+        return prim
+
     def _post_load(self):
         # Run super post load first
         super()._post_load()
@@ -1420,6 +1431,11 @@ class Robot(USDObject, GymObservable):
             sensor_counts = {p: 0 for p in SENSOR_PRIMS_TO_SENSOR_CLS.keys()}
             for prim in link.prim.GetChildren():
                 prim_type = prim.GetPrimTypeInfo().GetTypeName()
+                if prim_type == "Lidar" and gm.PHYSICS_BACKEND != "physx":
+                    # Switched off in _load(): Kit's lidar raycasts against PhysX's scene
+                    if self._obs_modalities == "all" or ScanSensor.all_modalities & set(self._obs_modalities):
+                        log.warning(f"Skipping lidar {prim.GetPrimPath()}: scan sensors need PhysX physics")
+                    continue
                 if prim_type in SENSOR_PRIMS_TO_SENSOR_CLS:
                     # Possibly filter out the sensor based on name
                     prim_path = str(prim.GetPrimPath())

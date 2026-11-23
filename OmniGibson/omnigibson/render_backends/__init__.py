@@ -11,9 +11,10 @@ RENDER_BACKENDS = {
 }
 
 # (gm.PHYSICS_BACKEND, gm.RENDER_BACKEND) pairs that are supported. PhysX lives inside Kit, so it only renders through
-# Kit; Newton runs without Kit, so it renders through Newton's own viewers (gl, ovrtx) or not at all.
+# Kit; Newton renders through Kit (which it then launches), Newton's own viewers (gl, ovrtx), or not at all.
 SUPPORTED_BACKEND_COMBINATIONS = (
     ("physx", "kit"),
+    ("newton", "kit"),
     ("newton", "none"),
     ("newton", "gl"),
     ("newton", "ovrtx"),
