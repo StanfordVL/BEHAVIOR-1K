@@ -182,9 +182,10 @@ gm.SHOW_DISCLAIMERS = False
 # Which physics backend to use. Must be a key in omnigibson.physics_backends.PHYSICS_BACKENDS
 gm.PHYSICS_BACKEND = "physx"
 
-# Which render backend to use. Must be a key in omnigibson.render_backends.RENDER_BACKENDS. An
-# independent axis from PHYSICS_BACKEND: which engine simulates and what turns that into pixels are
-# separate choices, even though Kit is currently the only implementation of either.
+# Which render backend to use. Must be a key in omnigibson.render_backends.RENDER_BACKENDS:
+# "kit" (Omniverse Kit / RTX, all modalities), "gl" (Newton's rasterized ViewerGL, rgb only), "ovrtx" (Newton's
+# ray-traced ViewerRTX, rgb only), or "none". Supported pairs with PHYSICS_BACKEND are listed in
+# omnigibson.render_backends.SUPPORTED_BACKEND_COMBINATIONS: physx + kit, and newton + none / gl / ovrtx.
 gm.RENDER_BACKEND = "kit"
 
 # Whether the Newton backend replays its physics substep from a captured CUDA graph (GPU only)

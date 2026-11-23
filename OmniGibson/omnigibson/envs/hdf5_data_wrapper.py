@@ -333,8 +333,13 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
             # Restore to checkpoint
             self.scene.restore(self.checkpoint_states[index])
 
-            # Configure the simulator to optimize for data collection
-            self._optimize_sim_for_data_collection(viewport_camera_path=og.sim.viewer_camera.active_camera_path)
+            # Configure the simulator to optimize for data collection (viewer_camera doesn't exist on
+            # a non-Kit render backend; _optimize_sim_for_data_collection is a no-op there anyway)
+            self._optimize_sim_for_data_collection(
+                viewport_camera_path=og.sim.viewer_camera.active_camera_path
+                if og.sim.viewer_camera is not None
+                else None
+            )
 
             # Prune all data stored at the current checkpoint step and beyond
             checkpoint_step_idx = self.checkpoint_step_idxs[index]
@@ -439,6 +444,10 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
         Args:
             viewport_camera_path (str): Prim path to the camera to use for the viewer for data collection
         """
+        # Everything below tunes Kit's own renderer (Replicator render products, carb settings, the
+        # viewer camera) -- nothing applies to any other render backend.
+        if gm.RENDER_BACKEND != "kit":
+            return
 
         # Disable all render products to save on speed
         # See https://forums.developer.nvidia.com/t/speeding-up-simulation-2023-1-1/300072/6
