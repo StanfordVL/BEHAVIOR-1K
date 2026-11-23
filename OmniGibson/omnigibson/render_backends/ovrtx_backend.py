@@ -12,8 +12,27 @@ from omnigibson.utils.ui_utils import create_module_logger
 
 log = create_module_logger(module_name=__name__)
 
-# UsdLux light prim types copied into the RTX viewer's stage (see _copy_scene_lights_into_rtx_viewer)
-_USD_LIGHT_TYPES = ("SphereLight", "RectLight", "DiskLight", "DistantLight", "DomeLight", "CylinderLight")
+# UsdLux light prim types copied into the RTX viewer's stage (see _copy_scene_lights_into_rtx_viewer). UsdLux has no
+# point light type: a point light is a SphereLight with treatAsPoint set. GeometryLight is left out because the mesh it
+# emits from isn't on the RTX stage.
+_USD_LIGHT_TYPES = (
+    "SphereLight",
+    "RectLight",
+    "DiskLight",
+    "DistantLight",
+    "DomeLight",
+    "CylinderLight",
+    "PortalLight",
+)
+
+
+def _is_copied_light_attribute(name):
+    """
+    Whether a light attribute is copied into the RTX viewer's stage: the light's inputs (intensity, color, radius,
+    shaping, shadow, ...), its light:* settings and treatAsPoint. Transforms are baked separately, and light/shadow
+    link collections point at OmniGibson prims that don't exist on the RTX stage.
+    """
+    return name.startswith(("inputs:", "light:")) or name == "treatAsPoint"
 
 
 def _copy_scene_lights_into_rtx_viewer(viewer):
@@ -36,14 +55,19 @@ def _copy_scene_lights_into_rtx_viewer(viewer):
     copied = 0
     for prim in og.sim.stage.Traverse():
         if prim.GetTypeName() not in _USD_LIGHT_TYPES:
+            if prim.GetTypeName() == "GeometryLight":
+                log.warning(f"Skipping GeometryLight {prim.GetPath()}: its emitting mesh isn't on the RTX stage")
             continue
         if UsdGeom.Imageable(prim).ComputeVisibility() == UsdGeom.Tokens.invisible:
             continue
 
         dst = viewer.stage.DefinePrim(f"/root/_OGSceneLights/light_{copied}", prim.GetTypeName())
+        # Applied schemas such as ShapingAPI and ShadowAPI decide whether the renderer reads their inputs
+        for schema in prim.GetAppliedSchemas():
+            dst.AddAppliedSchema(schema)
         for attr in prim.GetAttributes():
             name = attr.GetName()
-            if not name.startswith("inputs:"):
+            if not _is_copied_light_attribute(name):
                 continue
             value = attr.Get()
             if value is None:
