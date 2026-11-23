@@ -162,7 +162,7 @@ EOF
 2. NVIDIA ISAAC SIM EULA
    - Required for OmniGibson installation
    - By accepting, you agree to NVIDIA Isaac Sim End User License Agreement
-   - See: https://docs.isaacsim.omniverse.nvidia.com/6.0.0/common/licenses-isaac-sim.html
+   - See: https://docs.isaacsim.omniverse.nvidia.com/6.2.0/common/licenses-isaac-sim.html
 
 EOF
     fi
@@ -336,7 +336,7 @@ if [ "$OMNIGIBSON" = true ]; then
 
         # For aarch, do alternative install via direct one-liner
         if [ "$ARCH" = "aarch64" ]; then
-            python -m pip install isaacsim[all,extscache]==6.0.1.0 --extra-index-url https://pypi.nvidia.com
+            python -m pip install isaacsim[all,extscache]==6.2.0.0 --extra-index-url https://pypi.nvidia.com
         else
             # Helper functions
             check_glibc_old() {
@@ -346,32 +346,31 @@ if [ "$OMNIGIBSON" = true ]; then
             install_isaac_packages() {
                 local temp_dir=$(mktemp -d)
                 local packages=(
-                    "omniverse_kit-110.1.1.305458"
-                    "isaacsim_kernel-6.0.1.0"
-                    "isaacsim_app-6.0.1.0"
-                    "isaacsim_core-6.0.1.0"
-                    "isaacsim_gui-6.0.1.0"
-                    "isaacsim_utils-6.0.1.0"
-                    "isaacsim_storage-6.0.1.0"
-                    "isaacsim_asset-6.0.1.0"
-                    "isaacsim_sensor-6.0.1.0"
-                    "isaacsim_robot_motion-6.0.1.0"
-                    "isaacsim_robot-6.0.1.0"
-                    "isaacsim_benchmark-6.0.1.0"
-                    "isaacsim_code_editor-6.0.1.0"
-                    "isaacsim_ros1-6.0.1.0"
-                    "isaacsim_cortex-6.0.1.0"
-                    "isaacsim_example-6.0.1.0"
-                    "isaacsim_replicator-6.0.1.0"
-                    "isaacsim_rl-6.0.1.0"
-                    "isaacsim_robot_setup-6.0.1.0"
-                    "isaacsim_ros2-6.0.1.0"
-                    "isaacsim_template-6.0.1.0"
-                    "isaacsim_test-6.0.1.0"
-                    "isaacsim-6.0.1.0"
-                    "isaacsim_extscache_physics-6.0.1.0"
-                    "isaacsim_extscache_kit-6.0.1.0"
-                    "isaacsim_extscache_kit_sdk-6.0.1.0"
+                    "omniverse_kit-110.4.0.386251"
+                    "isaacsim_kernel-6.2.0.0"
+                    "isaacsim_app-6.2.0.0"
+                    "isaacsim_core-6.2.0.0"
+                    "isaacsim_gui-6.2.0.0"
+                    "isaacsim_utils-6.2.0.0"
+                    "isaacsim_storage-6.2.0.0"
+                    "isaacsim_asset-6.2.0.0"
+                    "isaacsim_sensor-6.2.0.0"
+                    "isaacsim_robot_motion-6.2.0.0"
+                    "isaacsim_robot-6.2.0.0"
+                    "isaacsim_benchmark-6.2.0.0"
+                    "isaacsim_code_editor-6.2.0.0"
+                    "isaacsim_ros1-6.2.0.0"
+                    "isaacsim_example-6.2.0.0"
+                    "isaacsim_replicator-6.2.0.0"
+                    "isaacsim_rl-6.2.0.0"
+                    "isaacsim_robot_setup-6.2.0.0"
+                    "isaacsim_ros2-6.2.0.0"
+                    "isaacsim_template-6.2.0.0"
+                    "isaacsim_test-6.2.0.0"
+                    "isaacsim-6.2.0.0"
+                    "isaacsim_extscache_physics-6.2.0.0"
+                    "isaacsim_extscache_kit-6.2.0.0"
+                    "isaacsim_extscache_kit_sdk-6.2.0.0"
                 )
 
                 # --fail keeps an HTTP error page from being saved under a .whl name;
@@ -439,10 +438,9 @@ if [ "$OMNIGIBSON" = true ]; then
     # Force reinstall cffi 1.17.1 to resolve compatibility issues with Isaac Sim extensions
     python -m pip install --force-reinstall cffi==1.17.1
 
-    # isaacsim-kernel 6.0.1 pins coverage==7.4.4, llvmlite==0.46 and websockets==12.0,
-    # which break numba (needs newer coverage/llvmlite) and omnigibson.eval
-    # (needs websockets>=13 for websockets.asyncio.server). Re-upgrade them.
-    python -m pip install --force-reinstall -U "coverage>=7.5" "llvmlite>=0.48" "websockets>=15.0.1"
+    # isaacsim-kernel 6.2.0 pins llvmlite==0.46 and websockets<15, which break numba (needs llvmlite 0.48)
+    # and omnigibson.eval (needs websockets>=13 for websockets.asyncio.server). Re-upgrade them.
+    python -m pip install --force-reinstall -U "coverage>=7.5" "llvmlite>=0.48,<0.49" "websockets>=15.0.1"
 
     # Override isaacsim-core's older newton pin; keep in sync with extras_require["newton"] in OmniGibson/setup.py
     python -m pip install "newton[sim]==1.7.0"
