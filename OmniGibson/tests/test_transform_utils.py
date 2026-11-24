@@ -7,6 +7,7 @@ from scipy.spatial.transform import Rotation as R
 from scipy.spatial.transform import Slerp
 from torch.testing import assert_close
 
+import omnigibson.utils.transform_utils_np as NT
 from omnigibson.utils.numpy_utils import NumpyTypes
 from omnigibson.utils.transform_utils import (
     align_vector_sets,
@@ -152,6 +153,22 @@ class TestQuaternionOperations:
             q1, q2 = RANDOM_QUATERNIONS[i], RANDOM_QUATERNIONS[i + 1]
             dist = quat_distance(q2, q1)
             assert quaternions_close(quat_multiply(dist, q1), q2)
+
+    def test_get_orientation_diff_in_radian_np(self):
+        # The numpy version must return the angle of the relative rotation between the two
+        # orientations, like the torch version, not the angle between their rotation axes.
+        identity = np.array([0.0, 0.0, 0.0, 1.0])
+        q_z01 = R.from_rotvec([0.0, 0.0, 0.1]).as_quat()
+        q_z10 = R.from_rotvec([0.0, 0.0, 1.0]).as_quat()
+        assert np.isclose(NT.get_orientation_diff_in_radian(q_z01, q_z10), 0.9)
+        assert np.isclose(NT.get_orientation_diff_in_radian(identity, q_z01), 0.1)
+        assert np.isclose(NT.get_orientation_diff_in_radian(q_z01, q_z01), 0.0)
+
+        rng = np.random.default_rng(0)
+        for _ in range(100):
+            r0, r1 = R.random(random_state=rng), R.random(random_state=rng)
+            expected = (r0 * r1.inv()).magnitude()
+            assert np.isclose(NT.get_orientation_diff_in_radian(r0.as_quat(), r1.as_quat()), expected)
 
 
 class TestVectorOperations:
