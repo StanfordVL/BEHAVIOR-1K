@@ -15,10 +15,6 @@ _ON_NEWTON = gm["PHYSICS_BACKEND"] == "newton"
 skip_newton_physical_particles = pytest.mark.skipif(
     _ON_NEWTON, reason="Physical particle systems are not supported on Newton yet"
 )
-skip_newton_tiago = pytest.mark.skipif(
-    _ON_NEWTON,
-    reason="Newton's contact view includes Tiago's eef links, which RigidContactAPI does not expect",
-)
 
 SYSTEM_EXAMPLES = {
     "water": FluidSystem,

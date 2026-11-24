@@ -1002,7 +1002,7 @@ class _NewtonPhysicsSimView:
 
         sensor_paths, sensor_body_idx = [], []
         for path, idx in self._backend._path_body_map.items():
-            if path not in matching:
+            if path not in matching or path not in self._backend._contact_reporting_paths:
                 continue
             if body_flags is not None and not bool(int(body_flags[idx]) & int(newton.BodyFlags.DYNAMIC)):
                 continue
@@ -1049,6 +1049,8 @@ class NewtonBackend(PhysicsBackend):
         self._joint_break_cb = None
         self._path_body_map = {}
         self._body_path_map = {}
+        # Prim paths opted into contact reporting; RigidContactAPI rows are exactly these bodies, as on PhysX
+        self._contact_reporting_paths = set()
         self._bvh_dirty = True
         self._contact_report_contacts = None
         self._contacts_dirty = True
@@ -1069,6 +1071,12 @@ class NewtonBackend(PhysicsBackend):
         self._mass_properties_dirty = False
         self._model_generation = 0
         self._warned_cpu_device = False
+
+    def enable_contact_reporting(self, prim):
+        self._contact_reporting_paths.add(str(prim.GetPath()))
+
+    def contact_reporting_enabled(self, prim, visual_only):
+        return str(prim.GetPath()) in self._contact_reporting_paths
 
     @classmethod
     def create_app(cls):

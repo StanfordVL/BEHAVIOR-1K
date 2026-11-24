@@ -4,7 +4,7 @@ import torch as th
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.controllers import ControllerView
-from utils import skip_newton_tiago
+from omnigibson.macros import gm
 
 
 # -------------------- Helper Functions --------------------
@@ -67,7 +67,6 @@ def _distance(a, b):
 
 
 # -------------------- Test Cases --------------------
-@skip_newton_tiago
 def test_arm_control():
     # Create env
     cfg = {
@@ -273,7 +272,11 @@ def test_arm_control():
     for i, robot in enumerate(env.robots[0]):
         initial_eef_pose[robot.name] = {arm: robot.get_relative_eef_pose(arm=arm) for arm in robot.arm_names}
 
-    for controller in ["InverseKinematicsController", "OperationalSpaceController"]:
+    controllers = ["InverseKinematicsController", "OperationalSpaceController"]
+    if gm["PHYSICS_BACKEND"] == "newton":
+        # OSC needs gravity and Coriolis compensation forces, which the Newton backend does not implement yet
+        controllers.remove("OperationalSpaceController")
+    for controller in controllers:
         for controller_mode in ["pose_delta_ori", "absolute_pose"]:
             controller_kwargs = {
                 "mode": controller_mode,
@@ -375,8 +378,9 @@ def test_arm_control():
                         curr_pos, curr_quat = robot.get_relative_eef_pose(arm=arm)
                         arm_group_key, arm_ci = robot.controllers[f"arm_{arm}"]
                         arm_goal = ControllerView.get_goal(arm_group_key, arm_ci)
-                        target_pos = arm_goal["target_pos"]
-                        target_quat = T.mat2quat(arm_goal["target_ori_mat"])
+                        # Controller goals live on the controller compute backend (CPU), poses on the sim device
+                        target_pos = arm_goal["target_pos"].to(curr_pos.device)
+                        target_quat = T.mat2quat(arm_goal["target_ori_mat"]).to(curr_quat.device)
                         pos_check = err_checks[controller_mode][action_name]["pos"]
                         if pos_check is not None:
                             is_valid_pos = pos_check(target_pos, curr_pos, init_pos)

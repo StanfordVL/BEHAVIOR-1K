@@ -24,7 +24,7 @@ if _DEVICE_OVERRIDE:
 
     og.Environment.__init__ = _env_init_with_device
 
-from utils import MULTI_ENV_ROBOTS, skip_newton_tiago  # noqa: E402  (after the backend override, which utils reads)
+from utils import MULTI_ENV_ROBOTS  # noqa: E402  (after the backend override, which utils reads)
 
 
 @pytest.fixture
@@ -436,7 +436,7 @@ def oyster(stopped_env):
 
 @pytest.fixture(
     scope="module",
-    params=[pytest.param(r, marks=skip_newton_tiago) if r == "tiago" else r for r in MULTI_ENV_ROBOTS],
+    params=MULTI_ENV_ROBOTS,
 )
 def robot_model(request):
     """Robot model name under test (a string like "fetch").
