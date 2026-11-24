@@ -41,16 +41,31 @@ def _goal_objects(env, env_idx):
     return cans, ashcans[0]
 
 
-def _place_inside(can, ashcan, retries=10):
+def _place_inside(can, ashcan, retries=3):
     """Place @can Inside @ashcan via kinematic sampling, retrying for flakiness.
 
     Inside.set_value rejection-samples a pose, settles physics, and verifies the
-    object is still inside; it returns False on a failed sample. Retry before giving up:
-    the later cans often fail to find a contact-free pose next to the cans already inside.
+    object is still inside; it returns False on a failed sample. Retry a few times
+    before giving up (sample_kinematics is known to be occasionally flaky).
     """
     for _ in range(retries):
         if can.states[Inside].set_value(ashcan, True):
             return True
+    return False
+
+
+def _place_all_inside(cans, ashcan, rounds=5):
+    """Place every can in @cans Inside @ashcan, starting over from scratch if one does not fit.
+
+    The cans placed first can leave no contact-free pose for a later one, and retrying that
+    can alone keeps sampling against the same bad arrangement, so restore the pre-placement
+    state and re-place them all instead.
+    """
+    state = og.sim.dump_state(serialized=False)
+    for _ in range(rounds):
+        if all(_place_inside(can, ashcan) for can in cans):
+            return True
+        og.sim.load_state(state, serialized=False)
     return False
 
 
@@ -253,8 +268,7 @@ class TestBehaviorTaskGoalCompletion:
         env = behavior_env
 
         cans, ashcan = _goal_objects(env, 0)
-        for i, can in enumerate(cans):
-            assert _place_inside(can, ashcan), f"failed to place can {i} inside ashcan (env 0)"
+        assert _place_all_inside(cans, ashcan), "failed to place the cans inside ashcan (env 0)"
 
         # Stored potential is 0.0 from the pre-test reset; placing cans does not touch it,
         # so this completing step should earn reward == r_potential * (0 - (-1)) for env 0.
@@ -285,8 +299,7 @@ class TestBehaviorTaskGoalCompletion:
 
         for env_idx in range(NUM_ENVS):
             cans, ashcan = _goal_objects(env, env_idx)
-            for i, can in enumerate(cans):
-                assert _place_inside(can, ashcan), f"failed to place can {i} inside ashcan (env {env_idx})"
+            assert _place_all_inside(cans, ashcan), f"failed to place the cans inside ashcan (env {env_idx})"
 
         _, _, terminateds, _, infos = env.step(_zero_actions(env))
 
@@ -300,8 +313,7 @@ class TestBehaviorTaskGoalCompletion:
         env = behavior_env
 
         cans, ashcan = _goal_objects(env, 0)
-        for i, can in enumerate(cans[:-1]):
-            assert _place_inside(can, ashcan), f"failed to place can {i} inside ashcan"
+        assert _place_all_inside(cans[:-1], ashcan), "failed to place the cans inside ashcan"
 
         _, rewards, terminateds, _, infos = env.step(_zero_actions(env))
 
@@ -325,8 +337,7 @@ class TestBehaviorTaskGoalCompletion:
 
         # Complete env 0
         cans, ashcan = _goal_objects(env, 0)
-        for i, can in enumerate(cans):
-            assert _place_inside(can, ashcan), f"failed to place can {i} inside ashcan"
+        assert _place_all_inside(cans, ashcan), "failed to place the cans inside ashcan"
         _, _, terminateds, _, infos = env.step(_zero_actions(env))
         assert terminateds[0], "env 0 should be complete before reset"
         # env 1 was never touched: capture its (incomplete) state to confirm the reset leaves it alone

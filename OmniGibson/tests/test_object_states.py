@@ -166,9 +166,18 @@ def test_inside(env, bottom_cabinet, bowl, dishtowel):
     assert not bowl.states[Inside].get_value(bottom_cabinet)
     assert not dishtowel.states[Inside].get_value(bottom_cabinet)
 
-    # Sampling can fail when the bowl leaves little room for the towel, so retry like the behavior task tests do
-    assert any(bowl.states[Inside].set_value(bottom_cabinet, True) for _ in range(10))
-    assert any(dishtowel.states[Inside].set_value(bottom_cabinet, True) for _ in range(10))
+    # The bowl can land where it leaves no room for the towel, so re-place both from scratch on a failure
+    state = og.sim.dump_state(serialized=False)
+    for _ in range(5):
+        if bowl.states[Inside].set_value(bottom_cabinet, True) and dishtowel.states[Inside].set_value(
+            bottom_cabinet, True
+        ):
+            break
+        og.sim.load_state(state, serialized=False)
+    else:
+        pytest.fail("failed to place the bowl and the dishtowel inside the cabinet")
+    assert bowl.states[Inside].get_value(bottom_cabinet)
+    assert dishtowel.states[Inside].get_value(bottom_cabinet)
 
     with pytest.raises(NotImplementedError):
         bowl.states[OnTop].set_value(bottom_cabinet, False)
