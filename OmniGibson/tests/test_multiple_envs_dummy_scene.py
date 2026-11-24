@@ -5,7 +5,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson import object_states
 from omnigibson.utils.constants import ParticleModifyCondition
 from omnigibson.utils.transform_utils import quat_multiply
-from utils import skip_newton_physical_particles, skip_newton_scene_prim_move
+from utils import skip_newton_physical_particles
 
 
 # ===================================================================
@@ -157,7 +157,6 @@ class TestSceneCoordinates:
     # Ordered last within this class purely as an optimization: it is the only num_envs=1 test
     # here, so running it after the num_envs=3 tests avoids rebuilding the shared 3-env env.
     # It also permanently moves the scene prim, which env.reset() does not restore.
-    @skip_newton_scene_prim_move
     def test_multi_scene_scene_prim(self, make_multi_env):
         env = make_multi_env(1)
         original_robot_pos = env.scenes[0].robots[0].get_position_orientation()[0]

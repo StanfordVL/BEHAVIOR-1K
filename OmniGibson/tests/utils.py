@@ -19,9 +19,6 @@ skip_newton_tiago = pytest.mark.skipif(
     _ON_NEWTON,
     reason="Newton's contact view includes Tiago's eef links, which RigidContactAPI does not expect",
 )
-skip_newton_scene_prim_move = pytest.mark.skipif(
-    _ON_NEWTON, reason="Moving a scene prim does not move its objects on Newton"
-)
 
 SYSTEM_EXAMPLES = {
     "water": FluidSystem,

@@ -1389,6 +1389,53 @@ class NewtonBackend(PhysicsBackend):
     def before_play(self, sim):
         self._rebuild()
 
+    def on_subtree_moved(self, prim_path, delta_pos, delta_quat):
+        # Stopped: the next play() rebuilds from USD, which already has the new pose
+        if self._model is None or self._model.joint_count == 0 or self.is_stopped():
+            return
+        import newton
+
+        prefix = prim_path.rstrip("/") + "/"
+        moved_bodies = {idx for path, idx in self._path_body_map.items() if path.startswith(prefix)}
+        if not moved_bodies:
+            return
+
+        joint_parent = self._model.joint_parent.numpy()
+        joint_child = self._model.joint_child.numpy()
+        joint_type = self._model.joint_type.numpy()
+        joint_q_start = self._model.joint_q_start.numpy()
+        joint_qd_start = self._model.joint_qd_start.numpy()
+        joint_q = _wp_to_torch(self._state_0.joint_q)
+        joint_qd = _wp_to_torch(self._state_0.joint_qd)
+        joint_X_p = _wp_to_torch(self._model.joint_X_p)
+        delta_pos = th.as_tensor(delta_pos, dtype=th.float32, device=joint_q.device)
+        delta_quat = th.as_tensor(delta_quat, dtype=th.float32, device=joint_q.device)
+        delta_rot = T.quat2mat(delta_quat)
+
+        def moved(pose):
+            return th.cat([delta_rot @ pose[:3] + delta_pos, T.quat_multiply(delta_quat, pose[3:7])])
+
+        # Moving the world-attached root joint of every articulation and body under @prim_path moves the whole subtree
+        JOINT_FREE = int(newton.JointType.FREE)
+        moved_fixed_root = False
+        for j in range(self._model.joint_count):
+            if int(joint_parent[j]) != -1 or int(joint_child[j]) not in moved_bodies:
+                continue
+            if joint_type[j] == JOINT_FREE:
+                q_start, qd_start = int(joint_q_start[j]), int(joint_qd_start[j])
+                joint_q[q_start : q_start + 7] = moved(joint_q[q_start : q_start + 7]).to(joint_q.dtype)
+                for offset in (0, 3):
+                    vel = joint_qd[qd_start + offset : qd_start + offset + 3]
+                    joint_qd[qd_start + offset : qd_start + offset + 3] = (delta_rot @ vel.float()).to(joint_qd.dtype)
+            else:
+                joint_X_p[j] = moved(joint_X_p[j].float()).to(joint_X_p.dtype)
+                moved_fixed_root = True
+
+        if moved_fixed_root and self._solver is not None:
+            self._solver.notify_model_changed(newton.ModelFlags.JOINT_PROPERTIES)
+        self._step_graphs = {}
+        self._sync_fk()
+
     def _rebuild(self):
         import newton
         import warp as wp

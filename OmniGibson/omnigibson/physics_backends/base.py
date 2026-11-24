@@ -86,6 +86,17 @@ class PhysicsBackend(ABC):
         Hook called every time `Simulator.play()` transitions from stopped to playing.
         """
 
+    def on_subtree_moved(self, prim_path, delta_pos, delta_quat):
+        """
+        Hook called after the USD xform at @prim_path was moved by a world-frame rigid transform. Backends that
+        read USD poses back on their own need not do anything.
+
+        Args:
+            prim_path (str): Prim path of the moved xform
+            delta_pos (th.Tensor): (3,) translation of the world-frame transform applied to the subtree
+            delta_quat (th.Tensor): (4,) (x,y,z,w) rotation of the world-frame transform applied to the subtree
+        """
+
     # ---- Lifecycle ----
 
     @abstractmethod
