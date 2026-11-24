@@ -148,6 +148,8 @@ jobs:
             test_file: test_multiple_envs_behavior_scene
             extra_files: >-
               tests/test_multiple_envs_behavior_task.py
+            # Builds the house env twice (with and without presampled robot pose); ~10 min each on Newton.
+            timeout: 60
         # --- BEGIN AUTO-GENERATED EXAMPLE INCLUDES ---
           - {test_file: test_examples, example: "environments.navigation_env_demo"}
           - {test_file: test_examples, example: "environments.vector_env_demo"}
@@ -235,7 +237,7 @@ jobs:
           --junitxml=${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}${{ matrix.backend == 'newton' && '_newton' || '' }}.xml
           -o junit_family=xunit1
         continue-on-error: true
-        timeout-minutes: 30
+        timeout-minutes: ${{ matrix.timeout || 30 }}
 
       - name: Check for failures, errors, or missing XML
         if: always()
