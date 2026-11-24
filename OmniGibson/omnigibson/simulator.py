@@ -749,6 +749,13 @@ def _launch_simulator(*args, **kwargs):
                 if playing:
                     self.update_handles()
 
+            # Kit 110.4's Fabric Scene Delegate aborts (std::terminate in libusdrt.hydra.fabric_scene_delegate) if prims
+            # are removed and new ones added with no render in between, e.g. stop -> remove robot -> add robot -> play
+            # (isaac-sim/IsaacSim#948). Render once so the delegate syncs the removal. Playing removals already render
+            # between steps.
+            if not playing:
+                self.render()
+
             # Run post-processing required if we were playing
             if playing:
                 if gm.ENABLE_TRANSITION_RULES:

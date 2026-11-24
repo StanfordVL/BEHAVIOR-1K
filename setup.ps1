@@ -149,7 +149,7 @@ function Prompt-ForTerms {
 2. NVIDIA ISAAC SIM EULA
    - Required for OmniGibson installation
    - By accepting, you agree to NVIDIA Isaac Sim End User License Agreement
-   - See: https://docs.isaacsim.omniverse.nvidia.com/6.0.0/common/licenses-isaac-sim.html
+   - See: https://docs.isaacsim.omniverse.nvidia.com/6.2.0/common/licenses-isaac-sim.html
 
 "@
     }
@@ -381,15 +381,15 @@ if ($extrasList.Count -gt 0) {
     if (-not $isaacInstalled) {
         # Isaac Sim packages to install
         $packages = @(
-            "omniverse_kit-110.1.1.305458", "isaacsim_kernel-6.0.1.0", "isaacsim_app-6.0.1.0",
-            "isaacsim_core-6.0.1.0", "isaacsim_gui-6.0.1.0", "isaacsim_utils-6.0.1.0",
-            "isaacsim_storage-6.0.1.0", "isaacsim_asset-6.0.1.0", "isaacsim_sensor-6.0.1.0",
-            "isaacsim_robot_motion-6.0.1.0", "isaacsim_robot-6.0.1.0", "isaacsim_benchmark-6.0.1.0",
-            "isaacsim_code_editor-6.0.1.0", "isaacsim_ros1-6.0.1.0", "isaacsim_cortex-6.0.1.0",
-            "isaacsim_example-6.0.1.0", "isaacsim_replicator-6.0.1.0", "isaacsim_rl-6.0.1.0",
-            "isaacsim_robot_setup-6.0.1.0", "isaacsim_ros2-6.0.1.0", "isaacsim_template-6.0.1.0",
-            "isaacsim_test-6.0.1.0", "isaacsim-6.0.1.0", "isaacsim_extscache_physics-6.0.1.0",
-            "isaacsim_extscache_kit-6.0.1.0", "isaacsim_extscache_kit_sdk-6.0.1.0"
+            "omniverse_kit-110.4.0.386251", "isaacsim_kernel-6.2.0.0", "isaacsim_app-6.2.0.0",
+            "isaacsim_core-6.2.0.0", "isaacsim_gui-6.2.0.0", "isaacsim_utils-6.2.0.0",
+            "isaacsim_storage-6.2.0.0", "isaacsim_asset-6.2.0.0", "isaacsim_sensor-6.2.0.0",
+            "isaacsim_robot_motion-6.2.0.0", "isaacsim_robot-6.2.0.0", "isaacsim_benchmark-6.2.0.0",
+            "isaacsim_code_editor-6.2.0.0", "isaacsim_ros1-6.2.0.0",
+            "isaacsim_example-6.2.0.0", "isaacsim_replicator-6.2.0.0", "isaacsim_rl-6.2.0.0",
+            "isaacsim_robot_setup-6.2.0.0", "isaacsim_ros2-6.2.0.0", "isaacsim_template-6.2.0.0",
+            "isaacsim_test-6.2.0.0", "isaacsim-6.2.0.0", "isaacsim_extscache_physics-6.2.0.0",
+            "isaacsim_extscache_kit-6.2.0.0", "isaacsim_extscache_kit_sdk-6.2.0.0"
         )
                 
         $tempDir = New-TemporaryFile | ForEach-Object { Remove-Item $_; New-Item -ItemType Directory -Path $_ }
@@ -423,7 +423,7 @@ if ($extrasList.Count -gt 0) {
             }
             
             Write-Host "Installing Isaac Sim packages..."
-            pip install $wheelFiles
+            pip install $wheelFiles --extra-index-url https://pypi.nvidia.com
             
             # Verify installation
             try {
@@ -460,7 +460,7 @@ if ($extrasList.Count -gt 0) {
     pip install --force-reinstall cffi==1.17.1
 
     # Override isaacsim-core's older newton pin; keep in sync with extras_require["newton"] in OmniGibson/setup.py
-    pip install "newton[sim]==1.7.0"
+    pip install "newton[sim]==1.7.0" "warp-lang==1.17.0"
 
     Write-Host "OmniGibson installation completed successfully!"
 }

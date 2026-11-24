@@ -1,6 +1,10 @@
 #!/bin/bash
 set -e
 
+# Bump whenever a change to this script requires rebuilding existing envs (Python/Isaac Sim/torch/CUDA
+# pins, conda packages, ...). CI rebuilds its env from scratch when this differs from the image's env.
+BEHAVIOR_ENV_VERSION=2
+
 # Parse arguments
 HELP=false
 NEW_ENV=false
@@ -162,7 +166,7 @@ EOF
 2. NVIDIA ISAAC SIM EULA
    - Required for OmniGibson installation
    - By accepting, you agree to NVIDIA Isaac Sim End User License Agreement
-   - See: https://docs.isaacsim.omniverse.nvidia.com/6.0.0/common/licenses-isaac-sim.html
+   - See: https://docs.isaacsim.omniverse.nvidia.com/6.2.0/common/licenses-isaac-sim.html
 
 EOF
     fi
@@ -336,7 +340,7 @@ if [ "$OMNIGIBSON" = true ]; then
 
         # For aarch, do alternative install via direct one-liner
         if [ "$ARCH" = "aarch64" ]; then
-            python -m pip install isaacsim[all,extscache]==6.0.1.0 --extra-index-url https://pypi.nvidia.com
+            python -m pip install isaacsim[all,extscache]==6.2.0.0 --extra-index-url https://pypi.nvidia.com
         else
             # Helper functions
             check_glibc_old() {
@@ -346,32 +350,31 @@ if [ "$OMNIGIBSON" = true ]; then
             install_isaac_packages() {
                 local temp_dir=$(mktemp -d)
                 local packages=(
-                    "omniverse_kit-110.1.1.305458"
-                    "isaacsim_kernel-6.0.1.0"
-                    "isaacsim_app-6.0.1.0"
-                    "isaacsim_core-6.0.1.0"
-                    "isaacsim_gui-6.0.1.0"
-                    "isaacsim_utils-6.0.1.0"
-                    "isaacsim_storage-6.0.1.0"
-                    "isaacsim_asset-6.0.1.0"
-                    "isaacsim_sensor-6.0.1.0"
-                    "isaacsim_robot_motion-6.0.1.0"
-                    "isaacsim_robot-6.0.1.0"
-                    "isaacsim_benchmark-6.0.1.0"
-                    "isaacsim_code_editor-6.0.1.0"
-                    "isaacsim_ros1-6.0.1.0"
-                    "isaacsim_cortex-6.0.1.0"
-                    "isaacsim_example-6.0.1.0"
-                    "isaacsim_replicator-6.0.1.0"
-                    "isaacsim_rl-6.0.1.0"
-                    "isaacsim_robot_setup-6.0.1.0"
-                    "isaacsim_ros2-6.0.1.0"
-                    "isaacsim_template-6.0.1.0"
-                    "isaacsim_test-6.0.1.0"
-                    "isaacsim-6.0.1.0"
-                    "isaacsim_extscache_physics-6.0.1.0"
-                    "isaacsim_extscache_kit-6.0.1.0"
-                    "isaacsim_extscache_kit_sdk-6.0.1.0"
+                    "omniverse_kit-110.4.0.386251"
+                    "isaacsim_kernel-6.2.0.0"
+                    "isaacsim_app-6.2.0.0"
+                    "isaacsim_core-6.2.0.0"
+                    "isaacsim_gui-6.2.0.0"
+                    "isaacsim_utils-6.2.0.0"
+                    "isaacsim_storage-6.2.0.0"
+                    "isaacsim_asset-6.2.0.0"
+                    "isaacsim_sensor-6.2.0.0"
+                    "isaacsim_robot_motion-6.2.0.0"
+                    "isaacsim_robot-6.2.0.0"
+                    "isaacsim_benchmark-6.2.0.0"
+                    "isaacsim_code_editor-6.2.0.0"
+                    "isaacsim_ros1-6.2.0.0"
+                    "isaacsim_example-6.2.0.0"
+                    "isaacsim_replicator-6.2.0.0"
+                    "isaacsim_rl-6.2.0.0"
+                    "isaacsim_robot_setup-6.2.0.0"
+                    "isaacsim_ros2-6.2.0.0"
+                    "isaacsim_template-6.2.0.0"
+                    "isaacsim_test-6.2.0.0"
+                    "isaacsim-6.2.0.0"
+                    "isaacsim_extscache_physics-6.2.0.0"
+                    "isaacsim_extscache_kit-6.2.0.0"
+                    "isaacsim_extscache_kit_sdk-6.2.0.0"
                 )
 
                 # --fail keeps an HTTP error page from being saved under a .whl name;
@@ -404,7 +407,7 @@ if [ "$OMNIGIBSON" = true ]; then
                 done
 
                 echo "Installing Isaac Sim packages..."
-                python -m pip install "${wheel_files[@]}"
+                python -m pip install "${wheel_files[@]}" --extra-index-url https://pypi.nvidia.com
                 rm -rf "$temp_dir"
 
                 # Verify installation
@@ -439,13 +442,15 @@ if [ "$OMNIGIBSON" = true ]; then
     # Force reinstall cffi 1.17.1 to resolve compatibility issues with Isaac Sim extensions
     python -m pip install --force-reinstall cffi==1.17.1
 
-    # isaacsim-kernel 6.0.1 pins coverage==7.4.4, llvmlite==0.46 and websockets==12.0,
-    # which break numba (needs newer coverage/llvmlite) and omnigibson.eval
-    # (needs websockets>=13 for websockets.asyncio.server). Re-upgrade them.
-    python -m pip install --force-reinstall -U "coverage>=7.5" "llvmlite>=0.48" "websockets>=15.0.1"
+    # isaacsim-kernel 6.2.0 pins llvmlite==0.46 and websockets<15, which break numba (needs llvmlite 0.48;
+    # numba pins one llvmlite minor per release, so pin numba alongside it -- 0.66 <-> llvmlite 0.48)
+    # and omnigibson.eval (needs websockets>=13 for websockets.asyncio.server). Re-upgrade them.
+    python -m pip install --force-reinstall -U "coverage>=7.5" "llvmlite>=0.48,<0.49" "numba>=0.66,<0.67" "websockets>=15.0.1"
 
     # Override isaacsim-core's older newton pin; keep in sync with extras_require["newton"] in OmniGibson/setup.py
-    python -m pip install "newton[sim]==1.7.0"
+    # Pin warp-lang to the omni.warp.core version Kit bundles (1.17.0): a newer pip warp (e.g. 1.19 via
+    # mujoco-warp>=1.15) gets mixed with Kit's copy at runtime and fails to import warp._src.apic.
+    python -m pip install "newton[sim]==1.7.0" "warp-lang==1.17.0"
 
     echo "OmniGibson installation completed successfully!"
 fi
@@ -512,6 +517,9 @@ if [ "$DATASET" = true ]; then
         exit 1
     }
 fi
+
+# Record which env version this env was built for (read by CI, see .github/workflows/tests.yml)
+if [ -n "$CONDA_PREFIX" ]; then echo "$BEHAVIOR_ENV_VERSION" > "$CONDA_PREFIX/.behavior_env_version"; fi
 
 echo ""
 echo "=== Installation Complete! ==="
