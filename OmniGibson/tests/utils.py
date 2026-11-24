@@ -12,10 +12,6 @@ from omnigibson.utils.constants import PrimType
 # Known Newton gaps; remove a marker once the backend supports the feature.
 # Item access does not mark the macro as read, so scripts run under pytest (e.g. examples) can still set it.
 _ON_NEWTON = gm["PHYSICS_BACKEND"] == "newton"
-skip_newton_physical_particles = pytest.mark.skipif(
-    _ON_NEWTON, reason="Physical particle systems are not supported on Newton yet"
-)
-
 SYSTEM_EXAMPLES = {
     "water": FluidSystem,
     "white_rice": GranularSystem,

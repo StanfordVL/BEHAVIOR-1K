@@ -766,19 +766,60 @@ class OmniSurfaceMaterialPrim(MaterialPrim):
         """
         self.set_input(inp="specular_transmission_scattering_color", val=lazy.pxr.Gf.Vec3f(*color))
 
-    @property
-    def average_diffuse_color(self):
-        base_color_weight = self.diffuse_reflection_weight
-        transmission_weight = self.enable_specular_transmission * self.specular_transmission_weight
+    # The inputs average_color_and_transmission() reads, as OmniSurfacePresets.mdl sets them for the presets BEHAVIOR's
+    # fluids use. Lets the color be computed without Kit (and so without the MDL), e.g. on the Newton backend.
+    FLUID_PRESET_COLOR_INPUTS = {
+        "ClearWater": (0.0, (1.0, 1.0, 1.0), True, 1.0, (1.0, 1.0, 1.0), (0.0, 0.0, 0.0)),
+        "DeepWater": (0.0, (1.0, 1.0, 1.0), True, 1.0, (0.744, 0.940, 1.0), (0.067, 0.134, 0.5)),
+        "Bubble": (0.0, (1.0, 1.0, 1.0), True, 1.0, (1.0, 1.0, 1.0), (0.0, 0.0, 0.0)),
+        "OrangeJuice": (1.0, (0.831, 0.426, 0.0), True, 0.3, (0.999, 0.513, 0.001), (0.999, 0.513, 0.001)),
+        "MapleSyrup": (0.0, (1.0, 1.0, 1.0), True, 1.0, (0.95, 0.35, 0.001), (0.5, 0.1, 0.001)),
+        "Honey": (0.0, (1.0, 1.0, 1.0), True, 1.0, (1.0, 0.474, 0.115), (1.0, 0.39, 0.0)),
+        "Jade": (1.0, (0.060, 0.440, 0.192), True, 0.6, (0.060, 0.440, 0.192), (0.0, 0.0, 0.0)),
+        "WholeMilk": (1.0, (1.0, 1.0, 1.0), False, 0.0, (1.0, 1.0, 1.0), (0.0, 0.0, 0.0)),
+        "SkimMilk": (1.0, (1.0, 1.0, 1.0), False, 0.0, (1.0, 1.0, 1.0), (0.0, 0.0, 0.0)),
+        "PeanutButter": (1.0, (1.0, 1.0, 1.0), False, 0.0, (1.0, 1.0, 1.0), (0.0, 0.0, 0.0)),
+    }
+    COLOR_INPUT_NAMES = (
+        "diffuse_reflection_weight",
+        "diffuse_reflection_color",
+        "enable_specular_transmission",
+        "specular_transmission_weight",
+        "specular_transmission_color",
+        "specular_transmission_scattering_color",
+    )
+
+    @staticmethod
+    def average_color_and_transmission(
+        diffuse_reflection_weight,
+        diffuse_reflection_color,
+        enable_specular_transmission,
+        specular_transmission_weight,
+        specular_transmission_color,
+        specular_transmission_scattering_color,
+    ):
+        """
+        Returns:
+            2-tuple:
+                - 3-array: weighted sum of the base (diffuse) color and the transmission colors
+                - float: fraction of that weight that is transmission, i.e. how see-through the material is
+        """
+        base_color_weight = diffuse_reflection_weight
+        transmission_weight = enable_specular_transmission * specular_transmission_weight
         total_weight = base_color_weight + transmission_weight
 
         # If the fluid doesn't have any color, we add a "blue" tint by default
         if total_weight == 0.0:
-            return th.tensor([0.0, 0.0, 1.0])
+            return th.tensor([0.0, 0.0, 1.0]), 0.0
 
         base_color_weight /= total_weight
         transmission_weight /= total_weight
         # Weighted sum of base color and transmission color
-        return base_color_weight * self.diffuse_reflection_color + transmission_weight * (
-            0.5 * self.specular_transmission_color + 0.5 * self.specular_transmission_scattering_color
+        color = base_color_weight * th.as_tensor(diffuse_reflection_color) + transmission_weight * (
+            0.5 * th.as_tensor(specular_transmission_color) + 0.5 * th.as_tensor(specular_transmission_scattering_color)
         )
+        return color, float(transmission_weight)
+
+    @property
+    def average_diffuse_color(self):
+        return self.average_color_and_transmission(*(getattr(self, name) for name in self.COLOR_INPUT_NAMES))[0]

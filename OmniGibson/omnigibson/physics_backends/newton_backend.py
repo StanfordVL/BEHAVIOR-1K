@@ -716,6 +716,25 @@ class _NewtonBatchArticulationView:
             target[self._handles[row]._global_qd_idx] = data[row]
 
 
+class _ParticleImportRoot:
+    """
+    Stands in for a scene object in _rebuild_impl()'s import loop, for a macro particle system. Imported from the
+    system prim  while ignoring every other child, e.g. the particle template.
+    """
+
+    prim_type = PrimType.RIGID
+    fixed_base = False
+    is_particle_root = True
+
+    def __init__(self, system_prim):
+        self.prim_path = str(system_prim.GetPath())
+        self.ignore_paths = [
+            str(child.GetPath())
+            for child in system_prim.GetChildren()
+            if child.GetName() != "particles" and not child.IsA(lazy.pxr.UsdShade.Material)
+        ]
+
+
 def _match_body_paths(backend, pattern):
     matched = set(_match_paths(pattern, backend._path_body_map))
     matched = [(path, idx) for path, idx in backend._path_body_map.items() if path in matched]
@@ -747,6 +766,10 @@ class _NewtonRigidBodyBatchView:
         if self._pattern is None:
             return
         backend = self._backend
+        # Only a view that would actually see the pending particles forces the deferred rebuild -- scene-wide views
+        # (RigidBodyViewAPI, RigidContactAPI) are re-created on every update_handles().
+        if backend._macro_particles_dirty and _match_paths(self._pattern, backend._macro_particle_roots()):
+            backend.ensure_model_current()
         if self._generation != backend._model_generation:
             self._generation = self._backend._model_generation
             paths, idxs = _match_body_paths(self._backend, self._pattern)
@@ -1043,7 +1066,10 @@ class NewtonBackend(PhysicsBackend):
         self._control = None
         self._contacts = None
         self._solver = None
+        self._collision_pipeline = None
+        # Newton collision pipeline feeding the plain (rigid-only) SolverMuJoCo path -- see _rebuild()
         self._rigid_collision_pipeline = None
+        self._mpm_in_place = False
         self._pre_step_cb = None
         self._post_step_cb = None
         self._joint_break_cb = None
@@ -1056,6 +1082,13 @@ class NewtonBackend(PhysicsBackend):
         self._contacts_dirty = True
         self._rebuilding = False
         self._path_joint_map = {}
+        # Fluid/granular particle systems (MicroPhysicalParticleSystem, e.g. "water") -- their
+        # particle count changes at runtime (generate_particles()/remove_particles()), so the
+        # authoritative current state lives here (synced from the live model before each mutation),
+        # not just derived from a fixed USD mesh.
+        self._fluid_systems = {}  # system_name -> {"pos": (N, 3) tensor, "vel": (N, 3) tensor}
+        self._path_fluid_particle_map = {}  # system_name -> (particle_start, particle_end) in the CURRENT model
+        self._fluid_surface_cache = {}  # see get_fluid_surface_meshes()
         self._articulation_handles = {}
         self._rigid_body_handles = {}
         self._gravity = 9.81
@@ -1068,7 +1101,14 @@ class NewtonBackend(PhysicsBackend):
         self._breakable_joints = {}
         self._already_broken_joints = set()
         self._joints_settle_steps_remaining = 0
+        # Set when a body's density (or a zero mass, meaning "derive from density") is authored on a live
+        # model.
         self._mass_properties_dirty = False
+        # MacroPhysicalParticleSystem particles are individual rigid-body prims under their system (not scene
+        # objects), imported by _rebuild_impl() after every object so object body indices stay stable.
+        self._known_macro_particle_paths = frozenset()
+        self._macro_particles_dirty = False
+        self._ensuring_model_current = False
         self._model_generation = 0
         self._warned_cpu_device = False
 
@@ -1177,6 +1217,8 @@ class NewtonBackend(PhysicsBackend):
         self._sim_context.render()
 
     def step(self, render):
+        # Apply any deferred particle-set change before physics runs.
+        self.ensure_model_current()
         self._sim_context.step(render=render)
 
     # MuJoCo rejects even a -1e-10 deficit, so this margin only has to cover float32 rounding.
@@ -1264,8 +1306,9 @@ class NewtonBackend(PhysicsBackend):
         return graph
 
     def step_physics_once(self, current_time):
-        if self._mass_properties_dirty:
+        if self._mass_properties_dirty or self._macro_particles_dirty:
             self._mass_properties_dirty = False
+            self._macro_particles_dirty = False
             self._joints_dirty = True
         if self._joints_dirty:
             self._joints_dirty = False
@@ -1275,17 +1318,26 @@ class NewtonBackend(PhysicsBackend):
             self._pre_step_cb()
 
         if self._solver is not None:
-            step_dt = self.get_physics_dt()
-            if self._rigid_collision_pipeline is not None:
-                self._rigid_collision_pipeline.collide(self._state_0, self._contacts)
-            graph = self._step_graph(step_dt)
-            if graph is not None:
-                import warp as wp
-
-                wp.capture_launch(graph)
+            if self._mpm_in_place:
+                applied_body_f = self._applied_body_forces()
+                self._state_0.clear_forces()
+                self._restore_applied_body_forces(applied_body_f)
+                if self._collision_pipeline is not None:
+                    self._collision_pipeline.collide(self._state_0, self._contacts)
+                self._solver.step(self._state_0, self._state_0, self._control, self._contacts, self.get_physics_dt())
             else:
-                self._solver.step(self._state_0, self._state_1, self._control, self._contacts, step_dt)
-            self._state_0, self._state_1 = self._state_1, self._state_0
+                # Replay this substep from a CUDA graph when one is available.
+                step_dt = self.get_physics_dt()
+                if self._rigid_collision_pipeline is not None:
+                    self._rigid_collision_pipeline.collide(self._state_0, self._contacts)
+                graph = self._step_graph(step_dt)
+                if graph is not None:
+                    import warp as wp
+
+                    wp.capture_launch(graph)
+                else:
+                    self._solver.step(self._state_0, self._state_1, self._control, self._contacts, step_dt)
+                self._state_0, self._state_1 = self._state_1, self._state_0
             self._state_0.clear_forces()
 
             self._bvh_dirty = True
@@ -1294,6 +1346,15 @@ class NewtonBackend(PhysicsBackend):
 
         if self._post_step_cb is not None:
             self._post_step_cb()
+
+    def _applied_body_forces(self):
+        """Copy of the apply_force_at_pos()/apply_torque() wrenches pending on state_0, or None."""
+        body_f = self._state_0.body_f
+        return None if body_f is None else _wp_to_torch(body_f).clone()
+
+    def _restore_applied_body_forces(self, applied_body_f):
+        if applied_body_f is not None:
+            _wp_to_torch(self._state_0.body_f).copy_(applied_body_f)
 
     def _compute_mass_matrix(self, handle):
         import newton
@@ -1337,9 +1398,47 @@ class NewtonBackend(PhysicsBackend):
     def physics_sim_view(self):
         return _NewtonPhysicsSimView(self)
 
+    def _macro_particle_roots(self):
+        """{particle prim path: owning system} for every live MacroPhysicalParticleSystem particle."""
+        from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
+
+        paths = {}
+        for scene in self.sim.scenes:
+            for system in scene.active_systems.values():
+                if not isinstance(system, MacroPhysicalParticleSystem) or not system.initialized:
+                    continue
+                root = self.sim.stage.GetPrimAtPath(f"{system.prim_path}/particles")
+                if not root.IsValid():
+                    continue
+                for child in root.GetChildren():
+                    if child.IsActive() and child.HasAPI(lazy.pxr.UsdPhysics.RigidBodyAPI):
+                        paths[str(child.GetPath())] = system
+        return paths
+
+    def ensure_model_current(self):
+        """
+        Applies a lazily-deferred model change (e.g. new macro particles) now, if one is pending and it's safe to.
+        """
+        if (
+            not self._macro_particles_dirty
+            or self._rebuilding
+            or self._ensuring_model_current
+            or self.sim.currently_stepping
+        ):
+            return
+        self._ensuring_model_current = True
+        try:
+            self._macro_particles_dirty = False
+            self._rebuild()
+            self.sim.update_handles()
+        finally:
+            self._ensuring_model_current = False
+
     def refresh_physics_sim_view(self):
         if self._model is None or not self.is_playing():
             return
+        if frozenset(self._macro_particle_roots()) != self._known_macro_particle_paths:
+            self._macro_particles_dirty = True
         current_paths = frozenset(obj.prim_path for scene in self.sim.scenes for obj in scene.objects)
         if current_paths != self._known_object_paths:
             self._rebuild()
@@ -1573,6 +1672,8 @@ class NewtonBackend(PhysicsBackend):
 
         from omnigibson.physics_backends.newton_visuals import add_usd_visual_shapes
 
+        for system_name in list(self._path_fluid_particle_map):
+            self._sync_fluid_system_from_model(system_name)
         captured_state = self._capture_state()
         self._already_broken_joints = set()
 
@@ -1586,6 +1687,12 @@ class NewtonBackend(PhysicsBackend):
         builder.shape_flags[ground_shape] = int(builder.shape_flags[ground_shape]) & ~int(newton.ShapeFlags.VISIBLE)
 
         newton.solvers.SolverMuJoCo.register_custom_attributes(builder)
+
+        if self._fluid_systems:
+            # Must be registered before any particles referencing "mpm:*" custom attributes are added.
+            from newton.solvers import SolverImplicitMPM
+
+            SolverImplicitMPM.register_custom_attributes(builder)
 
         objects = [obj for scene in self.sim.scenes for obj in scene.objects]
 
@@ -1603,7 +1710,12 @@ class NewtonBackend(PhysicsBackend):
         robot_joint_paths = set()
         arm_joint_paths = set()
         low_friction_body_idx = set()
-        for obj in objects:
+        # Macro-particle roots go last, so object body indices are unaffected by particle changes
+        macro_particle_paths = self._macro_particle_roots()
+        particle_systems = sorted({system.prim_path for system in macro_particle_paths.values()})
+        import_roots = objects + [_ParticleImportRoot(self.sim.stage.GetPrimAtPath(path)) for path in particle_systems]
+        for obj in import_roots:
+            is_particle_root = getattr(obj, "is_particle_root", False)
             if obj.prim_type == PrimType.CLOTH:
                 continue
 
@@ -1614,7 +1726,10 @@ class NewtonBackend(PhysicsBackend):
                 floating=not obj.fixed_base,
                 enable_self_collisions=False,
                 collapse_fixed_joints=False,
-                skip_mesh_approximation=False,
+                # Apply each collider's authored physics:approximation (convexHull on BEHAVIOR assets).
+                # Scenes with fluid keep the raw meshes:
+                # SolverImplicitMPM cannot build a collider from a convex mesh ("Shape type 10 not supported")
+                skip_mesh_approximation=bool(self._fluid_systems),
                 load_visual_shapes=False,
                 schema_resolvers=[
                     newton.usd.SchemaResolverNewton(),
@@ -1622,7 +1737,7 @@ class NewtonBackend(PhysicsBackend):
                     newton.usd.SchemaResolverMjc(),
                 ],
                 hide_collision_shapes=True,
-                ignore_paths=ignore_paths_by_obj.get(obj),
+                ignore_paths=getattr(obj, "ignore_paths", None) or ignore_paths_by_obj.get(obj),
             )
             # add_usd()'s own visual import is off; bake textured render-only shapes for Newton's viewers instead
             add_usd_visual_shapes(newton, builder, self.sim.stage, obj.prim_path, info["path_body_map"])
@@ -1651,6 +1766,11 @@ class NewtonBackend(PhysicsBackend):
                 for idx in range(joint_count_before, len(builder.joint_articulation))
                 if builder.joint_articulation[idx] < 0
             )
+            if is_particle_root:
+                # Each particle is its own free body, not one articulation
+                for idx in unassigned:
+                    builder.add_articulation([idx], label=f"{obj.prim_path}_{idx}")
+                continue
             run_start = None
             for i, idx in enumerate(unassigned):
                 if run_start is None:
@@ -1703,6 +1823,21 @@ class NewtonBackend(PhysicsBackend):
         self._path_body_map = path_body_map
         self._body_path_map = {idx: path for path, idx in path_body_map.items()}
         self._path_joint_map = path_joint_map
+
+        path_fluid_particle_map = {}
+        for system_name, particles in self._fluid_systems.items():
+            particle_start = builder.particle_count
+            pos = particles["pos"]
+            vel = particles["vel"]
+            builder.add_particles(
+                pos=[wp.vec3(*p) for p in pos.tolist()],
+                vel=[wp.vec3(*v) for v in vel.tolist()],
+                mass=[self._FLUID_DEFAULT_PARTICLE_MASS] * len(pos),
+                radius=[self._FLUID_DEFAULT_PARTICLE_RADIUS] * len(pos),
+                custom_attributes=self._FLUID_MATERIAL_DEFAULTS,
+            )
+            path_fluid_particle_map[system_name] = (particle_start, builder.particle_count)
+        self._path_fluid_particle_map = path_fluid_particle_map
 
         joint_qd_start = builder.joint_qd_start
         robot_authored_effort = {}
@@ -1921,9 +2056,65 @@ class NewtonBackend(PhysicsBackend):
             self._model.bvh_build_shapes(self._state_0, shape_flags=newton.ShapeFlags.COLLIDE_SHAPES)
         self._bvh_dirty = False
 
+        self._mpm_in_place = False
+        has_fluid = any(end > start for start, end in path_fluid_particle_map.values())
         has_rigid = self._model.joint_count > 0
         self._rigid_collision_pipeline = None
-        if has_rigid:
+        if has_fluid and has_rigid:
+            from newton.solvers.experimental.coupled import SolverCoupledProxy
+            from newton.solvers import SolverImplicitMPM
+
+            rigid_body_indices = list(range(self._model.body_count))
+            body_flags = self._model.body_flags.numpy()
+            kinematic = int(newton.BodyFlags.KINEMATIC)
+            kinematic_body_indices = [i for i in rigid_body_indices if body_flags[i] & kinematic]
+            dynamic_body_indices = [i for i in rigid_body_indices if not body_flags[i] & kinematic]
+            # One shared factory: SolverCoupledProxy requires every mjc->mpm proxy to use the same one
+            no_proxy_collisions = lambda _model: None
+            mpm_config = self._make_mpm_config()
+            self._solver = SolverCoupledProxy(
+                model=self._model,
+                entries=[
+                    SolverCoupledProxy.Entry(
+                        name="mpm",
+                        solver=lambda v: SolverImplicitMPM(model=v, config=mpm_config),
+                        particles=list(range(self._model.particle_count)),
+                        in_place=True,
+                    ),
+                    SolverCoupledProxy.Entry(
+                        name="mjc",
+                        solver=lambda v: newton.solvers.SolverMuJoCo(model=v, **self._mujoco_solver_kwargs()),
+                        bodies=rigid_body_indices,
+                        joints=list(range(self._model.joint_count)),
+                    ),
+                ],
+                coupling=SolverCoupledProxy.Config(
+                    proxies=[
+                        SolverCoupledProxy.Proxy(
+                            source="mjc",
+                            destination="mpm",
+                            bodies=bodies,
+                            mass_scale=1.0,
+                            mode=mode,
+                            collision_pipeline=no_proxy_collisions,
+                        )
+                        for bodies, mode in ((dynamic_body_indices, "lagged"), (kinematic_body_indices, "staggered"))
+                        if bodies
+                    ],
+                    iterations=1,
+                ),
+            )
+            self._collision_pipeline = newton.CollisionPipeline(self._model, soft_contact_max=0)
+            self._contacts = self._collision_pipeline.contacts()
+            self._mpm_in_place = True
+        elif has_fluid:
+            # Fluid but no rigid bodies.
+            mpm_config = self._make_mpm_config()
+            self._solver = SolverImplicitMPM(model=self._model, config=mpm_config)
+            self._collision_pipeline = None
+            self._mpm_in_place = True
+        elif self._model.joint_count > 0:
+            self._collision_pipeline = None
             try:
                 self._solver = newton.solvers.SolverMuJoCo(self._model, **self._mujoco_solver_kwargs())
                 self._rigid_collision_pipeline = newton.CollisionPipeline(
@@ -1943,6 +2134,7 @@ class NewtonBackend(PhysicsBackend):
                     )
                 self._solver = None
         else:
+            self._collision_pipeline = None
             self._solver = None
 
         self._elevate_low_friction_geom_priority(low_friction_body_idx)
@@ -1964,8 +2156,20 @@ class NewtonBackend(PhysicsBackend):
         self._contacts_dirty = True
 
         self._known_object_paths = frozenset(obj.prim_path for obj in objects)
+        self._known_macro_particle_paths = frozenset(macro_particle_paths)
         self._model_generation += 1
         self._restore_state(captured_state)
+
+    # Fluid (SolverImplicitMPM) defaults: water as in newton's example_mpm_water_dam_break.py -- frictionless, with
+    # newton's own (incompressible) yield defaults.
+    _FLUID_DEFAULT_PARTICLE_RADIUS = 0.01
+    _FLUID_DEFAULT_PARTICLE_MASS = 1000.0 * (2 * _FLUID_DEFAULT_PARTICLE_RADIUS) ** 3
+    _FLUID_MATERIAL_DEFAULTS = {
+        "mpm:friction": 0.0,
+        "mpm:tensile_yield_ratio": 1.0,
+        "mpm:viscosity": 0.0,
+    }
+    _FLUID_VOXEL_SIZE = 0.05
 
     # Must match or exceed every SolverMuJoCo construction's nconmax below.
     _RIGID_CONTACT_MAX = 250_000
@@ -1985,10 +2189,33 @@ class NewtonBackend(PhysicsBackend):
             nconmax=self._RIGID_CONTACT_MAX,
         )
 
+    def _make_mpm_config(self):
+        """SolverImplicitMPM.Config, validated standalone against a water-like blob (settles/spreads
+        flat under gravity, no explosion) -- matches newton's own coupled-MPM example's tuning."""
+        from newton.solvers import SolverImplicitMPM
+
+        config = SolverImplicitMPM.Config()
+        config.voxel_size = self._FLUID_VOXEL_SIZE
+        config.grid_type = "fixed"
+        config.grid_padding = 50
+        config.max_active_cell_count = 1 << 15
+        config.strain_basis = "P0"
+        config.max_iterations = 50
+        config.critical_fraction = 0.0
+        return config
+
     def _capture_state(self):
         if self._model is None:
             return None
-        captured = {"articulations": {}, "rigid_bodies": {}}
+        captured = {"articulations": {}, "rigid_bodies": {}, "macro_particles": {}}
+        # Macro particles have no per-prim handles; snapshot their bodies directly by path
+        if self._known_macro_particle_paths and self._state_0 is not None and self._state_0.body_q is not None:
+            body_q = _wp_to_torch(self._state_0.body_q)
+            body_qd = _wp_to_torch(self._state_0.body_qd)
+            for path in self._known_macro_particle_paths:
+                idx = self._path_body_map.get(path)
+                if idx is not None:
+                    captured["macro_particles"][path] = (body_q[idx].clone(), body_qd[idx].clone())
         for path, handle in self._articulation_handles.items():
             if not handle.is_physics_handle_valid():
                 continue
@@ -2036,6 +2263,11 @@ class NewtonBackend(PhysicsBackend):
                 handle.set_gains(kps=data["gains_ke"], kds=data["gains_kd"])
             if data["world_pos"] is not None and self._path_body_map.get(handle._root_link_prim_path) is not None:
                 handle.set_world_poses(data["world_pos"], data["world_quat"])
+        particle_paths = [p for p in captured.get("macro_particles", {}) if p in self._path_body_map]
+        if particle_paths:
+            view = _NewtonRigidBodyBatchView(self, [self._path_body_map[p] for p in particle_paths], particle_paths)
+            view.set_transforms(th.stack([captured["macro_particles"][p][0] for p in particle_paths]))
+            view.set_velocities(th.stack([captured["macro_particles"][p][1] for p in particle_paths]))
         for path, data in captured["rigid_bodies"].items():
             handle = self._rigid_body_handles.get(path)
             if handle is None or not handle.is_physics_handle_valid():
@@ -2080,6 +2312,175 @@ class NewtonBackend(PhysicsBackend):
 
     def set_cloth_stiffness(self, prim_path, bend=None, damping=None, shear=None, stretch=None):
         pass
+
+    # ---- Fluid/granular particle-system state I/O ----
+
+    def _sync_fluid_system_from_model(self, system_name):
+        """Write the live model's current state for `system_name` back into self._fluid_systems, if built."""
+        if system_name not in self._path_fluid_particle_map:
+            return
+        start, end = self._path_fluid_particle_map[system_name]
+        if end == start:
+            self._fluid_systems[system_name] = {
+                "pos": th.zeros((0, 3), dtype=th.float32, device=self.sim.device),
+                "vel": th.zeros((0, 3), dtype=th.float32, device=self.sim.device),
+            }
+            return
+        self._fluid_systems[system_name] = {
+            "pos": _wp_to_torch(self._state_0.particle_q)[start:end, :3].clone(),
+            "vel": _wp_to_torch(self._state_0.particle_qd)[start:end, :3].clone(),
+        }
+
+    def create_particle_system(self, system_name):
+        if system_name not in self._fluid_systems:
+            self._fluid_systems[system_name] = {
+                "pos": th.zeros((0, 3), device=self.sim.device),
+                "vel": th.zeros((0, 3), device=self.sim.device),
+            }
+
+    def generate_particles(self, system_name, positions, velocities=None):
+        self._sync_fluid_system_from_model(system_name)
+        positions = th.as_tensor(positions, dtype=th.float32, device=self.sim.device).reshape(-1, 3)
+        velocities = (
+            th.zeros_like(positions)
+            if velocities is None
+            else th.as_tensor(velocities, dtype=th.float32, device=self.sim.device).reshape(-1, 3)
+        )
+        system = self._fluid_systems[system_name]
+        system["pos"] = th.cat([system["pos"], positions])
+        system["vel"] = th.cat([system["vel"], velocities])
+        self._path_fluid_particle_map.pop(system_name, None)
+        self._rebuild()
+
+    def remove_particles(self, system_name, idxs):
+        self._sync_fluid_system_from_model(system_name)
+        system = self._fluid_systems[system_name]
+        keep = th.ones(len(system["pos"]), dtype=th.bool, device=system["pos"].device)
+        keep[th.as_tensor(idxs, dtype=th.long, device=system["pos"].device)] = False
+        system["pos"] = system["pos"][keep]
+        system["vel"] = system["vel"][keep]
+        self._path_fluid_particle_map.pop(system_name, None)
+        self._rebuild()
+
+    def get_particle_positions(self, system_name):
+        if system_name in self._path_fluid_particle_map:
+            start, end = self._path_fluid_particle_map[system_name]
+            if end == start:
+                return th.zeros((0, 3), dtype=th.float32, device=self.sim.device)
+            return _wp_to_torch(self._state_0.particle_q)[start:end, :3]
+        return self._fluid_systems[system_name]["pos"]
+
+    def set_particle_positions(self, system_name, positions, idxs=None):
+        positions = th.as_tensor(positions, dtype=th.float32, device=self.sim.device).reshape(-1, 3)
+        if system_name in self._path_fluid_particle_map:
+            start, end = self._path_fluid_particle_map[system_name]
+            if end == start:
+                return
+            particle_q = _wp_to_torch(self._state_0.particle_q)
+            idx = (
+                th.arange(start, end, device=particle_q.device)[idxs]
+                if idxs is not None
+                else th.arange(start, end, device=particle_q.device)
+            )
+            particle_q[idx, :3] = positions
+        else:
+            system = self._fluid_systems[system_name]
+            if idxs is not None:
+                system["pos"][idxs] = positions.to(system["pos"].device)
+            else:
+                system["pos"] = positions
+
+    def get_particle_velocities(self, system_name):
+        if system_name in self._path_fluid_particle_map:
+            start, end = self._path_fluid_particle_map[system_name]
+            if end == start:
+                return th.zeros((0, 3), dtype=th.float32, device=self.sim.device)
+            return _wp_to_torch(self._state_0.particle_qd)[start:end, :3]
+        return self._fluid_systems[system_name]["vel"]
+
+    def set_particle_velocities(self, system_name, velocities, idxs=None):
+        velocities = th.as_tensor(velocities, dtype=th.float32, device=self.sim.device).reshape(-1, 3)
+        if system_name in self._path_fluid_particle_map:
+            start, end = self._path_fluid_particle_map[system_name]
+            if end == start:
+                return
+            particle_qd = _wp_to_torch(self._state_0.particle_qd)
+            idx = (
+                th.arange(start, end, device=particle_qd.device)[idxs]
+                if idxs is not None
+                else th.arange(start, end, device=particle_qd.device)
+            )
+            particle_qd[idx, :3] = velocities
+        else:
+            system = self._fluid_systems[system_name]
+            if idxs is not None:
+                system["vel"][idxs] = velocities.to(system["vel"].device)
+            else:
+                system["vel"] = velocities
+
+    # Surface reconstruction settings from newton's example_mpm_water_dam_break.py, with the voxel and kernel sized
+    # to _FLUID_VOXEL_SIZE and the 2 cm particle spacing
+    _FLUID_SURFACE_VOXEL_SIZE = 0.3 * _FLUID_VOXEL_SIZE
+    _FLUID_SURFACE_KWARGS = dict(
+        kernel_radius=max(6.0 * _FLUID_DEFAULT_PARTICLE_RADIUS, 1.5 * _FLUID_SURFACE_VOXEL_SIZE),
+        threshold=0.25,
+        smooth_lambda=0.0,
+        anisotropic=True,
+        kernel_scale=0.6,
+        anisotropy_ratio=16.0,
+        anisotropy_scale=2.0,
+        anisotropy_min_neighbors=4,
+        anisotropy_binning=True,
+        anisotropy_strength=0.95,
+        field_smooth_iterations=1,
+        field_smooth_radius=2,
+        field_mode="sdf",
+        redistance_iterations=1,
+        mesh_smooth_iterations=1,
+    )
+
+    def get_fluid_surface_meshes(self):
+        """
+        Surface meshes reconstructed from the live MPM particles, for rendering fluid as a liquid instead of beads.
+
+        Returns:
+            dict: system_name -> (vertices, indices, normals) warp arrays, or None if the system has no surface
+                (e.g. a few isolated droplets). Empty if no fluid is currently simulated.
+        """
+        import warp as wp
+
+        if not self._mpm_in_place:
+            return {}
+        mpm = self._solver.solver("mpm") if hasattr(self._solver, "solver") else self._solver
+        if self._fluid_surface_cache.get("solver") is not mpm:
+            # Each rebuild makes a new solver (and particle layout), so the extraction contexts are per solver
+            self._fluid_surface_cache = {"solver": mpm, "surfaces": {}, "flags": {}}
+        cache = self._fluid_surface_cache
+        systems = {name: span for name, span in self._path_fluid_particle_map.items() if span[1] > span[0]}
+        meshes = {}
+        for system_name, (start, end) in systems.items():
+            if system_name not in cache["surfaces"]:
+                cache["surfaces"][system_name] = mpm.create_particle_surface(
+                    voxel_size=self._FLUID_SURFACE_VOXEL_SIZE, **self._FLUID_SURFACE_KWARGS
+                )
+                flags = None
+                if len(systems) > 1:
+                    # Surface only this system's particles, so separate fluids don't merge into one mesh
+                    flags = mpm._mpm_model.particle_flags.numpy().copy()
+                    flags[:start] = 0
+                    flags[end:] = 0
+                    flags = wp.array(flags, dtype=wp.int32, device=self._model.device)
+                cache["flags"][system_name] = flags
+            mesh = mpm.extract_particle_surface(
+                self._state_0,
+                cache["surfaces"][system_name],
+                extrapolate_into_colliders=True,
+                collider_extrapolation_depth=2.0 * self._FLUID_SURFACE_VOXEL_SIZE,
+                particle_flags=cache["flags"][system_name],
+            )
+            vertices, indices, normals = mesh.to_arrays()
+            meshes[system_name] = None if vertices is None else (vertices, indices, normals)
+        return meshes
 
     def _sync_fk(self):
         import newton
@@ -2318,7 +2719,23 @@ class NewtonBackend(PhysicsBackend):
             self._bvh_dirty = False
 
     def _get_mujoco_solver(self):
-        return self._solver
+        """The live SolverMuJoCo instance backing this model's rigid dynamics, or None if there's no
+        rigid content at all (fluid-only scenes).
+        """
+        if self._solver is None:
+            return None
+        import newton
+
+        if isinstance(self._solver, newton.solvers.SolverMuJoCo):
+            return self._solver
+        from newton.solvers.experimental.coupled import SolverCoupledProxy
+
+        if isinstance(self._solver, SolverCoupledProxy):
+            try:
+                return self._solver.solver("mjc")
+            except KeyError:
+                return None
+        return None
 
     def _ensure_contacts_fresh(self):
         if not self._contacts_dirty:
