@@ -10,7 +10,6 @@ from utils import (
     place_obj_on_floor_plane,
     place_objA_on_objB_bbox,
     skip_newton_physical_particles,
-    skip_newton_inside_sampling,
 )
 
 import omnigibson as og
@@ -147,7 +146,6 @@ def test_on_top(env, breakfast_table, bowl, dishtowel):
         bowl.states[OnTop].set_value(breakfast_table, False)
 
 
-@skip_newton_inside_sampling
 def test_inside(env, bottom_cabinet, bowl, dishtowel):
     place_obj_on_floor_plane(bottom_cabinet)
     bowl.set_position_orientation(position=[0.0, 0.0, 0.08])
@@ -168,8 +166,9 @@ def test_inside(env, bottom_cabinet, bowl, dishtowel):
     assert not bowl.states[Inside].get_value(bottom_cabinet)
     assert not dishtowel.states[Inside].get_value(bottom_cabinet)
 
-    assert bowl.states[Inside].set_value(bottom_cabinet, True)
-    assert dishtowel.states[Inside].set_value(bottom_cabinet, True)
+    # Sampling can fail when the bowl leaves little room for the towel, so retry like the behavior task tests do
+    assert any(bowl.states[Inside].set_value(bottom_cabinet, True) for _ in range(10))
+    assert any(dishtowel.states[Inside].set_value(bottom_cabinet, True) for _ in range(10))
 
     with pytest.raises(NotImplementedError):
         bowl.states[OnTop].set_value(bottom_cabinet, False)

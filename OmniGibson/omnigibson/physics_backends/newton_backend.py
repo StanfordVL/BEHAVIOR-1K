@@ -496,7 +496,8 @@ class NewtonRigidBodyHandle:
         return self._valid
 
     def get_world_poses(self, clone=True):
-        if not self._valid:
+        # Stopped: poses are set on USD and the Newton state is stale until the next play() rebuilds it from USD
+        if not self._valid or self._backend.is_stopped():
             from omnigibson.utils.usd_utils import get_world_pose
 
             pos, quat_wxyz_from_xyzw = get_world_pose(self.prim_path)
@@ -1377,7 +1378,7 @@ class NewtonBackend(PhysicsBackend):
         return lazy.pxr.UsdGeom.Xformable(prim).GetLocalTransformation(lazy.pxr.Usd.TimeCode.Default())
 
     def get_live_world_pose(self, prim_path):
-        if self._rebuilding or self._state_0 is None or self._state_0.body_q is None:
+        if self._rebuilding or self.is_stopped() or self._state_0 is None or self._state_0.body_q is None:
             return None
         body_idx = self._path_body_map.get(prim_path)
         if body_idx is None or body_idx >= self._state_0.body_q.shape[0]:

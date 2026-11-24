@@ -17,13 +17,6 @@ skip_newton_tiago = pytest.mark.skipif(
     gm.PHYSICS_BACKEND == "newton",
     reason="Newton's contact view includes Tiago's eef links, which RigidContactAPI does not expect",
 )
-skip_newton_inside_sampling = pytest.mark.skipif(
-    gm.PHYSICS_BACKEND == "newton",
-    reason="Inside.set_value often fails on Newton: the sampled object leaves the container while settling",
-)
-skip_newton_stopped_pose_set = pytest.mark.skipif(
-    gm.PHYSICS_BACKEND == "newton", reason="Poses set while the sim is stopped are not applied on Newton"
-)
 skip_newton_scene_prim_move = pytest.mark.skipif(
     gm.PHYSICS_BACKEND == "newton", reason="Moving a scene prim does not move its objects on Newton"
 )

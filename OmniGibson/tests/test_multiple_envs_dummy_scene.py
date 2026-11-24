@@ -5,7 +5,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson import object_states
 from omnigibson.utils.constants import ParticleModifyCondition
 from omnigibson.utils.transform_utils import quat_multiply
-from utils import skip_newton_physical_particles, skip_newton_scene_prim_move, skip_newton_stopped_pose_set
+from utils import skip_newton_physical_particles, skip_newton_scene_prim_move
 
 
 # ===================================================================
@@ -240,7 +240,6 @@ class TestRobotGetterSetter:
         assert not th.allclose(got_world_pos2, new_world_pos, atol=1e-3)
         assert not th.allclose(got_world_ori2, new_world_ori, atol=1e-3)
 
-    @skip_newton_stopped_pose_set
     def test_setter_sim_stopped(self, make_multi_env, robot_model):
         """Getter/setter should work even when the simulator is stopped."""
         env = make_multi_env(2, robot=robot_model)

@@ -21,7 +21,6 @@ from utils import (
     BEHAVIOR_ACTIVITY_NAME as ACTIVITY_NAME,
     BEHAVIOR_NUM_ENVS as NUM_ENVS,
     BEHAVIOR_R_POTENTIAL as R_POTENTIAL,
-    skip_newton_inside_sampling,
 )
 
 
@@ -42,12 +41,12 @@ def _goal_objects(env, env_idx):
     return cans, ashcans[0]
 
 
-def _place_inside(can, ashcan, retries=3):
+def _place_inside(can, ashcan, retries=10):
     """Place @can Inside @ashcan via kinematic sampling, retrying for flakiness.
 
     Inside.set_value rejection-samples a pose, settles physics, and verifies the
-    object is still inside; it returns False on a failed sample. Retry a few times
-    before giving up (sample_kinematics is known to be occasionally flaky).
+    object is still inside; it returns False on a failed sample. Retry before giving up:
+    the later cans often fail to find a contact-free pose next to the cans already inside.
     """
     for _ in range(retries):
         if can.states[Inside].set_value(ashcan, True):
@@ -249,7 +248,6 @@ class TestBehaviorTaskGoalCompletion:
                 gs = infos[env_idx]["done"]["goal_status"]
                 assert len(gs["unsatisfied"]) > 0, f"env {env_idx} goal satisfied without placing cans"
 
-    @skip_newton_inside_sampling
     def test_single_env_completion_and_reward(self, behavior_env):
         """Completing only env 0 makes env 0 (and only env 0) succeed, with correct reward."""
         env = behavior_env
@@ -281,7 +279,6 @@ class TestBehaviorTaskGoalCompletion:
         assert abs(env.task.get_potential(env, 0) - (-1.0)) < 1e-6, "env 0 potential not -1.0 at success"
         assert env.task.get_potential(env, 1) > -1.0, "env 1 potential indicates success without placement"
 
-    @skip_newton_inside_sampling
     def test_all_envs_completion(self, behavior_env):
         """Completing every env makes every env succeed (all combination)."""
         env = behavior_env
