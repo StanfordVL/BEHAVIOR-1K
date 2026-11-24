@@ -1068,8 +1068,8 @@ class NewtonBackend(PhysicsBackend):
         self._mass_properties_dirty = False
         self._model_generation = 0
         # sync_to_render_layer()'s per-body cache, rebuilt whenever the model generation changes
-        self._fabric_sync_cache = None
-        self._fabric_sync_generation = None
+        self._render_sync_cache = None
+        self._render_sync_generation = None
         self._warned_cpu_device = False
 
     @classmethod
@@ -1083,7 +1083,7 @@ class NewtonBackend(PhysicsBackend):
 
         app = launch_kit_app()
         # Kit's own physics engine (PhysX) would otherwise attach to the shared stage, simulate every rigid body
-        # alongside Newton once the timeline plays and overwrite Newton's poses in Fabric. Stop Kit simulating on play
+        # alongside Newton once the timeline plays and overwrite the poses Newton renders. Stop Kit simulating on play
         # (also keeps Isaac's SimulationManager from building a PhysX tensor view), and deactivate its engines the way
         # SimulationManager.switch_physics_engine() deactivates the engines it switches away from.
         lazy.carb.settings.get_settings().set_bool("/app/player/playSimulations", False)
@@ -1384,43 +1384,30 @@ class NewtonBackend(PhysicsBackend):
         pass
 
     def sync_to_render_layer(self):
-        # Only Kit renders from Fabric; Newton's own viewers read the model state directly
-        hierarchy = self.sim.fabric_hierarchy
-        if hierarchy is None or self._rebuilding or self._state_0 is None:
+        # Newton's own viewers read the model state directly, so only push poses to a backend that asks for them
+        render_backend = self.sim.render_backend
+        if not render_backend.needs_pose_updates or self._rebuilding or self._state_0 is None:
             return
-        if self._state_0.body_q is not None and self._fabric_sync_generation != self._model_generation:
-            self._build_fabric_sync_cache()
-        paths, body_idx, scales = self._fabric_sync_cache if self._state_0.body_q is not None else ([], None, None)
-        if paths:
-            body_q = _wp_to_torch(self._state_0.body_q)
-            body_q = body_q[body_idx.to(body_q.device)].cpu().double()
-            # Fabric's matrices are row-vector (USD) convention: rows are the scaled world axes, then the translation
-            matrices = th.zeros(len(paths), 4, 4, dtype=th.float64)
-            matrices[:, :3, :3] = T.quat2mat(body_q[:, 3:7]).transpose(1, 2) * scales.unsqueeze(-1)
-            matrices[:, 3, :3] = body_q[:, :3]
-            matrices[:, 3, 3] = 1.0
-            Matrix4d = lazy.usdrt.Gf.Matrix4d
-            for path, matrix in zip(paths, matrices.tolist()):
-                hierarchy.set_world_xform(path, Matrix4d(*matrix[0], *matrix[1], *matrix[2], *matrix[3]))
+        if self._state_0.body_q is not None:
+            if self._render_sync_generation != self._model_generation:
+                self._build_render_sync_cache()
+            prim_paths, body_idx = self._render_sync_cache
+            if prim_paths:
+                body_q = _wp_to_torch(self._state_0.body_q)
+                body_q = body_q[body_idx.to(body_q.device)].cpu().double()
+                render_backend.update_rendered_poses(prim_paths, body_q[:, :3], body_q[:, 3:7])
 
-    def _build_fabric_sync_cache(self):
-        """Caches each simulated body's Fabric path, Newton body index and authored world scale for sync_to_render_layer()."""
-        paths, body_idx, scales = [], [], []
+    def _build_render_sync_cache(self):
+        """Caches each simulated body's prim path and Newton body index for sync_to_render_layer()."""
+        prim_paths, body_idx = [], []
         n_bodies = self._state_0.body_q.shape[0]
         for prim_path, idx in self._path_body_map.items():
-            prim = self.sim.stage.GetPrimAtPath(prim_path)
-            if idx >= n_bodies or not prim.IsValid():
-                continue
-            raw = lazy.pxr.UsdGeom.Xformable(prim).ComputeLocalToWorldTransform(lazy.pxr.Usd.TimeCode.Default())
-            paths.append(lazy.usdrt.Sdf.Path(prim_path))
-            body_idx.append(idx)
-            scales.append([raw.GetRow3(i).GetLength() for i in range(3)])
-        self._fabric_sync_cache = (
-            paths,
-            th.tensor(body_idx, dtype=th.long),
-            th.tensor(scales, dtype=th.float64).reshape(-1, 3),
-        )
-        self._fabric_sync_generation = self._model_generation
+            if idx < n_bodies and self.sim.stage.GetPrimAtPath(prim_path).IsValid():
+                prim_paths.append(prim_path)
+                body_idx.append(idx)
+        # A new tuple per rebuild, so the render backend can key its own per-body caches on its identity
+        self._render_sync_cache = (tuple(prim_paths), th.tensor(body_idx, dtype=th.long))
+        self._render_sync_generation = self._model_generation
 
     def set_dof_position_targets(self, view, data, indices, cast=False):
         view.set_dof_position_targets_fast(data, indices)

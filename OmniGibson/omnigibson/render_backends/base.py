@@ -22,6 +22,9 @@ class RenderBackend(ABC):
     supports_camera_capture = False
     supports_viewport = False
     supports_materials = False
+    # Whether a physics backend must push its body poses through update_rendered_poses() for this backend to draw
+    # bodies where they are, because it doesn't read the physics backend's state itself
+    needs_pose_updates = False
 
     def __init__(self, sim=None):
         self.sim = sim
@@ -168,6 +171,19 @@ class RenderBackend(ABC):
         Advance/tick the render graph by one frame (a Kit app-update + RTX draw, or equivalent). Does
         NOT itself return pixel data -- that is a later phase's `capture_modality()`-style method.
         """
+
+    def update_rendered_poses(self, prim_paths, positions, orientations):
+        """
+        Draws the rigid bodies at @prim_paths at the given world poses, for a physics backend whose simulated poses
+        don't live on the stage. Only called if `needs_pose_updates` is True.
+
+        Args:
+            prim_paths (tuple of str): Prim paths of the bodies. The same tuple object is passed until the set of
+                bodies changes, so implementations may cache per-body data keyed on its identity
+            positions (th.Tensor): (N, 3) world positions
+            orientations (th.Tensor): (N, 4) world quaternions in (x, y, z, w) order
+        """
+        raise NotImplementedError
 
     # ---- Camera capture pipeline ----
 
