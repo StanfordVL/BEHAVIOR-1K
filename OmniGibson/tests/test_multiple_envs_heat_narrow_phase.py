@@ -80,7 +80,7 @@ def multi_env():
     cfg = {
         "env": {"num_envs": N_ENVS},
         "scene": {"type": "Scene"},
-        "robots": [{"model": "fetch", "obs_modalities": ["rgb"], "position": [20.0, 20.0, 0.1]}],
+        "robots": [{"model": "fetch", "obs_modalities": [], "position": [20.0, 20.0, 0.1]}],
         "objects": OBJECTS_CFG,
         "task": {"type": "DummyTask"},
     }
@@ -163,7 +163,7 @@ def place_board_so_aabb_reaches_but_geometry_does_not(board, element, threshold)
         for sx in (-1.0, 1.0):
             for sy in (-1.0, 1.0):
                 for sz in (-1.0, 1.0):
-                    sign = th.tensor([sx, sy, sz])
+                    sign = th.tensor([sx, sy, sz], device=og.sim.device)
                     # 0.8 keeps the target point inside the box rather than exactly on its surface.
                     corner = centre + 0.8 * sign * (hi - lo) * 0.5
                     board.keep_still()
@@ -247,7 +247,9 @@ def test_point_source_still_heats_a_target_on_the_element_n3(multi_env):
     stoves, bagels = scene_objs(env, "stove"), scene_objs(env, "bagel")
     for stove, bagel in zip(stoves, bagels):
         bagel.keep_still()
-        bagel.set_position_orientation(position=heat_link_world_pos(stove) + th.tensor([0.0, 0.0, 0.05]))
+        bagel.set_position_orientation(
+            position=heat_link_world_pos(stove) + th.tensor([0.0, 0.0, 0.05], device=og.sim.device)
+        )
     og.sim.step()
     for stove in stoves:
         assert stove.states[ToggledOn].set_value(True)

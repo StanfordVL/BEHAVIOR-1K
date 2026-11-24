@@ -1,5 +1,6 @@
 import math
 
+import pytest
 import torch as th
 
 import omnigibson as og
@@ -7,6 +8,25 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.systems import FluidSystem, GranularSystem, MacroPhysicalParticleSystem, MacroVisualParticleSystem
 from omnigibson.utils.constants import PrimType
+
+# Known Newton gaps; remove a marker once the backend supports the feature
+skip_newton_physical_particles = pytest.mark.skipif(
+    gm.PHYSICS_BACKEND == "newton", reason="Physical particle systems are not supported on Newton yet"
+)
+skip_newton_tiago = pytest.mark.skipif(
+    gm.PHYSICS_BACKEND == "newton",
+    reason="Newton's contact view includes Tiago's eef links, which RigidContactAPI does not expect",
+)
+skip_newton_inside_sampling = pytest.mark.skipif(
+    gm.PHYSICS_BACKEND == "newton",
+    reason="Inside.set_value often fails on Newton: the sampled object leaves the container while settling",
+)
+skip_newton_stopped_pose_set = pytest.mark.skipif(
+    gm.PHYSICS_BACKEND == "newton", reason="Poses set while the sim is stopped are not applied on Newton"
+)
+skip_newton_scene_prim_move = pytest.mark.skipif(
+    gm.PHYSICS_BACKEND == "newton", reason="Moving a scene prim does not move its objects on Newton"
+)
 
 SYSTEM_EXAMPLES = {
     "water": FluidSystem,

@@ -5,6 +5,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson import object_states
 from omnigibson.utils.constants import ParticleModifyCondition
 from omnigibson.utils.transform_utils import quat_multiply
+from utils import skip_newton_physical_particles, skip_newton_scene_prim_move, skip_newton_stopped_pose_set
 
 
 # ===================================================================
@@ -96,7 +97,7 @@ class TestSceneCoordinates:
 
         robot = env.scenes[1].robots[0]
         initial_global_pos = robot.get_position_orientation()[0]
-        new_global_pos = initial_global_pos + th.tensor([1.0, 0.5, 0.0], dtype=th.float32)
+        new_global_pos = initial_global_pos + th.tensor([1.0, 0.5, 0.0], dtype=th.float32, device=og.sim.device)
 
         robot.set_position_orientation(position=new_global_pos)
 
@@ -116,7 +117,7 @@ class TestSceneCoordinates:
         ), f"Updated local position {updated_local_pos} does not match expected {expected_local_pos}"
 
         global_pos_change = updated_global_pos - initial_global_pos
-        expected_change = th.tensor([1.0, 0.5, 0.0], dtype=th.float32)
+        expected_change = th.tensor([1.0, 0.5, 0.0], dtype=th.float32, device=og.sim.device)
         assert th.allclose(
             global_pos_change, expected_change, atol=1e-3
         ), f"Global position change {global_pos_change} does not match expected change {expected_change}"
@@ -125,8 +126,8 @@ class TestSceneCoordinates:
         env = make_multi_env(3)
 
         robot = env.scenes[1].robots[0]
-        new_relative_pos = th.tensor([1.0, 2.0, 0.5])
-        new_relative_ori = th.tensor([0, 0, 0.7071, 0.7071])
+        new_relative_pos = th.tensor([1.0, 2.0, 0.5], device=og.sim.device)
+        new_relative_ori = th.tensor([0, 0, 0.7071, 0.7071], device=og.sim.device)
 
         robot.set_position_orientation(position=new_relative_pos, orientation=new_relative_ori, frame="scene")
         updated_relative_pos, updated_relative_ori = robot.get_position_orientation(frame="scene")
@@ -156,10 +157,11 @@ class TestSceneCoordinates:
     # Ordered last within this class purely as an optimization: it is the only num_envs=1 test
     # here, so running it after the num_envs=3 tests avoids rebuilding the shared 3-env env.
     # It also permanently moves the scene prim, which env.reset() does not restore.
+    @skip_newton_scene_prim_move
     def test_multi_scene_scene_prim(self, make_multi_env):
         env = make_multi_env(1)
         original_robot_pos = env.scenes[0].robots[0].get_position_orientation()[0]
-        scene_prim_displacement = th.tensor([10.0, 0.0, 0.0], dtype=th.float32)
+        scene_prim_displacement = th.tensor([10.0, 0.0, 0.0], dtype=th.float32, device=og.sim.device)
         original_scene_prim_pos = env.scenes[0]._scene_prim.get_position_orientation()[0]
         env.scenes[0].set_position_orientation(position=original_scene_prim_pos + scene_prim_displacement)
         new_scene_prim_pos = env.scenes[0]._scene_prim.get_position_orientation()[0]
@@ -210,8 +212,8 @@ class TestRobotGetterSetter:
         robot_obj = env.scenes[1].robots[0]
 
         # Test setting in world frame
-        new_world_pos = th.tensor([1.0, 2.0, 0.5])
-        new_world_ori = T.euler2quat(th.tensor([0, 0, th.pi / 2]))
+        new_world_pos = th.tensor([1.0, 2.0, 0.5], device=og.sim.device)
+        new_world_ori = T.euler2quat(th.tensor([0, 0, th.pi / 2], device=og.sim.device))
         robot_obj.set_position_orientation(position=new_world_pos, orientation=new_world_ori)
 
         got_world_pos, got_world_ori = robot_obj.get_position_orientation()
@@ -220,8 +222,8 @@ class TestRobotGetterSetter:
         assert th.allclose(got_world_ori, new_world_ori, atol=1e-3)
 
         # Test setting in scene frame
-        new_scene_pos = th.tensor([0.5, 1.0, 0.25])
-        new_scene_ori = T.euler2quat(th.tensor([0, th.pi / 4, 0]))
+        new_scene_pos = th.tensor([0.5, 1.0, 0.25], device=og.sim.device)
+        new_scene_ori = T.euler2quat(th.tensor([0, th.pi / 4, 0], device=og.sim.device))
         robot_obj.set_position_orientation(position=new_scene_pos, orientation=new_scene_ori, frame="scene")
 
         got_scene_pos, got_scene_ori = robot_obj.get_position_orientation(frame="scene")
@@ -230,14 +232,15 @@ class TestRobotGetterSetter:
         assert th.allclose(got_scene_ori, new_scene_ori, atol=1e-3)
 
         # Setting a different scene-frame pose should change world-frame result
-        new_scene_pos2 = th.tensor([-1.0, -2.0, 0.1])
-        new_scene_ori2 = T.euler2quat(th.tensor([th.pi / 6, 0, 0]))
+        new_scene_pos2 = th.tensor([-1.0, -2.0, 0.1], device=og.sim.device)
+        new_scene_ori2 = T.euler2quat(th.tensor([th.pi / 6, 0, 0], device=og.sim.device))
         robot_obj.set_position_orientation(position=new_scene_pos2, orientation=new_scene_ori2, frame="scene")
 
         got_world_pos2, got_world_ori2 = robot_obj.get_position_orientation()
         assert not th.allclose(got_world_pos2, new_world_pos, atol=1e-3)
         assert not th.allclose(got_world_ori2, new_world_ori, atol=1e-3)
 
+    @skip_newton_stopped_pose_set
     def test_setter_sim_stopped(self, make_multi_env, robot_model):
         """Getter/setter should work even when the simulator is stopped."""
         env = make_multi_env(2, robot=robot_model)
@@ -246,8 +249,8 @@ class TestRobotGetterSetter:
 
         robot_obj = env.scenes[1].robots[0]
 
-        new_world_pos = th.tensor([1.0, 2.0, 0.5])
-        new_world_ori = T.euler2quat(th.tensor([0, 0, th.pi / 2]))
+        new_world_pos = th.tensor([1.0, 2.0, 0.5], device=og.sim.device)
+        new_world_ori = T.euler2quat(th.tensor([0, 0, th.pi / 2], device=og.sim.device))
         robot_obj.set_position_orientation(position=new_world_pos, orientation=new_world_ori)
 
         got_world_pos, got_world_ori = robot_obj.get_position_orientation()
@@ -255,8 +258,8 @@ class TestRobotGetterSetter:
         assert th.allclose(got_world_pos, new_world_pos, atol=1e-3)
         assert th.allclose(got_world_ori, new_world_ori, atol=1e-3)
 
-        new_scene_pos = th.tensor([0.5, 1.0, 0.25])
-        new_scene_ori = T.euler2quat(th.tensor([0, th.pi / 4, 0]))
+        new_scene_pos = th.tensor([0.5, 1.0, 0.25], device=og.sim.device)
+        new_scene_ori = T.euler2quat(th.tensor([0, th.pi / 4, 0], device=og.sim.device))
         robot_obj.set_position_orientation(position=new_scene_pos, orientation=new_scene_ori, frame="scene")
 
         got_scene_pos, got_scene_ori = robot_obj.get_position_orientation(frame="scene")
@@ -264,8 +267,8 @@ class TestRobotGetterSetter:
         assert th.allclose(got_scene_pos, new_scene_pos, atol=1e-3)
         assert th.allclose(got_scene_ori, new_scene_ori, atol=1e-3)
 
-        new_scene_pos2 = th.tensor([-1.0, -2.0, 0.1])
-        new_scene_ori2 = T.euler2quat(th.tensor([th.pi / 6, 0, 0]))
+        new_scene_pos2 = th.tensor([-1.0, -2.0, 0.1], device=og.sim.device)
+        new_scene_ori2 = T.euler2quat(th.tensor([th.pi / 6, 0, 0], device=og.sim.device))
         robot_obj.set_position_orientation(position=new_scene_pos2, orientation=new_scene_ori2, frame="scene")
 
         got_scene_pos2, got_scene_ori2 = robot_obj.get_position_orientation(frame="scene")
@@ -282,6 +285,7 @@ class TestRobotGetterSetter:
 # ===================================================================
 
 
+@skip_newton_physical_particles
 class TestParticles:
     def test_multi_scene_particle_source(self, make_multi_env):
         sink_cfg = dict(

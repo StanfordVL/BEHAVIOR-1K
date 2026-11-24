@@ -22,6 +22,7 @@ def load_robot_config(robot_name):
         full_config = yaml.safe_load(file)
         robot_config = full_config.get("robots", {})[0]
         robot_config["disable_grasp_handling"] = True
+        robot_config["obs_modalities"] = []
         return robot_config
 
 

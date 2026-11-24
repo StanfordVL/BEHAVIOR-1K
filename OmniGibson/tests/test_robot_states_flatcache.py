@@ -168,10 +168,11 @@ def test_robot_load_drive(robot_name):
         og.sim.step()
 
         # Set viewer in front facing robot
-        og.sim.viewer_camera.set_position_orientation(
-            position=[2.69918369, -3.63686664, 4.57894564],
-            orientation=[0.39592411, 0.1348514, 0.29286304, 0.85982],
-        )
+        if og.sim.viewer_camera is not None:
+            og.sim.viewer_camera.set_position_orientation(
+                position=[2.69918369, -3.63686664, 4.57894564],
+                orientation=[0.39592411, 0.1348514, 0.29286304, 0.85982],
+            )
 
         # If this is a manipulation robot, we want to test moving the arm
         if robot.is_manipulation:
@@ -273,10 +274,11 @@ def test_grasping_mode(grasping_mode):
         cfg = dict(scene=scene_cfg, objects=objects_cfg)
 
         env = og.Environment(configs=cfg)
-        og.sim.viewer_camera.set_position_orientation(
-            position=[1.0170, 0.5663, 1.0554],
-            orientation=[0.1734, 0.5006, 0.8015, 0.2776],
-        )
+        if og.sim.viewer_camera is not None:
+            og.sim.viewer_camera.set_position_orientation(
+                position=[1.0170, 0.5663, 1.0554],
+                orientation=[0.1734, 0.5006, 0.8015, 0.2776],
+            )
         og.sim.stop()
 
         robot = Robot(

@@ -96,6 +96,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        backend: [physx]
         test_file:
           - test_controllers
           # - test_curobo
@@ -131,6 +132,22 @@ jobs:
             extra_files: >-
               tests/test_multiple_envs_grasp.py
               tests/test_multiple_envs_point_tasks.py
+        # Newton physics (no renderer). Only suites that exercise Newton itself; known gaps are
+        # skipped in the tests via the skip_newton_* markers in tests/utils.py.
+          - {backend: newton, test_file: test_ag_states}
+          - {backend: newton, test_file: test_controllers}
+          - {backend: newton, test_file: test_dump_load_states}
+          - {backend: newton, test_file: test_envs}
+          - {backend: newton, test_file: test_object_removal}
+          - {backend: newton, test_file: test_object_states}
+          - {backend: newton, test_file: test_multiple_envs_heat_narrow_phase}
+          - {backend: newton, test_file: test_multiple_envs_heat_states}
+          - {backend: newton, test_file: test_multiple_envs_dummy_scene}
+          - {backend: newton, test_file: test_multiple_envs_grasp}
+          - backend: newton
+            test_file: test_multiple_envs_behavior_scene
+            extra_files: >-
+              tests/test_multiple_envs_behavior_task.py
         # --- BEGIN AUTO-GENERATED EXAMPLE INCLUDES ---
           - {test_file: test_examples, example: "environments.navigation_env_demo"}
           - {test_file: test_examples, example: "environments.vector_env_demo"}
@@ -197,16 +214,25 @@ jobs:
         if: steps.setup_env.outputs.fresh_env != 'true'
         run: conda run -n "$CONDA_ENV" --no-capture-output pip install -e .[dev,primitives,eval] --no-build-isolation
 
+      # isaacsim-core pins an older newton; install OmniGibson's pin on top (as setup.sh does)
+      - name: Install Newton
+        if: matrix.backend == 'newton'
+        run: conda run -n "$CONDA_ENV" --no-capture-output pip install -e .[newton] --no-build-isolation
+
       - name: Print env
         run: printenv
 
       - name: Run tests
+        env:
+          OMNIGIBSON_PHYSICS_BACKEND: ${{ matrix.backend == 'newton' && 'newton' || '' }}
+          OMNIGIBSON_RENDER_BACKEND: ${{ matrix.backend == 'newton' && 'none' || '' }}
+          OMNIGIBSON_DEVICE: ${{ matrix.backend == 'newton' && 'cuda' || '' }}
         run: >
           conda run -n "$CONDA_ENV" --no-capture-output
-          pytest -s tests/${{ matrix.test_file }}.py
+          pytest -s tests/${{ matrix.test_file }}.py ${{ matrix.extra_files || '' }}
           ${{ matrix.example && format('-k "{0}"', matrix.example) || '' }}
           ${{ matrix.args && format('--test-args={0}', matrix.args) || '' }}
-          --junitxml=${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}.xml
+          --junitxml=${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}${{ matrix.backend == 'newton' && '_newton' || '' }}.xml
           -o junit_family=xunit1
         continue-on-error: true
         timeout-minutes: 30
@@ -214,7 +240,7 @@ jobs:
       - name: Check for failures, errors, or missing XML
         if: always()
         run: |
-          xml=${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}.xml
+          xml=${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}${{ matrix.backend == 'newton' && '_newton' || '' }}.xml
           if [ ! -f "$xml" ]; then
             cat > "$xml" << 'EOF'
           <?xml version="1.0"?>
@@ -245,8 +271,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ github.run_id }}-tests-${{ matrix.test_file }}${{ matrix.example && format('-{0}', matrix.example) || '' }}
-          path: OmniGibson/${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}.xml
+          name: ${{ github.run_id }}-tests-${{ matrix.test_file }}${{ matrix.example && format('-{0}', matrix.example) || '' }}${{ matrix.backend == 'newton' && '-newton' || '' }}
+          path: OmniGibson/${{ matrix.test_file }}${{ matrix.example && format('_{0}', matrix.example) || '' }}${{ matrix.backend == 'newton' && '_newton' || '' }}.xml
           overwrite: true
 
       - name: Remove scratch conda environment

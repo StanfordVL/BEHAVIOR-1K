@@ -1,16 +1,18 @@
 import torch as th
 
-from utils import SYSTEM_EXAMPLES
+from utils import SYSTEM_EXAMPLES, skip_newton_physical_particles
 
 import omnigibson as og
 from omnigibson.object_states import Covered
 from omnigibson.systems import VisualParticleSystem, MicroPhysicalParticleSystem
 
 
+@skip_newton_physical_particles
 def test_system_spawn_and_clear(env, breakfast_table):
-    og.sim.viewer_camera.set_position_orientation(
-        th.tensor([0.1525, -0.2867, 0.0773]), th.tensor([0.6538, 0.1604, 0.1762, 0.7181])
-    )
+    if og.sim.viewer_camera is not None:
+        og.sim.viewer_camera.set_position_orientation(
+            th.tensor([0.1525, -0.2867, 0.0773]), th.tensor([0.6538, 0.1604, 0.1762, 0.7181])
+        )
     og.sim.step()
     for system_name, system_class in SYSTEM_EXAMPLES.items():
         for _ in range(3):

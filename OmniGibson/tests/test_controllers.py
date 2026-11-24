@@ -4,6 +4,7 @@ import torch as th
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.controllers import ControllerView
+from utils import skip_newton_tiago
 
 
 # -------------------- Helper Functions --------------------
@@ -66,6 +67,7 @@ def _distance(a, b):
 
 
 # -------------------- Test Cases --------------------
+@skip_newton_tiago
 def test_arm_control():
     # Create env
     cfg = {

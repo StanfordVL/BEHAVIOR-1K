@@ -1,13 +1,14 @@
 import tempfile
 
 import torch as th
-from utils import SYSTEM_EXAMPLES
+from utils import SYSTEM_EXAMPLES, skip_newton_physical_particles
 
 import omnigibson as og
 from omnigibson.object_states import Covered
 from omnigibson.systems import VisualParticleSystem
 
 
+@skip_newton_physical_particles
 def test_dump_load(env, breakfast_table):
     for system_name, system_class in SYSTEM_EXAMPLES.items():
         system = env.scene.get_system(system_name)
@@ -26,6 +27,7 @@ def test_dump_load(env, breakfast_table):
         env.scene.clear_system(system_name)
 
 
+@skip_newton_physical_particles
 def test_dump_load_serialized(env, breakfast_table):
     for system_name, system_class in SYSTEM_EXAMPLES.items():
         system = env.scene.get_system(system_name)

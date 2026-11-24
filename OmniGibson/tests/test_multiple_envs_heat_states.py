@@ -98,7 +98,7 @@ def multi_env():
     cfg = {
         "env": {"num_envs": N_ENVS},
         "scene": {"type": "Scene"},
-        "robots": [{"model": "fetch", "obs_modalities": ["rgb"], "position": [20.0, 20.0, 0.1]}],
+        "robots": [{"model": "fetch", "obs_modalities": [], "position": [20.0, 20.0, 0.1]}],
         "objects": OBJECTS_CFG,
         "task": {"type": "DummyTask"},
     }
@@ -228,7 +228,7 @@ def test_toggled_stove_heats_targets_in_every_env_n3(multi_env):
     for stove, bagel in zip(stoves, bagels):
         elem = heat_link_world_pos(stove)
         bagel.keep_still()
-        bagel.set_position_orientation(position=elem + th.tensor([0.0, 0.0, 0.05]))
+        bagel.set_position_orientation(position=elem + th.tensor([0.0, 0.0, 0.05], device=og.sim.device))
     og.sim.step()
     for stove in stoves:
         assert stove.states[ToggledOn].set_value(True)
@@ -272,7 +272,9 @@ def test_stove_heats_only_its_own_env_n3(multi_env):
     bagels = scene_objs(env, "bagel_a")
     for stove, bagel in zip(stoves, bagels):
         bagel.keep_still()
-        bagel.set_position_orientation(position=heat_link_world_pos(stove) + th.tensor([0.0, 0.0, 0.05]))
+        bagel.set_position_orientation(
+            position=heat_link_world_pos(stove) + th.tensor([0.0, 0.0, 0.05], device=og.sim.device)
+        )
     og.sim.step()
     assert stoves[1].states[ToggledOn].set_value(True)
     for _ in range(10):
@@ -302,7 +304,7 @@ def test_microwave_requires_inside_per_env_n3(multi_env):
     bagels = scene_objs(env, "bagel_b")
     for mw, bagel in zip(microwaves, bagels):
         bagel.keep_still()
-        bagel.set_position_orientation(position=mw.aabb_center + th.tensor([0.0, 0.03, 0.0]))
+        bagel.set_position_orientation(position=mw.aabb_center + th.tensor([0.0, 0.03, 0.0], device=og.sim.device))
     for _ in range(3):
         og.sim.step()
 
@@ -340,7 +342,7 @@ def test_fridge_cools_per_env_n3(multi_env):
     bagels = scene_objs(env, "bagel_b")
     for fridge, bagel in zip(fridges, bagels):
         bagel.keep_still()
-        bagel.set_position_orientation(position=fridge.aabb_center + th.tensor([0.0, 0.0, 0.1]))
+        bagel.set_position_orientation(position=fridge.aabb_center + th.tensor([0.0, 0.0, 0.1], device=og.sim.device))
         assert fridge.states[Open].set_value(False, fully=True)
     for _ in range(3):
         og.sim.step()

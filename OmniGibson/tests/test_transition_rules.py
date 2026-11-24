@@ -3,7 +3,7 @@ import math
 import pytest
 
 import torch as th
-from utils import place_obj_on_floor_plane, remove_all_systems, retrieve_obj_cfg
+from utils import place_obj_on_floor_plane, remove_all_systems, retrieve_obj_cfg, skip_newton_physical_particles
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
@@ -24,6 +24,8 @@ from omnigibson.object_states import (
 )
 from omnigibson.objects import DatasetObject
 from omnigibson.transition_rules import REGISTERED_RULES
+
+pytestmark = skip_newton_physical_particles
 
 
 def test_dryer_rule(env, clothes_dryer, remover_dishtowel, bowl):

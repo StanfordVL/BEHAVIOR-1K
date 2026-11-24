@@ -178,8 +178,8 @@ class TestBehaviorRobotGetterSetter:
         robot = env.scenes[1].robots[0]
 
         # Test world frame setter
-        new_world_pos = th.tensor([1.0, 2.0, 0.5])
-        new_world_ori = T.euler2quat(th.tensor([0, 0, th.pi / 2]))
+        new_world_pos = th.tensor([1.0, 2.0, 0.5], device=og.sim.device)
+        new_world_ori = T.euler2quat(th.tensor([0, 0, th.pi / 2], device=og.sim.device))
         robot.set_position_orientation(position=new_world_pos, orientation=new_world_ori)
 
         got_world_pos, got_world_ori = robot.get_position_orientation()
@@ -188,8 +188,8 @@ class TestBehaviorRobotGetterSetter:
         assert th.allclose(got_world_ori, new_world_ori, atol=1e-3)
 
         # Test scene frame setter
-        new_scene_pos = th.tensor([0.5, 1.0, 0.25])
-        new_scene_ori = T.euler2quat(th.tensor([0, th.pi / 4, 0]))
+        new_scene_pos = th.tensor([0.5, 1.0, 0.25], device=og.sim.device)
+        new_scene_ori = T.euler2quat(th.tensor([0, th.pi / 4, 0], device=og.sim.device))
         robot.set_position_orientation(position=new_scene_pos, orientation=new_scene_ori, frame="scene")
 
         got_scene_pos, got_scene_ori = robot.get_position_orientation(frame="scene")
@@ -198,8 +198,8 @@ class TestBehaviorRobotGetterSetter:
         assert th.allclose(got_scene_ori, new_scene_ori, atol=1e-3)
 
         # Setting a different scene-frame pose should change world-frame result
-        new_scene_pos2 = th.tensor([-1.0, -2.0, 0.1])
-        new_scene_ori2 = T.euler2quat(th.tensor([th.pi / 6, 0, 0]))
+        new_scene_pos2 = th.tensor([-1.0, -2.0, 0.1], device=og.sim.device)
+        new_scene_ori2 = T.euler2quat(th.tensor([th.pi / 6, 0, 0], device=og.sim.device))
         robot.set_position_orientation(position=new_scene_pos2, orientation=new_scene_ori2, frame="scene")
 
         got_world_pos2, _ = robot.get_position_orientation()
