@@ -370,19 +370,23 @@ class TestBehaviorTaskPartialReset:
         """Resetting env_indices=[1] only resets scene 1, leaving scene 0 unchanged."""
         env = behavior_env
 
-        known_pos = th.tensor([1.0, 1.0, 0.5])
-        env.scenes[0].robots[0].set_position_orientation(position=known_pos, frame="scene")
-        og.sim.step()
+        # Shift scene 0's robot 0.3 m from its reset pose, onto clear floor, so a wrongful reset of scene 0
+        # would move it back. (Teleporting it to an arbitrary spot lands it on furniture, and it keeps moving.)
+        robot = env.scenes[0].robots[0]
+        pos, ori = robot.get_position_orientation(frame="scene")
+        shift = th.tensor([-0.3, 0.0, 0.0], device=pos.device)
+        robot.set_position_orientation(position=pos + shift, orientation=ori, frame="scene")
+        for _ in range(10):
+            og.sim.step()
 
-        pos_before = env.scenes[0].robots[0].get_position_orientation(frame="scene")[0].clone()
+        pos_before = robot.get_position_orientation(frame="scene")[0].clone()
 
         env.reset(env_indices=th.tensor([1]))
 
-        pos_after = env.scenes[0].robots[0].get_position_orientation(frame="scene")[0]
+        pos_after = robot.get_position_orientation(frame="scene")[0]
         print(f"  pos_before={pos_before}, pos_after={pos_after}")
-        # BehaviorTask scenes have many objects, so physics settling causes more drift than minimal scenes
         assert th.allclose(
-            pos_before, pos_after, atol=0.15
+            pos_before, pos_after, atol=0.05
         ), f"Scene 0 robot moved after resetting only scene 1: {pos_before} vs {pos_after}"
 
 
