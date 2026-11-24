@@ -22,12 +22,14 @@ import traceback
 from contextlib import nullcontext
 from pathlib import Path
 
+import torch as th
 import warp as wp
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.render_backends.base import RenderBackend
+import omnigibson.utils.transform_utils as T
 from omnigibson.utils.constants import LightingMode
 from omnigibson.utils.ui_utils import create_module_logger, logo_small
 
@@ -159,7 +161,7 @@ def launch_kit_app():
     """
     Launches the Isaac Sim / Omniverse Kit application and returns its `SimulationApp`.
 
-    Called from `PhysXBackend.create_app()` / `KitRenderBackend.create_app()`, so a configuration in
+    Called from `PhysXBackend.create_app()` / `NewtonBackend.create_app()`, so a configuration in
     which no backend needs Kit never reaches any of this code.
 
     Returns:
@@ -376,6 +378,12 @@ class KitRenderBackend(RenderBackend):
     supports_camera_capture = True
     supports_viewport = True
     supports_materials = True
+    needs_pose_updates = True
+
+    def __init__(self, sim=None):
+        super().__init__(sim=sim)
+        # update_rendered_poses()'s per-body cache: (prim_paths it was built for, Fabric paths, authored world scales)
+        self._body_pose_cache = None
 
     def apply_renderer_settings(self):
         self.sim._set_renderer_settings()
@@ -387,6 +395,27 @@ class KitRenderBackend(RenderBackend):
         return usdrt_stage, lazy.usdrt.hierarchy.IFabricHierarchy().get_fabric_hierarchy(
             usdrt_stage.GetFabricId(), usdrt_stage.GetStageIdAsStageId()
         )
+
+    def update_rendered_poses(self, prim_paths, positions, orientations):
+        if self._body_pose_cache is None or self._body_pose_cache[0] is not prim_paths:
+            fabric_paths, scales = [], []
+            for prim_path in prim_paths:
+                prim = self.sim.stage.GetPrimAtPath(prim_path)
+                raw = lazy.pxr.UsdGeom.Xformable(prim).ComputeLocalToWorldTransform(lazy.pxr.Usd.TimeCode.Default())
+                fabric_paths.append(lazy.usdrt.Sdf.Path(prim_path))
+                scales.append([raw.GetRow3(i).GetLength() for i in range(3)])
+            self._body_pose_cache = (prim_paths, fabric_paths, th.tensor(scales, dtype=th.float64).reshape(-1, 3))
+        _, fabric_paths, scales = self._body_pose_cache
+
+        # Fabric's matrices are row-vector (USD) convention: rows are the scaled world axes, then the translation
+        matrices = th.zeros(len(fabric_paths), 4, 4, dtype=th.float64)
+        matrices[:, :3, :3] = T.quat2mat(orientations.double()).transpose(1, 2) * scales.unsqueeze(-1)
+        matrices[:, 3, :3] = positions.double()
+        matrices[:, 3, 3] = 1.0
+        hierarchy = self.sim.fabric_hierarchy
+        Matrix4d = lazy.usdrt.Gf.Matrix4d
+        for path, matrix in zip(fabric_paths, matrices.tolist()):
+            hierarchy.set_world_xform(path, Matrix4d(*matrix[0], *matrix[1], *matrix[2], *matrix[3]))
 
     def before_play(self, sim):
         # Kit's RTX renderer only actually draws new frames for a render product while its own

@@ -1067,21 +1067,60 @@ class NewtonBackend(PhysicsBackend):
         self._joints_settle_steps_remaining = 0
         self._mass_properties_dirty = False
         self._model_generation = 0
+        # sync_to_render_layer()'s per-body cache, rebuilt whenever the model generation changes
+        self._render_sync_cache = None
+        self._render_sync_generation = None
         self._warned_cpu_device = False
 
     @classmethod
     def create_app(cls):
-        from omnigibson.simulator import _StandaloneApp
+        if gm.RENDER_BACKEND != "kit":
+            from omnigibson.simulator import _StandaloneApp
 
-        return _StandaloneApp()
+            return _StandaloneApp()
+
+        from omnigibson.render_backends.kit_backend import launch_kit_app
+
+        app = launch_kit_app()
+        # Kit's own physics engine (PhysX) would otherwise attach to the shared stage, simulate every rigid body
+        # alongside Newton once the timeline plays and overwrite the poses Newton renders. Stop Kit simulating on play
+        # (also keeps Isaac's SimulationManager from building a PhysX tensor view), and deactivate its engines the way
+        # SimulationManager.switch_physics_engine() deactivates the engines it switches away from.
+        lazy.carb.settings.get_settings().set_bool("/app/player/playSimulations", False)
+        physics = lazy.omni.physics.core.get_physics_interface()
+        for sim_id in physics.get_simulation_ids():
+            if physics.is_simulation_active(sim_id):
+                simulation = physics.get_simulation(sim_id)
+                if simulation and simulation.stage_update_fns and simulation.stage_update_fns.on_detach:
+                    simulation.stage_update_fns.on_detach()
+                physics.deactivate_simulation(sim_id)
+                log.info(f"Deactivated Kit physics engine {physics.get_simulation_name(sim_id)} for Newton")
+        return app
 
     def add_ground_plane(self, prim_path, visible=True, color=None):
+        # Newton's own ground is the collision plane _rebuild_impl() adds to the model
         with self.sim.editing_usd():
-            self.sim.stage.DefinePrim(prim_path, "Xform")
+            if gm.RENDER_BACKEND == "kit":
+                # Kit renders the stage, so author the same plane PhysX gets. Newton ignores its collision schema,
+                # since it only imports registered objects.
+                lazy.isaacsim.core.api.objects.ground_plane.GroundPlane(
+                    prim_path=prim_path,
+                    name="ground_plane",
+                    z_position=0,
+                    size=None,
+                    color=None if color is None else th.tensor(color),
+                    visible=visible,
+                )
+            else:
+                self.sim.stage.DefinePrim(prim_path, "Xform")
 
     def create_physics_context(self, physics_dt, rendering_dt, device):
         self._sim_context = StandaloneSimulationContext(
-            backend=self, physics_dt=physics_dt, rendering_dt=rendering_dt, device=device
+            backend=self,
+            physics_dt=physics_dt,
+            rendering_dt=rendering_dt,
+            device=device,
+            use_kit_stage=gm.RENDER_BACKEND == "kit",
         )
         self._joint_change_listener = lazy.pxr.Tf.Notice.Register(
             lazy.pxr.Usd.Notice.ObjectsChanged, self._on_usd_joint_changed, self._sim_context.stage
@@ -1165,10 +1204,13 @@ class NewtonBackend(PhysicsBackend):
         self._sim_context.stop()
 
     def render(self):
-        self._sim_context.render()
+        self.sync_to_render_layer()
+        self.sim.render_backend.render()
 
     def step(self, render):
         self._sim_context.step(render=render)
+        if render:
+            self.render()
 
     # MuJoCo rejects even a -1e-10 deficit, so this margin only has to cover float32 rounding.
     _INERTIA_BALANCE_MARGIN = 1e-6
@@ -1342,7 +1384,30 @@ class NewtonBackend(PhysicsBackend):
         pass
 
     def sync_to_render_layer(self):
-        pass
+        # Newton's own viewers read the model state directly, so only push poses to a backend that asks for them
+        render_backend = self.sim.render_backend
+        if not render_backend.needs_pose_updates or self._rebuilding or self._state_0 is None:
+            return
+        if self._state_0.body_q is not None:
+            if self._render_sync_generation != self._model_generation:
+                self._build_render_sync_cache()
+            prim_paths, body_idx = self._render_sync_cache
+            if prim_paths:
+                body_q = _wp_to_torch(self._state_0.body_q)
+                body_q = body_q[body_idx.to(body_q.device)].cpu().double()
+                render_backend.update_rendered_poses(prim_paths, body_q[:, :3], body_q[:, 3:7])
+
+    def _build_render_sync_cache(self):
+        """Caches each simulated body's prim path and Newton body index for sync_to_render_layer()."""
+        prim_paths, body_idx = [], []
+        n_bodies = self._state_0.body_q.shape[0]
+        for prim_path, idx in self._path_body_map.items():
+            if idx < n_bodies and self.sim.stage.GetPrimAtPath(prim_path).IsValid():
+                prim_paths.append(prim_path)
+                body_idx.append(idx)
+        # A new tuple per rebuild, so the render backend can key its own per-body caches on its identity
+        self._render_sync_cache = (tuple(prim_paths), th.tensor(body_idx, dtype=th.long))
+        self._render_sync_generation = self._model_generation
 
     def set_dof_position_targets(self, view, data, indices, cast=False):
         view.set_dof_position_targets_fast(data, indices)
@@ -1568,8 +1633,10 @@ class NewtonBackend(PhysicsBackend):
                 hide_collision_shapes=True,
                 ignore_paths=ignore_paths_by_obj.get(obj),
             )
-            # add_usd()'s own visual import is off; bake textured render-only shapes for Newton's viewers instead
-            add_usd_visual_shapes(newton, builder, self.sim.stage, obj.prim_path, info["path_body_map"])
+            if gm.RENDER_BACKEND != "kit":
+                # add_usd()'s own visual import is off; bake textured render-only shapes for Newton's viewers.
+                # Kit renders the stage's own visual meshes instead.
+                add_usd_visual_shapes(newton, builder, self.sim.stage, obj.prim_path, info["path_body_map"])
 
             path_body_map.update(info["path_body_map"])
             path_joint_map.update(info["path_joint_map"])

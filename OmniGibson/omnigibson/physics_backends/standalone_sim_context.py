@@ -2,9 +2,19 @@ import omnigibson.lazy as lazy
 
 
 class StandaloneSimulationContext:
-    def __init__(self, backend, physics_dt, rendering_dt, device=None):
+    def __init__(self, backend, physics_dt, rendering_dt, device=None, use_kit_stage=False):
+        """
+        Args:
+            use_kit_stage (bool): Whether to use Kit's own USD context stage, so a Kit render backend renders it,
+                instead of a private in-memory one
+        """
         self._backend = backend
-        self._stage = lazy.pxr.Usd.Stage.CreateInMemory()
+        if use_kit_stage:
+            # create_new_stage() returns a success flag, not the stage
+            lazy.isaacsim.core.utils.stage.create_new_stage()
+            self._stage = lazy.isaacsim.core.utils.stage.get_current_stage()
+        else:
+            self._stage = lazy.pxr.Usd.Stage.CreateInMemory()
         # A bare stage defaults to Y-up, which makes Newton's add_usd() rotate every imported frame
         lazy.pxr.UsdGeom.SetStageUpAxis(self._stage, lazy.pxr.UsdGeom.Tokens.z)
         lazy.pxr.UsdGeom.SetStageMetersPerUnit(self._stage, 1.0)
