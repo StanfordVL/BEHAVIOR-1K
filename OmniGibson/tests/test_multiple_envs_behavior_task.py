@@ -11,6 +11,8 @@ Uses the ``picking_up_trash`` activity on ``house_double_floor_lower``.
 Env/scene infrastructure for the same env lives in ``test_multiple_envs_behavior_scene.py``.
 """
 
+import math
+
 import torch as th
 
 import omnigibson as og
@@ -41,32 +43,26 @@ def _goal_objects(env, env_idx):
     return cans, ashcans[0]
 
 
-def _place_inside(can, ashcan, retries=3):
-    """Place @can Inside @ashcan via kinematic sampling, retrying for flakiness.
+def _place_all_inside(cans, ashcan, radius=0.05, settle_steps=30):
+    """Stand every can in @cans upright on the bottom of @ashcan, spaced on a circle, and let them settle.
 
-    Inside.set_value rejection-samples a pose, settles physics, and verifies the
-    object is still inside; it returns False on a failed sample. Retry a few times
-    before giving up (sample_kinematics is known to be occasionally flaky).
+    These tests check goal bookkeeping, not the Inside sampler: rejection-sampling several cans into
+    the small trash can is slow and flaky once it fills up, so place them deterministically.
+    Returns whether every can then reports Inside.
     """
-    for _ in range(retries):
-        if can.states[Inside].set_value(ashcan, True):
-            return True
-    return False
-
-
-def _place_all_inside(cans, ashcan, rounds=5):
-    """Place every can in @cans Inside @ashcan, starting over from scratch if one does not fit.
-
-    The cans placed first can leave no contact-free pose for a later one, and retrying that
-    can alone keeps sampling against the same bad arrangement, so restore the pre-placement
-    state and re-place them all instead.
-    """
-    state = og.sim.dump_state(serialized=False)
-    for _ in range(rounds):
-        if all(_place_inside(can, ashcan) for can in cans):
-            return True
-        og.sim.load_state(state, serialized=False)
-    return False
+    lo, hi = ashcan.aabb
+    center = (lo + hi) / 2
+    r = radius if len(cans) > 1 else 0.0
+    for i, can in enumerate(cans):
+        angle = 2 * math.pi * i / len(cans)
+        pos = th.tensor(
+            [center[0] + r * math.cos(angle), center[1] + r * math.sin(angle), lo[2] + 0.02 + can.aabb_extent[2] / 2]
+        )
+        can.set_position_orientation(position=pos, orientation=th.tensor([0.0, 0.0, 0.0, 1.0]))
+        can.keep_still()
+    for _ in range(settle_steps):
+        og.sim.step()
+    return all(can.states[Inside].get_value(ashcan) for can in cans)
 
 
 def _zero_actions(env):
