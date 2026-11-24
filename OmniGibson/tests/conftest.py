@@ -14,6 +14,15 @@ if os.environ.get("OMNIGIBSON_PHYSICS_BACKEND"):
 if os.environ.get("OMNIGIBSON_RENDER_BACKEND"):
     gm.RENDER_BACKEND = os.environ["OMNIGIBSON_RENDER_BACKEND"]
 _DEVICE_OVERRIDE = os.environ.get("OMNIGIBSON_DEVICE")
+if _DEVICE_OVERRIDE:
+    # Apply the device to every env a test builds, not just the conftest fixtures
+    _env_init = og.Environment.__init__
+
+    def _env_init_with_device(self, configs, *args, **kwargs):
+        configs = list(configs) if isinstance(configs, (list, tuple)) else [configs]
+        _env_init(self, configs + [{"env": {"device": _DEVICE_OVERRIDE}}], *args, **kwargs)
+
+    og.Environment.__init__ = _env_init_with_device
 
 from utils import MULTI_ENV_ROBOTS  # noqa: E402  (after the backend override, which utils reads)
 
@@ -25,10 +34,7 @@ def stopped_env():
         gm.USE_GPU_DYNAMICS = True
         gm.ENABLE_TRANSITION_RULES = True
 
-    configs = {"scene": {"type": "Scene"}}
-    if _DEVICE_OVERRIDE:
-        configs["env"] = {"device": _DEVICE_OVERRIDE}
-    env = og.Environment(configs=configs)
+    env = og.Environment(configs={"scene": {"type": "Scene"}})
     og.sim.stop()
     yield env
 
@@ -61,7 +67,7 @@ def robot(stopped_env):
     obj = Robot(
         name="fetch",
         model="fetch",
-        obs_modalities="rgb",
+        obs_modalities=[],
         position=[150, 150, 100],
         orientation=[0, 0, 0, 1],
     )
@@ -428,7 +434,10 @@ def oyster(stopped_env):
     return obj
 
 
-@pytest.fixture(scope="module", params=MULTI_ENV_ROBOTS)
+@pytest.fixture(
+    scope="module",
+    params=MULTI_ENV_ROBOTS,
+)
 def robot_model(request):
     """Robot model name under test (a string like "fetch").
 

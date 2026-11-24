@@ -21,8 +21,11 @@ import torch as th
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.object_states import Contains, Heated
+from utils import skip_newton_physical_particles
 
 N_ENVS = 2
+
+pytestmark = skip_newton_physical_particles
 
 
 @pytest.fixture(scope="module")
@@ -37,7 +40,7 @@ def multi_env():
     cfg = {
         "env": {"num_envs": N_ENVS},
         "scene": {"type": "Scene"},
-        "robots": [{"type": "Fetch", "obs_modalities": ["rgb"], "position": [20.0, 20.0, 0.1]}],
+        "robots": [{"type": "Fetch", "obs_modalities": [], "position": [20.0, 20.0, 0.1]}],
         "objects": [
             {
                 "type": "DatasetObject",

@@ -9,6 +9,7 @@ from utils import (
     get_random_pose,
     place_obj_on_floor_plane,
     place_objA_on_objB_bbox,
+    skip_newton_physical_particles,
 )
 
 import omnigibson as og
@@ -165,8 +166,18 @@ def test_inside(env, bottom_cabinet, bowl, dishtowel):
     assert not bowl.states[Inside].get_value(bottom_cabinet)
     assert not dishtowel.states[Inside].get_value(bottom_cabinet)
 
-    assert bowl.states[Inside].set_value(bottom_cabinet, True)
-    assert dishtowel.states[Inside].set_value(bottom_cabinet, True)
+    # The bowl can land where it leaves no room for the towel, so re-place both from scratch on a failure
+    state = og.sim.dump_state(serialized=False)
+    for _ in range(5):
+        if bowl.states[Inside].set_value(bottom_cabinet, True) and dishtowel.states[Inside].set_value(
+            bottom_cabinet, True
+        ):
+            break
+        og.sim.load_state(state, serialized=False)
+    else:
+        pytest.fail("failed to place the bowl and the dishtowel inside the cabinet")
+    assert bowl.states[Inside].get_value(bottom_cabinet)
+    assert dishtowel.states[Inside].get_value(bottom_cabinet)
 
     with pytest.raises(NotImplementedError):
         bowl.states[OnTop].set_value(bottom_cabinet, False)
@@ -1006,6 +1017,7 @@ def test_zero_dt_refresh_does_not_advance_time_dependent_states(env, microwave, 
     ), "Temperature should decay toward DEFAULT_TEMPERATURE after a real step"
 
 
+@skip_newton_physical_particles
 def test_particle_source(env, furniture_sink):
     sink = env.scene.object_registry("name", "furniture_sink")
 
@@ -1033,6 +1045,7 @@ def test_particle_source(env, furniture_sink):
     water_system.remove_all_particles()
 
 
+@skip_newton_physical_particles
 def test_particle_sink(env, furniture_sink):
     sink = env.scene.object_registry("name", "furniture_sink")
     place_obj_on_floor_plane(sink)
@@ -1179,6 +1192,7 @@ def test_particle_remover(env, breakfast_table, vacuum, remover_dishtowel):
     water_system.remove_all_particles()
 
 
+@skip_newton_physical_particles
 def test_saturated(env, remover_dishtowel):
     place_obj_on_floor_plane(remover_dishtowel)
 
@@ -1333,6 +1347,7 @@ def test_draped(env, breakfast_table, carpet):
         carpet.states[Draped].set_value(breakfast_table, False)
 
 
+@skip_newton_physical_particles
 def test_filled(env, stockpot):
     systems = [
         env.scene.get_system(system_name)
@@ -1358,6 +1373,7 @@ def test_filled(env, stockpot):
         assert not stockpot.states[Filled].get_value(system)
 
 
+@skip_newton_physical_particles
 def test_contains(env, stockpot):
     systems = [env.scene.get_system(system_name) for system_name, system_class in SYSTEM_EXAMPLES.items()]
     for system in systems:
@@ -1394,6 +1410,7 @@ def test_contains(env, stockpot):
         system.remove_all_particles()
 
 
+@skip_newton_physical_particles
 def test_covered(env, bracelet, bowl, microwave):
     systems = [env.scene.get_system(system_name) for system_name, system_class in SYSTEM_EXAMPLES.items()]
     for obj in (bracelet, bowl, microwave):

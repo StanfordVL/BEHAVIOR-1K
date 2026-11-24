@@ -496,7 +496,8 @@ class NewtonRigidBodyHandle:
         return self._valid
 
     def get_world_poses(self, clone=True):
-        if not self._valid:
+        # Stopped: poses are set on USD and the Newton state is stale until the next play() rebuilds it from USD
+        if not self._valid or self._backend.is_stopped():
             from omnigibson.utils.usd_utils import get_world_pose
 
             pos, quat_wxyz_from_xyzw = get_world_pose(self.prim_path)
@@ -1001,7 +1002,7 @@ class _NewtonPhysicsSimView:
 
         sensor_paths, sensor_body_idx = [], []
         for path, idx in self._backend._path_body_map.items():
-            if path not in matching:
+            if path not in matching or path not in self._backend._contact_reporting_paths:
                 continue
             if body_flags is not None and not bool(int(body_flags[idx]) & int(newton.BodyFlags.DYNAMIC)):
                 continue
@@ -1048,6 +1049,8 @@ class NewtonBackend(PhysicsBackend):
         self._joint_break_cb = None
         self._path_body_map = {}
         self._body_path_map = {}
+        # Prim paths opted into contact reporting; RigidContactAPI rows are exactly these bodies, as on PhysX
+        self._contact_reporting_paths = set()
         self._bvh_dirty = True
         self._contact_report_contacts = None
         self._contacts_dirty = True
@@ -1068,6 +1071,12 @@ class NewtonBackend(PhysicsBackend):
         self._mass_properties_dirty = False
         self._model_generation = 0
         self._warned_cpu_device = False
+
+    def enable_contact_reporting(self, prim):
+        self._contact_reporting_paths.add(str(prim.GetPath()))
+
+    def contact_reporting_enabled(self, prim, visual_only):
+        return str(prim.GetPath()) in self._contact_reporting_paths
 
     @classmethod
     def create_app(cls):
@@ -1377,7 +1386,7 @@ class NewtonBackend(PhysicsBackend):
         return lazy.pxr.UsdGeom.Xformable(prim).GetLocalTransformation(lazy.pxr.Usd.TimeCode.Default())
 
     def get_live_world_pose(self, prim_path):
-        if self._rebuilding or self._state_0 is None or self._state_0.body_q is None:
+        if self._rebuilding or self.is_stopped() or self._state_0 is None or self._state_0.body_q is None:
             return None
         body_idx = self._path_body_map.get(prim_path)
         if body_idx is None or body_idx >= self._state_0.body_q.shape[0]:
@@ -1387,6 +1396,53 @@ class NewtonBackend(PhysicsBackend):
 
     def before_play(self, sim):
         self._rebuild()
+
+    def on_subtree_moved(self, prim_path, delta_pos, delta_quat):
+        # Stopped: the next play() rebuilds from USD, which already has the new pose
+        if self._model is None or self._model.joint_count == 0 or self.is_stopped():
+            return
+        import newton
+
+        prefix = prim_path.rstrip("/") + "/"
+        moved_bodies = {idx for path, idx in self._path_body_map.items() if path.startswith(prefix)}
+        if not moved_bodies:
+            return
+
+        joint_parent = self._model.joint_parent.numpy()
+        joint_child = self._model.joint_child.numpy()
+        joint_type = self._model.joint_type.numpy()
+        joint_q_start = self._model.joint_q_start.numpy()
+        joint_qd_start = self._model.joint_qd_start.numpy()
+        joint_q = _wp_to_torch(self._state_0.joint_q)
+        joint_qd = _wp_to_torch(self._state_0.joint_qd)
+        joint_X_p = _wp_to_torch(self._model.joint_X_p)
+        delta_pos = th.as_tensor(delta_pos, dtype=th.float32, device=joint_q.device)
+        delta_quat = th.as_tensor(delta_quat, dtype=th.float32, device=joint_q.device)
+        delta_rot = T.quat2mat(delta_quat)
+
+        def moved(pose):
+            return th.cat([delta_rot @ pose[:3] + delta_pos, T.quat_multiply(delta_quat, pose[3:7])])
+
+        # Moving the world-attached root joint of every articulation and body under @prim_path moves the whole subtree
+        JOINT_FREE = int(newton.JointType.FREE)
+        moved_fixed_root = False
+        for j in range(self._model.joint_count):
+            if int(joint_parent[j]) != -1 or int(joint_child[j]) not in moved_bodies:
+                continue
+            if joint_type[j] == JOINT_FREE:
+                q_start, qd_start = int(joint_q_start[j]), int(joint_qd_start[j])
+                joint_q[q_start : q_start + 7] = moved(joint_q[q_start : q_start + 7]).to(joint_q.dtype)
+                for offset in (0, 3):
+                    vel = joint_qd[qd_start + offset : qd_start + offset + 3]
+                    joint_qd[qd_start + offset : qd_start + offset + 3] = (delta_rot @ vel.float()).to(joint_qd.dtype)
+            else:
+                joint_X_p[j] = moved(joint_X_p[j].float()).to(joint_X_p.dtype)
+                moved_fixed_root = True
+
+        if moved_fixed_root and self._solver is not None:
+            self._solver.notify_model_changed(newton.ModelFlags.JOINT_PROPERTIES)
+        self._step_graphs = {}
+        self._sync_fk()
 
     def _rebuild(self):
         import newton
