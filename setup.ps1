@@ -460,7 +460,7 @@ if ($extrasList.Count -gt 0) {
     pip install --force-reinstall cffi==1.17.1
 
     # Override isaacsim-core's older newton pin; keep in sync with extras_require["newton"] in OmniGibson/setup.py
-    pip install "newton[sim]==1.7.0"
+    pip install "newton[sim]==1.7.0" "warp-lang==1.17.0"
 
     Write-Host "OmniGibson installation completed successfully!"
 }

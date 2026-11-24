@@ -448,7 +448,9 @@ if [ "$OMNIGIBSON" = true ]; then
     python -m pip install --force-reinstall -U "coverage>=7.5" "llvmlite>=0.48,<0.49" "numba>=0.66,<0.67" "websockets>=15.0.1"
 
     # Override isaacsim-core's older newton pin; keep in sync with extras_require["newton"] in OmniGibson/setup.py
-    python -m pip install "newton[sim]==1.7.0"
+    # Pin warp-lang to the omni.warp.core version Kit bundles (1.17.0): a newer pip warp (e.g. 1.19 via
+    # mujoco-warp>=1.15) gets mixed with Kit's copy at runtime and fails to import warp._src.apic.
+    python -m pip install "newton[sim]==1.7.0" "warp-lang==1.17.0"
 
     echo "OmniGibson installation completed successfully!"
 fi
