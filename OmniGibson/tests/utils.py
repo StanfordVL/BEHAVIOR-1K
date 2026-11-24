@@ -9,16 +9,18 @@ from omnigibson.macros import gm
 from omnigibson.systems import FluidSystem, GranularSystem, MacroPhysicalParticleSystem, MacroVisualParticleSystem
 from omnigibson.utils.constants import PrimType
 
-# Known Newton gaps; remove a marker once the backend supports the feature
+# Known Newton gaps; remove a marker once the backend supports the feature.
+# Item access does not mark the macro as read, so scripts run under pytest (e.g. examples) can still set it.
+_ON_NEWTON = gm["PHYSICS_BACKEND"] == "newton"
 skip_newton_physical_particles = pytest.mark.skipif(
-    gm.PHYSICS_BACKEND == "newton", reason="Physical particle systems are not supported on Newton yet"
+    _ON_NEWTON, reason="Physical particle systems are not supported on Newton yet"
 )
 skip_newton_tiago = pytest.mark.skipif(
-    gm.PHYSICS_BACKEND == "newton",
+    _ON_NEWTON,
     reason="Newton's contact view includes Tiago's eef links, which RigidContactAPI does not expect",
 )
 skip_newton_scene_prim_move = pytest.mark.skipif(
-    gm.PHYSICS_BACKEND == "newton", reason="Moving a scene prim does not move its objects on Newton"
+    _ON_NEWTON, reason="Moving a scene prim does not move its objects on Newton"
 )
 
 SYSTEM_EXAMPLES = {
