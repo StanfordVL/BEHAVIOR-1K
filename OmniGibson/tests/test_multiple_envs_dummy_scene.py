@@ -5,6 +5,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson import object_states
 from omnigibson.utils.constants import ParticleModifyCondition
 from omnigibson.utils.transform_utils import quat_multiply
+from utils import skip_newton_multi_scene_fluid
 
 
 # ===================================================================
@@ -283,6 +284,7 @@ class TestRobotGetterSetter:
 
 
 class TestParticles:
+    @skip_newton_multi_scene_fluid
     def test_multi_scene_particle_source(self, make_multi_env):
         sink_cfg = dict(
             type="DatasetObject",
