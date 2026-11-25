@@ -1,0 +1,251 @@
+{
+    "success": false,
+    "results": {
+        "prolonged_pause": {
+            "robot0::pos::max_pause_length": {
+                "success": true,
+                "feedback": null
+            }
+        },
+        "collision": {
+            "robot_self": {
+                "success": false,
+                "feedback": "Too many collisions (11) when checking robot_self, must be <= 0"
+            },
+            "robot_nonarm_nonground": {
+                "success": false,
+                "feedback": "Too many collisions (19) when checking robot_nonarm_nonground, must be <= 0"
+            }
+        },
+        "motion": {
+            "robot0::pos::vel_avg": {
+                "success": true,
+                "feedback": null
+            },
+            "robot0::pos::vel_prop_over_09max": {
+                "success": true,
+                "feedback": null
+            },
+            "robot0::pos::acc_avg": {
+                "success": true,
+                "feedback": null
+            },
+            "robot0::pos::jerk_avg": {
+                "success": true,
+                "feedback": null
+            }
+        },
+        "task_success": {
+            "task_success": {
+                "success": true,
+                "feedback": null
+            }
+        },
+        "gripper_in_fov": {
+            "robot0::arm_left::grasp_changes_outside_fov": {
+                "success": true,
+                "feedback": null
+            },
+            "robot0::arm_right::grasp_changes_outside_fov": {
+                "success": true,
+                "feedback": null
+            }
+        },
+        "head_camera_upright_during_navigation": {
+            "robot0::head_camera_tilted_during_navigation": {
+                "success": true,
+                "feedback": null
+            }
+        },
+        "ghost_hand_appearance": {
+            "robot0::arm_left::n_steps_while_ungrasping": {
+                "success": true,
+                "feedback": null
+            },
+            "robot0::arm_right::n_steps_while_ungrasping": {
+                "success": true,
+                "feedback": null
+            }
+        },
+        "failed_grasp": {
+            "robot0::arm_left::failed_grasp_count": {
+                "success": true,
+                "feedback": null
+            },
+            "robot0::arm_right::failed_grasp_count": {
+                "success": true,
+                "feedback": null
+            }
+        }
+    },
+    "metrics": {
+        "prolonged_pause::robot0::pos::max_pause_length": 29,
+        "collision::robot_self::n_collision": 11,
+        "collision::robot_nonarm_nonground::n_collision": 19,
+        "motion::robot0::pos::vel_avg": [
+            0.007765169721096754,
+            0.01132514700293541,
+            0.03606186807155609,
+            0.06414547562599182,
+            0.06392086297273636,
+            0.04248805344104767,
+            0.04683680832386017,
+            0.0047114272601902485,
+            0.008341006003320217,
+            0.012048684991896152,
+            0.020059529691934586,
+            0.008847522549331188,
+            0.009694778360426426,
+            0.00838562659919262
+        ],
+        "motion::robot0::pos::vel_prop_over_05max": 0.0,
+        "motion::robot0::pos::vel_prop_over_06max": 0.0,
+        "motion::robot0::pos::vel_prop_over_07max": 0.0,
+        "motion::robot0::pos::vel_prop_over_08max": 0.0,
+        "motion::robot0::pos::vel_prop_over_09max": 0.0,
+        "motion::robot0::pos::vel_prop_over_10max": 0.0,
+        "motion::robot0::pos::acc_avg": [
+            0.33256590366363525,
+            0.46796977519989014,
+            1.0143306255340576,
+            1.0247280597686768,
+            1.6615049839019775,
+            0.8714061975479126,
+            1.3592244386672974,
+            0.10912284255027771,
+            0.3323173224925995,
+            0.38559213280677795,
+            0.4246622323989868,
+            0.40299755334854126,
+            0.37078413367271423,
+            0.36634939908981323
+        ],
+        "motion::robot0::pos::jerk_avg": [
+            17.972143173217773,
+            24.83568000793457,
+            48.6932373046875,
+            45.92020797729492,
+            71.22992706298828,
+            40.222633361816406,
+            64.86872863769531,
+            5.9527506828308105,
+            18.146879196166992,
+            20.37347412109375,
+            22.499853134155273,
+            21.568815231323242,
+            19.95086669921875,
+            20.115434646606445
+        ],
+        "motion::robot0::pos::vel_std": [
+            0.02590538188815117,
+            0.02402431331574917,
+            0.12503184378147125,
+            0.10345394909381866,
+            0.1604900360107422,
+            0.09886574000120163,
+            0.12502454221248627,
+            0.02880747802555561,
+            0.02393747679889202,
+            0.04377598315477371,
+            0.07603902369737625,
+            0.027861693874001503,
+            0.03382384777069092,
+            0.030168456956744194
+        ],
+        "motion::robot0::pos::acc_std": [
+            0.8134406208992004,
+            0.7207347750663757,
+            2.154656171798706,
+            1.7504991292953491,
+            3.1322693824768066,
+            1.758810043334961,
+            3.015056848526001,
+            0.545314371585846,
+            0.6858819723129272,
+            0.8127943277359009,
+            1.4925615787506104,
+            0.7885849475860596,
+            0.8311582207679749,
+            0.7737559080123901
+        ],
+        "motion::robot0::pos::jerk_std": [
+            40.88844299316406,
+            36.73093032836914,
+            91.0099868774414,
+            79.61380004882812,
+            127.43315124511719,
+            74.22055053710938,
+            130.77378845214844,
+            27.97473907470703,
+            35.01450729370117,
+            39.85733413696289,
+            77.03073120117188,
+            38.86735153198242,
+            40.51814651489258,
+            39.697025299072266
+        ],
+        "motion::robot0::pos::vel_max": [
+            0.9179283380508423,
+            0.4149160385131836,
+            2.8347666263580322,
+            1.1114215850830078,
+            2.5928359031677246,
+            1.298119306564331,
+            2.0418028831481934,
+            0.3658219873905182,
+            0.3640463650226593,
+            0.5464920401573181,
+            1.4375673532485962,
+            0.6421382427215576,
+            0.49705153703689575,
+            0.6402861475944519
+        ],
+        "motion::robot0::pos::acc_max": [
+            22.950252532958984,
+            5.875129222869873,
+            40.99369430541992,
+            25.15192985534668,
+            39.06570816040039,
+            31.605125427246094,
+            48.34126281738281,
+            8.271474838256836,
+            5.42668342590332,
+            8.031953811645508,
+            40.73207473754883,
+            15.929155349731445,
+            9.449152946472168,
+            11.931507110595703
+        ],
+        "motion::robot0::pos::jerk_max": [
+            981.7479858398438,
+            307.2703552246094,
+            1695.297119140625,
+            1098.1326904296875,
+            1468.7501220703125,
+            1239.882568359375,
+            2110.916259765625,
+            372.51739501953125,
+            279.0108947753906,
+            384.8467712402344,
+            2364.064697265625,
+            558.73193359375,
+            474.9504699707031,
+            423.8218994140625
+        ],
+        "task_success::success": true,
+        "gripper_in_fov::robot0::arm_left::gripper_outside_fov": 451,
+        "gripper_in_fov::robot0::arm_left::grasp_changes_outside_fov": 0,
+        "gripper_in_fov::robot0::arm_right::gripper_outside_fov": 894,
+        "gripper_in_fov::robot0::arm_right::grasp_changes_outside_fov": 0,
+        "head_camera_upright_during_navigation::robot0::head_camera_tilted_during_navigation": 0,
+        "ghost_hand_appearance::robot0::arm_left::n_steps_total": 1721,
+        "ghost_hand_appearance::robot0::arm_left::n_steps_while_ungrasping": 0,
+        "ghost_hand_appearance::robot0::arm_right::n_steps_total": 0,
+        "ghost_hand_appearance::robot0::arm_right::n_steps_while_ungrasping": 0,
+        "failed_grasp::robot0::arm_left::failed_grasp_count": 0,
+        "failed_grasp::robot0::arm_right::failed_grasp_count": 0,
+        "task_relevant_obj_vel::vacuum.n.04_1::pos::vel_avg": 0.08590303361415863,
+        "task_relevant_obj_vel::vacuum.n.04_1::pos::vel_std": 0.12413366138935089,
+        "task_relevant_obj_vel::vacuum.n.04_1::pos::vel_max": 1.2763047218322754
+    }
+}
