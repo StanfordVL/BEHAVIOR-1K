@@ -1,6 +1,5 @@
 import math
 
-import pytest
 import torch as th
 
 import omnigibson as og
