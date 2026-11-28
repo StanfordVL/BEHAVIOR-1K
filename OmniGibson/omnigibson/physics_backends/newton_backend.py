@@ -1067,8 +1067,6 @@ class NewtonBackend(PhysicsBackend):
         self._contacts = None
         self._solver = None
         self._collision_pipeline = None
-        # Newton collision pipeline feeding the plain (rigid-only) SolverMuJoCo path -- see _rebuild()
-        self._rigid_collision_pipeline = None
         self._mpm_in_place = False
         self._pre_step_cb = None
         self._post_step_cb = None
@@ -1328,8 +1326,8 @@ class NewtonBackend(PhysicsBackend):
             else:
                 # Replay this substep from a CUDA graph when one is available.
                 step_dt = self.get_physics_dt()
-                if self._rigid_collision_pipeline is not None:
-                    self._rigid_collision_pipeline.collide(self._state_0, self._contacts)
+                if self._collision_pipeline is not None:
+                    self._collision_pipeline.collide(self._state_0, self._contacts)
                 graph = self._step_graph(step_dt)
                 if graph is not None:
                     import warp as wp
@@ -2059,7 +2057,7 @@ class NewtonBackend(PhysicsBackend):
         self._mpm_in_place = False
         has_fluid = any(end > start for start, end in path_fluid_particle_map.values())
         has_rigid = self._model.joint_count > 0
-        self._rigid_collision_pipeline = None
+        self._collision_pipeline = None
         if has_fluid and has_rigid:
             from newton.solvers.experimental.coupled import SolverCoupledProxy
             from newton.solvers import SolverImplicitMPM
@@ -2104,26 +2102,22 @@ class NewtonBackend(PhysicsBackend):
                     iterations=1,
                 ),
             )
-            self._collision_pipeline = newton.CollisionPipeline(self._model, soft_contact_max=0)
+            # The coupled MuJoCo entry uses the same nconmax (_RIGID_CONTACT_MAX)
+            self._collision_pipeline = self._make_collision_pipeline(newton, self._RIGID_CONTACT_MAX)
             self._contacts = self._collision_pipeline.contacts()
             self._mpm_in_place = True
         elif has_fluid:
             # Fluid but no rigid bodies.
             mpm_config = self._make_mpm_config()
             self._solver = SolverImplicitMPM(model=self._model, config=mpm_config)
-            self._collision_pipeline = None
             self._mpm_in_place = True
         elif self._model.joint_count > 0:
-            self._collision_pipeline = None
             try:
                 self._solver = newton.solvers.SolverMuJoCo(self._model, **self._mujoco_solver_kwargs())
-                self._rigid_collision_pipeline = newton.CollisionPipeline(
-                    self._model,
-                    broad_phase="explicit",
-                    rigid_contact_max=max(self._RIGID_CONTACT_MAX, self._solver.get_max_contact_count()),
-                    soft_contact_max=0,
+                self._collision_pipeline = self._make_collision_pipeline(
+                    newton, max(self._RIGID_CONTACT_MAX, self._solver.get_max_contact_count())
                 )
-                self._contacts = self._rigid_collision_pipeline.contacts()
+                self._contacts = self._collision_pipeline.contacts()
             except ValueError as e:
                 if "joint" in str(e).lower():
                     log.warning(f"No Newton solver created (model has no joints yet): {e}")
@@ -2134,7 +2128,6 @@ class NewtonBackend(PhysicsBackend):
                     )
                 self._solver = None
         else:
-            self._collision_pipeline = None
             self._solver = None
 
         self._elevate_low_friction_geom_priority(low_friction_body_idx)
@@ -2187,6 +2180,12 @@ class NewtonBackend(PhysicsBackend):
             use_mujoco_contacts=False,
             njmax=32_768,
             nconmax=self._RIGID_CONTACT_MAX,
+        )
+
+    def _make_collision_pipeline(self, newton, rigid_contact_max):
+        """Rigid shape contacts for MuJoCo; MPM resolves particle-collider contact itself."""
+        return newton.CollisionPipeline(
+            self._model, broad_phase="explicit", rigid_contact_max=rigid_contact_max, soft_contact_max=0
         )
 
     def _make_mpm_config(self):
