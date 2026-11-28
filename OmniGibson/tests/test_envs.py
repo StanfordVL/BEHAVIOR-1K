@@ -1,6 +1,5 @@
 import omnigibson as og
 from omnigibson.macros import gm
-from utils import skip_newton_physical_particles
 
 
 def task_tester(task_type):
@@ -62,7 +61,6 @@ def test_behavior_task():
     task_tester("BehaviorTask")
 
 
-@skip_newton_physical_particles
 def test_rs_int_full_load():
     cfg = {
         "scene": {

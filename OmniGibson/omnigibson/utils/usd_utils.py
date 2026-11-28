@@ -3678,6 +3678,10 @@ def copy_prim_tree_to_path(source_prim_path, dest_prim_path):
                 continue
             dest_attr = dest_prim.CreateAttribute(attr.GetName(), attr.GetTypeName())
             dest_attr.Set(attr.Get())
+            # Interpolation is metadata, not value: without it faceVarying normals read back as vertex
+            for key in ("interpolation", "elementSize"):
+                if attr.HasAuthoredMetadata(key):
+                    dest_attr.SetMetadata(key, attr.GetMetadata(key))
         for rel in source_prim.GetRelationships():
             targets = rel.GetTargets()
             if not targets:

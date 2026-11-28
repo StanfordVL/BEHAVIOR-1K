@@ -265,7 +265,7 @@ class ClothPrim(GeomPrim):
             vertex_normals=new_normals,
         )
         # Apply the inverse of the world transform to get the mesh back into its local frame
-        tm.apply_transform(th.linalg.inv_ex(scaled_world_transform).inverse)
+        tm.apply_transform(th.linalg.inv_ex(scaled_world_transform).inverse.cpu().numpy())
 
         # Update the mesh prim to store the new information. First update the non-configuration-
         # dependent fields

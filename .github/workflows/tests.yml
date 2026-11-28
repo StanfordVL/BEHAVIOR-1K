@@ -144,6 +144,9 @@ jobs:
           - {backend: newton, test_file: test_multiple_envs_heat_states}
           - {backend: newton, test_file: test_multiple_envs_dummy_scene}
           - {backend: newton, test_file: test_multiple_envs_grasp}
+          - {backend: newton, test_file: test_systems}
+          - {backend: newton, test_file: test_transition_rules}
+          - {backend: newton, test_file: test_multiple_envs_transition_rules}
           - backend: newton
             test_file: test_multiple_envs_behavior_scene
             extra_files: >-

@@ -21,11 +21,8 @@ import torch as th
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.object_states import Contains, Heated
-from utils import skip_newton_physical_particles
 
 N_ENVS = 2
-
-pytestmark = skip_newton_physical_particles
 
 
 @pytest.fixture(scope="module")
@@ -75,7 +72,9 @@ def test_macro_physical_particle_state_is_scene_relative(multi_env):
     og.sim.step()
 
     for s in range(N_ENVS):
-        popcorn[s].generate_particles(positions=[(pots[s].aabb_center + th.tensor([0.0, 0.03, 0.05])).tolist()])
+        popcorn[s].generate_particles(
+            positions=[(pots[s].aabb_center + th.tensor([0.0, 0.03, 0.05], device=og.sim.device)).tolist()]
+        )
     og.sim.step()
     for s in range(N_ENVS):
         assert pots[s].states[Contains].get_value(popcorn[s]), f"setup failed: popcorn not contained in scene {s}"
@@ -83,7 +82,7 @@ def test_macro_physical_particle_state_is_scene_relative(multi_env):
     states = [popcorn[s].dump_state(serialized=False) for s in range(N_ENVS)]
 
     # 1) Dumped positions are scene-relative: no scene world-offset baked into the state.
-    identity_quat = th.tensor([0.0, 0.0, 0.0, 1.0])
+    identity_quat = th.tensor([0.0, 0.0, 0.0, 1.0], device=og.sim.device)
     for s in range(N_ENVS):
         world_pos = popcorn[s].get_particles_position_orientation()[0][0]
         rel_expected = env.scenes[s].convert_world_pose_to_scene_relative(world_pos, identity_quat)[0]
@@ -122,8 +121,12 @@ def test_cooking_physical_particle_rule_fires_per_scene_with_isolation(multi_env
     og.sim.step()
 
     for s in range(N_ENVS):
-        rice[s].generate_particles(positions=[(pots[s].aabb_center + th.tensor([0.03, 0.0, 0.0])).tolist()])
-        water[s].generate_particles(positions=[(pots[s].aabb_center + th.tensor([-0.03, 0.0, 0.0])).tolist()])
+        rice[s].generate_particles(
+            positions=[(pots[s].aabb_center + th.tensor([0.03, 0.0, 0.0], device=og.sim.device)).tolist()]
+        )
+        water[s].generate_particles(
+            positions=[(pots[s].aabb_center + th.tensor([-0.03, 0.0, 0.0], device=og.sim.device)).tolist()]
+        )
     og.sim.step()
     for s in range(N_ENVS):
         assert pots[s].states[Contains].get_value(rice[s]), f"setup failed: rice not contained in scene {s}"

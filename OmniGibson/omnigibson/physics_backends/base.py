@@ -461,6 +461,36 @@ class PhysicsBackend(ABC):
     def set_cloth_stiffness(self, prim_path, bend=None, damping=None, shear=None, stretch=None):
         """Set any subset of this cloth's bend/damping/shear/stretch stiffness values (None = unchanged)."""
 
+    # ---- Fluid/granular particle-system state I/O ----
+
+    @abstractmethod
+    def create_particle_system(self, system_name):
+        """Register a new, initially-empty named particle system."""
+
+    @abstractmethod
+    def generate_particles(self, system_name, positions, velocities=None):
+        """Add new particles (world-frame positions, optional velocities, else zero) to a system."""
+
+    @abstractmethod
+    def remove_particles(self, system_name, idxs):
+        """Remove particles at the given indices from a system."""
+
+    @abstractmethod
+    def get_particle_positions(self, system_name):
+        """Return an (N, 3) world-frame particle position tensor for a system."""
+
+    @abstractmethod
+    def set_particle_positions(self, system_name, positions, idxs=None):
+        """Set world-frame particle positions (shape must match get_particle_positions)."""
+
+    @abstractmethod
+    def get_particle_velocities(self, system_name):
+        """Return an (N, 3) world-frame particle velocity tensor for a system."""
+
+    @abstractmethod
+    def set_particle_velocities(self, system_name, velocities, idxs=None):
+        """Set world-frame particle velocities (shape must match get_particle_velocities)."""
+
     # ---- Joint-break events ----
 
     @abstractmethod
